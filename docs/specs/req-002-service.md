@@ -166,7 +166,7 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 
 **Definition of Done**:
 
-- Starting without each required variable stops Erpel with its name; an invalid URL, leeway, algorithm, time zone or operation name, or an empty scope list, stops it with name and rule.
+- Starting without each required variable stops Erpel with its name; an invalid URL, leeway, algorithm, time zone or operation name, an empty scope list or an empty or invalid ERPNext Host, stops it with name and rule.
 - `http://id.example.com/…` as issuer or JWKS URL, and `https://ERP.example.com/mcp/` or `https://erp.example.com` as resource URL, stop Erpel.
 - `http://erp.internal` as ERPNext URL, and a variable `ERPEL_TOOL`, each start Erpel with a warning in the `start` line.
 - The message for an invalid API secret doesn't contain the secret.
@@ -208,7 +208,7 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 | Event | When | Fields besides `time`, `level`, `event` |
 | :- | :- | :- |
 | `start` | at start | version, resource URL, issuer, client, subject, company, leeway, offered operations, warnings |
-| `operation` | each operation | operation, arguments (strings cut to 200 characters), `sub`, `sid` (null when the token has none), outcome (document number, row count, or the refusal as in REQ-001-PRS-F008), duration, number of ERPNext calls and their total duration |
+| `operation` | each operation | operation, arguments (strings and keys cut to 200 characters, lists and objects to their first 100 items), `sub`, `sid` (null when the token has none), `outcome` (`{"rows": n}`, `{"document": "<name>"}`, or `{"refusal": "<text>"}` with the refusal as in REQ-001-PRS-F008), duration, number of ERPNext calls and their total duration |
 | `rejection` | each rejection | status, reason, `sub` and client where the signature was valid |
 | `jwks` | each JWKS fetch | outcome, number of keys |
 | `error` | an unexpected exception, or a configuration Erpel refuses | operation if any, exception type, message and traceback without secrets; for a refused configuration, the problems |
@@ -220,7 +220,8 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 
 - A test that creates a draft finds one `operation` line with the operation, `sid` and the draft's number; a refused update finds one with the refusal.
 - With a fake ERPNext that delays each answer by 1 s, a create making three ERPNext calls logs 3 calls and an ERPNext duration of at least 3 s, within its total duration.
-- A newline or quote in an argument doesn't break the line.
+- A newline or quote in an argument doesn't break the line; a 10,000-character key and a list of 10,000 items are cut.
+- An unexpected exception in an operation writes one `error` line with the operation and traceback and one `operation` line; the agent gets a tool error without the exception's text.
 - Every captured line of a test run parses as JSON and has a known event.
 - With `ERPEL_LOG_LEVEL=ERROR`, `start` and `rejection` lines are still written, and library lines below error are not.
 - Verification: test.

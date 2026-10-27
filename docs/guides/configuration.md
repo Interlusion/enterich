@@ -30,7 +30,7 @@ The three URLs may use plain `http` only for a loopback host (tests and local de
 | Variable | Required | Default | Meaning |
 | :- | :- | :- | :- |
 | `ERPEL_ERPNEXT_URL` | yes |  | Base URL Erpel calls. An `http://` address sends the API key unencrypted: use it only on a network you trust (Erpel logs a warning at start for any host but loopback) |
-| `ERPEL_ERPNEXT_HOST` | no | host of `ERPEL_ERPNEXT_URL` | `Host` header sent, for a site served under another name than the address Erpel calls |
+| `ERPEL_ERPNEXT_HOST` | no | host of `ERPEL_ERPNEXT_URL` | `Host` header sent, for a site served under another name than the address Erpel calls: a host name or IP address, optionally with a port |
 | `ERPEL_ERPNEXT_PUBLIC_URL` | yes |  | Base URL people open ERPNext at; used for links in results |
 | `ERPEL_ERPNEXT_API_KEY` | yes |  | The agent user's API key (secret) |
 | `ERPEL_ERPNEXT_API_SECRET` | yes |  | The agent user's API secret (secret) |

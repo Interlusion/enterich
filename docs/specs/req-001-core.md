@@ -277,7 +277,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-F008: Refusals reported
 
-**Description**: Erpel SHALL return an ERPNext refusal as a tool error carrying the HTTP status, ERPNext's `exc_type` and the first message of `_server_messages`, as plain text of at most 300 characters, labelled as ERPNext's message; it SHALL forward no other part of ERPNext's error body (`exc`, `exception`, `_debug_messages`, tracebacks). Erpel's own refusals SHALL be tool errors naming the input and the rule it broke.
+**Description**: Erpel SHALL return an ERPNext refusal as a tool error carrying the HTTP status, ERPNext's `exc_type` and the first message of `_server_messages`, labelled as ERPNext's message; it SHALL forward no other part of ERPNext's error body (`exc`, `exception`, `_debug_messages`, tracebacks). Erpel's own refusals SHALL be tool errors naming the input and the rule it broke. Every tool error SHALL reach the agent as plain text of at most 300 characters.
 
 **Related URS**: REQ-001-URS-F006, REQ-001-URS-NF002
 
@@ -287,6 +287,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - An error body with a traceback in `exc` yields a tool error without it.
 - A refusal without `_server_messages` yields the status and `exc_type`, or for 403 and 404 the text of REQ-001-PRS-F009.
 - An input that breaks the schema is refused with the property and rule.
+- A message of 2,000 characters from ERPNext, and an input with 50 unknown properties, each reach the agent as at most 300 characters.
 - Verification: test.
 - Evidence: Erpel's test suite.
 
@@ -304,13 +305,13 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-F010: Name inputs stay names
 
-**Description**: A name input SHALL be 1 to 140 characters, without control characters, leading or trailing whitespace, or a `.` or `..` path segment, and SHALL reach ERPNext only as a query parameter, a JSON value or a single URL-encoded path segment.
+**Description**: A name input SHALL be 1 to 140 characters, without control or format characters, line or paragraph separators, leading or trailing whitespace, or a `.` or `..` path segment, and SHALL reach ERPNext only as a query parameter, a JSON value or a single URL-encoded path segment.
 
 **Related URS**: REQ-001-URS-F004
 
 **Definition of Done**:
 
-- `../User/Administrator`, `a/./b`, a name with a newline and a 141-character name are refused before any ERPNext call.
+- `../User/Administrator`, `a/./b`, a name with a newline, U+2028 or U+202E, and a 141-character name are refused before any ERPNext call.
 - A name with `/`, `%`, `&`, `?`, `#` or spaces, such as `X?run_method=discard` or `a#b`, reaches ERPNext unchanged as one parameter or one encoded segment.
 - Verification: test.
 - Evidence: Erpel's test suite.
@@ -364,7 +365,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - An `offset` of 10,001, a quantity with 7 decimal places and a `to_date` before `from_date` are refused naming the input and the rule.
 - A `search` for `50%` matches the text `50%` only, not any text starting with `50`.
 - Debits of 0.1 and 0.2 against a credit of 0.3 are equal: numbers are compared as decimals.
-- List results carry `count`, `offset` and `has_more`; get results carry `modified`, `url` and `truncated`.
+- List results carry `count`, `offset`, `has_more` and `records`; get results carry `modified`, `url` and `truncated`; yes/no fields are booleans.
 - Each `state` sends exactly the filter of the States table.
 - An update clearing a field its area spec doesn't name as clearable is refused.
 - Verification: test.
@@ -449,9 +450,11 @@ Numbers are read as decimals, never as binary floating point. Every operation re
 
 ### Results
 
-- **Lists:** `{count, offset, has_more, <records>}`, where `count` is the number of records returned, in the fixed order of the area spec's ERPNext calls table.
+- **Lists:** `{count, offset, has_more, records}`, where `records` holds the records in the fixed order of the area spec's ERPNext calls table and `count` is their number.
 - **Gets:** the record with `modified`, `url`, its child tables of at most 100 rows each, and `truncated` (the names of cut tables, usually empty).
 - **Every record and child row** carries an `outside_text` object, empty when it has no such field.
+- **Yes/no fields** (ERPNext's Check fields, stored as 0 and 1) are returned as `true` and `false`.
+- **`url`** is the document's form in ERPNext, built as ERPNext v16 builds it: the public URL, `/desk/`, the DocType in lower case with hyphens for spaces, and the name percent-encoded as one segment (`/desk/sales-invoice/SINV-2026-00001`).
 - **Creates and updates:** the draft's `name`, `modified`, `status`, `docstatus`, `company`, the further fields its area spec lists, `url`, and `warnings`.
 
 ### States
