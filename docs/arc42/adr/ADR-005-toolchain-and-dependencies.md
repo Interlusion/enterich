@@ -21,7 +21,7 @@ The MCP SDK changes how Erpel talks to clients; an SDK update needs more care th
 - **ruff** for linting and formatting Python; **mdformat** with `mdformat-gfm` for Markdown, configured in `.mdformat.toml` (one line per paragraph, consecutive list numbers, tables without padding, so a change shows as one changed line); **basedpyright** in strict mode for types (it installs Node.js as a locked Python package, where `pyright` downloads it on first run); **pytest** with anyio's plugin for async tests (anyio already comes with the SDK), **coverage** with branch coverage, **syrupy** for the tool-list snapshot.
 - **Configuration with plain pydantic models**, no `pydantic-settings`; **logging with the standard library** and a small JSON formatter.
 - **HTTP client: `httpx2`,** the one the MCP SDK already depends on, so the image carries one HTTP stack; created with `trust_env=False`, so no proxy or certificate setting from the environment reaches the ERPNext calls.
-- **Layout:** `src/erpel/` (package), `tests/` (unit and end-to-end tests with a fake ERPNext and a fake JWKS), `Containerfile`, `.github/`.
+- **Layout:** `src/erpel/` (package), `tests/` (unit and end-to-end tests with a fake ERPNext and a fake JWKS), `Dockerfile`, `.github/`.
 
 ### Pins
 

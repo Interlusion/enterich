@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-24 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: describes the planned setup; nothing is built yet |
+| **Status** | Draft: the service, tests, image and CI are built; `erpnext.py`, `shapes.py`, `tools/` and the fake ERPNext are not yet |
 
 ## Repository layout
 
@@ -28,7 +28,7 @@ tests/
   snapshots/         tools.json: the published tool list
 docs/                specs, architecture, ADRs, guides, backlog
 AGENTS.md            rules for coding agents; CLAUDE.md imports it
-Containerfile        build, runtime and test stages
+Dockerfile           build, runtime and test stages
 pyproject.toml, uv.lock, .python-version
 .github/workflows/   ci.yml (later: release.yml)
 .github/dependabot.yml
@@ -58,9 +58,9 @@ uv run python -m tests.fakes   # fake JWKS and ERPNext; prints the env to use
 ## Container
 
 ```sh
-docker build -f Containerfile -t erpel:dev .                     # runtime image
-docker build -f Containerfile --target test -t erpel:test .      # runtime plus tests
-docker run --rm erpel:test                                       # runs the tests
+docker build -t erpel:dev .                     # runtime image
+docker build --target test -t erpel:test .      # runtime plus tests
+docker run --rm erpel:test                      # runs the tests
 ```
 
 The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The runtime image carries neither tests nor dev dependencies; the `test` stage adds both on top of it, so the tests run against the same packages.

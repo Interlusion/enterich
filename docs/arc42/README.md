@@ -1,6 +1,6 @@
 # Erpel architecture
 
-Compact [arc42](https://arc42.org/): all twelve sections in this file, until one of them outgrows it. Nothing is built yet; this describes the design the requirement specifications ([index](../specs/README.md)) and the [ADRs](adr/README.md) set out. When code exists and disagrees, the code wins and this file is fixed.
+Compact [arc42](https://arc42.org/): all twelve sections in this file, until one of them outgrows it. The service around the operations is built, the operations are not yet; this describes the design the requirement specifications ([index](../specs/README.md)) and the [ADRs](adr/README.md) set out. When code exists and disagrees, the code wins and this file is fixed.
 
 Diagrams are Mermaid, rendered by GitHub.
 
@@ -85,7 +85,7 @@ flowchart LR
 
 ## 5. Building block view
 
-*Planned, not built yet.*
+*Built: `config`, `app`, `auth`, `log`. Not yet: `erpnext`, `shapes`, `tools/*`.*
 
 ```mermaid
 flowchart TB
