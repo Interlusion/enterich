@@ -1,5 +1,6 @@
 """Example configuration: placeholders only, never a real site's values."""
 
+from erpel import tools
 from erpel.config import Settings, load
 
 RESOURCE_URL = "https://erp.example.com/mcp"
@@ -26,4 +27,4 @@ ENV: dict[str, str] = {
 
 def settings(**overrides: str) -> Settings:
     env = {**ENV, **{f"ERPEL_{k.upper()}": v for k, v in overrides.items()}}
-    return load(env, ())
+    return load(env, tools.names())

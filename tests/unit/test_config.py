@@ -44,6 +44,18 @@ def test_example_configuration_loads_with_defaults() -> None:
     assert s.warnings == ()
 
 
+@pytest.mark.parametrize("value", ["", "  ", "erp example.com", "erp.example.com/x", "user@erp"])
+def test_an_empty_or_invalid_erpnext_host_stops_erpel(value: str) -> None:
+    assert [p.split(":")[0] for p in problems(ERPNEXT_HOST=value)] == ["ERPEL_ERPNEXT_HOST"]
+
+
+@pytest.mark.parametrize(
+    "value", ["erp.example.com", "erp.internal:8000", "10.0.0.5", "[::1]:8080"]
+)
+def test_an_erpnext_host_may_carry_a_port(value: str) -> None:
+    assert load({**ENV, "ERPEL_ERPNEXT_HOST": value}, ("list_items",)).erpnext_host == value
+
+
 @pytest.mark.parametrize("name", REQUIRED)
 def test_each_required_variable_is_named_when_missing(name: str) -> None:
     assert problems(**{name: None}) == [f"ERPEL_{name}: required"]

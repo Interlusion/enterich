@@ -1,8 +1,14 @@
+import io
+import json
 import logging
 import os
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
+
+from erpel import log
+from tests.fakes.settings import API_KEY, API_SECRET
 
 
 @pytest.fixture
@@ -21,3 +27,29 @@ def isolated(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     yield
     root.handlers[:] = handlers
     root.setLevel(level)
+
+
+KNOWN_EVENTS = {"start", "operation", "rejection", "jwks", "error", "library"}
+
+
+class Logs:
+    def __init__(self) -> None:
+        self.stream = io.StringIO()
+
+    def lines(self) -> list[dict[str, Any]]:
+        return [json.loads(line) for line in self.stream.getvalue().splitlines()]
+
+    def events(self, name: str) -> list[dict[str, Any]]:
+        return [line for line in self.lines() if line["event"] == name]
+
+
+@pytest.fixture
+def logs() -> Iterator[Logs]:
+    captured = Logs()
+    log.configure("DEBUG", captured.stream)
+    yield captured
+    lines = captured.lines()  # every line parses as JSON
+    assert {line["event"] for line in lines} <= KNOWN_EVENTS
+    text = captured.stream.getvalue()
+    assert API_KEY not in text
+    assert API_SECRET not in text

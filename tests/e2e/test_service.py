@@ -1,65 +1,18 @@
 """The service end to end, against a fake JWKS: REQ-002-PRS-NF001 to
 REQ-002-PRS-NF003, REQ-002-PRS-NF008 to REQ-002-PRS-NF012."""
 
-import io
 import json
-from collections.abc import Iterator
 from typing import Any
 
+import httpx2
 import pytest
 from starlette.testclient import TestClient
 
-from erpel import log
 from erpel.app import create_app
-from erpel.config import Settings
+from tests.conftest import Logs
+from tests.e2e.mcp import ACCEPT, BASE, METADATA, bearer, client
 from tests.fakes.jwks import FakeJwks, Signer, rsa_signer, token
-from tests.fakes.settings import API_KEY, API_SECRET, ISSUER, RESOURCE_URL, settings
-
-BASE = "https://erp.example.com"
-METADATA = "/.well-known/oauth-protected-resource/mcp"
-ACCEPT = {"accept": "application/json, text/event-stream"}
-KNOWN_EVENTS = {"start", "operation", "rejection", "jwks", "error", "library"}
-
-
-class Logs:
-    def __init__(self) -> None:
-        self.stream = io.StringIO()
-
-    def lines(self) -> list[dict[str, Any]]:
-        return [json.loads(line) for line in self.stream.getvalue().splitlines()]
-
-    def events(self, name: str) -> list[dict[str, Any]]:
-        return [line for line in self.lines() if line["event"] == name]
-
-
-@pytest.fixture
-def logs() -> Iterator[Logs]:
-    captured = Logs()
-    log.configure("DEBUG", captured.stream)
-    yield captured
-    lines = captured.lines()  # every line parses as JSON
-    assert {line["event"] for line in lines} <= KNOWN_EVENTS
-    text = captured.stream.getvalue()
-    assert API_KEY not in text
-    assert API_SECRET not in text
-
-
-@pytest.fixture
-def signer() -> Signer:
-    return rsa_signer()
-
-
-@pytest.fixture
-def jwks(signer: Signer) -> FakeJwks:
-    return FakeJwks([signer])
-
-
-def client(jwks: FakeJwks, s: Settings | None = None) -> TestClient:
-    return TestClient(create_app(s or settings(), jwks.client()), base_url=BASE)
-
-
-def bearer(t: str) -> dict[str, str]:
-    return {"authorization": f"Bearer {t}", **ACCEPT}
+from tests.fakes.settings import ISSUER, RESOURCE_URL, settings
 
 
 def initialize(c: TestClient, t: str, version: str) -> Any:
@@ -241,6 +194,20 @@ def test_a_2_mib_body_gets_413_before_the_token_check(
         response = c.post("/mcp", headers=bearer(token(signer)), content=b"x" * (2 * 1024 * 1024))
     assert response.status_code == 413
     assert jwks.fetches == 0
+
+
+def test_shutdown_closes_the_outgoing_clients(monkeypatch: pytest.MonkeyPatch) -> None:
+    closed: list[httpx2.AsyncClient] = []
+
+    class Recorded(httpx2.AsyncClient):
+        async def aclose(self) -> None:
+            closed.append(self)
+            await super().aclose()
+
+    monkeypatch.setattr(httpx2, "AsyncClient", Recorded)
+    with TestClient(create_app(settings()), base_url=BASE):
+        assert closed == []
+    assert len(closed) == 2  # the JWKS client and the ERPNext client
 
 
 def test_healthz_needs_nothing(jwks: FakeJwks, logs: Logs) -> None:
