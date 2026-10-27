@@ -7,6 +7,8 @@ the HTTP server go through the same formatter, as event `library`.
 import json
 import logging
 import sys
+import traceback
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Any, TextIO
 
@@ -14,6 +16,7 @@ from erpel.config import LogLevel
 
 LOGGER = "erpel"
 LIBRARY_EVENT = "library"
+MAX_MESSAGE = 300
 
 
 class JsonFormatter(logging.Formatter):
@@ -53,3 +56,21 @@ def configure(level: LogLevel, stream: TextIO | None = None) -> None:
 def event(name: str, level: int = logging.INFO, **fields: Any) -> None:
     """Write one line for an Erpel event."""
     logging.getLogger(LOGGER).log(level, name, extra={"event": name, "fields": fields})
+
+
+def failure(exc: BaseException, secrets: Iterable[str] = (), **fields: Any) -> None:
+    """Write the `error` line for an unexpected exception, with every secret replaced."""
+
+    def clean(text: str) -> str:
+        for secret in secrets:
+            text = text.replace(secret, "***") if secret else text
+        return text
+
+    event(
+        "error",
+        logging.ERROR,
+        **fields,
+        exception=type(exc).__name__,
+        message=clean(str(exc))[:MAX_MESSAGE],
+        traceback=clean("".join(traceback.format_exception(exc))),
+    )

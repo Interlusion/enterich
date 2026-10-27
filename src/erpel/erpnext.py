@@ -1,0 +1,190 @@
+"""The one ERPNext client: the agent user's key, its limits, its refusals.
+
+REQ-002-PRS-NF006 (one credential, the configured Host, no cookies, no
+redirects, no proxy), REQ-002-PRS-NF011 (30 s per call, 10 MiB per answer)
+and REQ-001-PRS-F008 (refusals reported as plain text).
+"""
+
+import html
+import json
+import re
+import time
+from collections.abc import Generator, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass
+from http.cookiejar import CookieJar, DefaultCookiePolicy
+from typing import Any, cast
+from urllib.parse import quote
+
+import anyio
+import httpx2
+
+from erpel.config import Settings
+
+CALL_TIMEOUT = 30.0
+MAX_RESPONSE_BYTES = 10 * 1024 * 1024
+MAX_MESSAGE = 300
+# A tag starts with its name right after `<` or `</`; `qty < 0 and rate > 5` has none.
+_TAG = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?/?>")
+
+
+class ErpnextError(Exception):
+    """A call that ended without a usable answer; `str()` is the text for the agent."""
+
+
+class Refused(ErpnextError):  # noqa: N818 - ERPNext's answer, not a fault of Erpel's
+    """ERPNext answered with an error status."""
+
+    def __init__(self, text: str, status: int, exc_type: str | None) -> None:
+        super().__init__(text)
+        self.status = status
+        self.exc_type = exc_type
+
+
+@dataclass
+class Meter:
+    calls: int = 0
+    seconds: float = 0.0
+
+
+_meter: ContextVar[Meter | None] = ContextVar("erpnext_meter", default=None)
+
+
+@contextmanager
+def metered() -> Generator[Meter]:
+    """Count the ERPNext calls made inside the block and their total time."""
+    meter = Meter()
+    token = _meter.set(meter)
+    try:
+        yield meter
+    finally:
+        _meter.reset(token)
+
+
+class Erpnext:
+    def __init__(
+        self, settings: Settings, transport: httpx2.AsyncBaseTransport | None = None
+    ) -> None:
+        key, secret = self._secrets = settings.secrets
+        self._client = httpx2.AsyncClient(
+            base_url=settings.erpnext_url,
+            headers={
+                "authorization": f"token {key}:{secret}",
+                "host": settings.erpnext_host,
+                "accept": "application/json",
+            },
+            # A jar that stores nothing: no session cookie ever goes back to ERPNext.
+            cookies=CookieJar(policy=DefaultCookiePolicy(allowed_domains=[])),
+            transport=transport,
+            trust_env=False,
+            follow_redirects=False,
+            timeout=None,  # CALL_TIMEOUT covers the whole call, body included
+        )
+
+    async def get_list(
+        self,
+        doctype: str,
+        *,
+        fields: Sequence[str],
+        filters: Sequence[Sequence[Any]] = (),
+        or_filters: Sequence[Sequence[Any]] = (),
+        order_by: str,
+        start: int,
+        page_length: int,
+    ) -> list[dict[str, Any]]:
+        params = {
+            "fields": json.dumps(list(fields)),
+            "filters": json.dumps([list(f) for f in filters]),
+            "order_by": order_by,
+            "limit_start": str(start),
+            "limit_page_length": str(page_length),
+        }
+        if or_filters:
+            params["or_filters"] = json.dumps([list(f) for f in or_filters])
+        answer = await self._call("GET", f"/api/resource/{quote(doctype, safe='')}", params)
+        return cast("list[dict[str, Any]]", _expect(answer, "data", list))
+
+    async def get_doc(self, doctype: str, name: str) -> dict[str, Any]:
+        params = {"doctype": doctype, "name": name}
+        answer = await self._call("GET", "/api/method/frappe.client.get", params)
+        return cast("dict[str, Any]", _expect(answer, "message", dict))
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
+    async def _call(self, method: str, path: str, params: dict[str, str]) -> Any:
+        meter = _meter.get()
+        started = time.monotonic()
+        try:
+            with anyio.fail_after(CALL_TIMEOUT):
+                status, body = await self._send(method, path, params)
+        except TimeoutError:
+            raise ErpnextError(f"ERPNext didn't answer within {CALL_TIMEOUT:g} seconds.") from None
+        except httpx2.HTTPError as exc:
+            raise ErpnextError(f"ERPNext can't be reached ({type(exc).__name__}).") from None
+        finally:
+            if meter is not None:
+                meter.calls += 1
+                meter.seconds += time.monotonic() - started
+        if 300 <= status < 400:
+            raise ErpnextError(
+                f"ERPNext answered with a redirect ({status}); Erpel doesn't follow redirects. "
+                "Check ERPEL_ERPNEXT_URL."
+            )
+        try:
+            answer = json.loads(body) if body else None
+        except ValueError, RecursionError:
+            answer = None
+        if status >= 400:
+            raise self._refusal(status, answer)
+        if answer is None:
+            raise ErpnextError("ERPNext's answer isn't JSON.")
+        return answer
+
+    async def _send(self, method: str, path: str, params: dict[str, str]) -> tuple[int, bytes]:
+        async with self._client.stream(method, path, params=params) as response:
+            body = bytearray()
+            async for chunk in response.aiter_bytes():
+                body += chunk
+                if len(body) > MAX_RESPONSE_BYTES:
+                    raise ErpnextError("ERPNext's answer exceeded 10 MiB.")
+            return response.status_code, bytes(body)
+
+    def _refusal(self, status: int, answer: Any) -> Refused:
+        exc_type = answer.get("exc_type") if isinstance(answer, dict) else None  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        exc_type = exc_type if isinstance(exc_type, str) else None
+        message = _first_message(answer)
+        label = f"{status} {exc_type}" if exc_type else str(status)
+        text = f"ERPNext refused the request ({label})."
+        if message:
+            text += f" ERPNext's message: {message}"
+        for secret in self._secrets:
+            text = text.replace(secret, "***")
+        if len(text) > MAX_MESSAGE:
+            text = text[: MAX_MESSAGE - 1] + "…"
+        return Refused(text, status, exc_type)
+
+
+def _first_message(answer: Any) -> str | None:
+    """The first of `_server_messages` as plain text; nothing else of the body."""
+    if not isinstance(answer, dict):
+        return None
+    raw = answer.get("_server_messages")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    try:
+        messages = json.loads(raw) if isinstance(raw, str) else None
+        listed = cast("list[Any]", messages) if isinstance(messages, list) else []
+        first = json.loads(listed[0]) if listed and isinstance(listed[0], str) else None
+    except ValueError, RecursionError:
+        return None
+    message = first.get("message") if isinstance(first, dict) else first  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    if not isinstance(message, str):
+        return None
+    return " ".join(html.unescape(_TAG.sub("", message)).split()) or None
+
+
+def _expect[T](answer: Any, key: str, kind: type[T]) -> T:
+    value = answer.get(key) if isinstance(answer, dict) else None  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    if not isinstance(value, kind):
+        raise ErpnextError(f"ERPNext's answer has no {key}.")
+    return value

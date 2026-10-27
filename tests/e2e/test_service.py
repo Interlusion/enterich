@@ -9,10 +9,15 @@ import pytest
 from starlette.testclient import TestClient
 
 from erpel.app import create_app
+from erpel.tools import names
 from tests.conftest import Logs
 from tests.e2e.mcp import ACCEPT, BASE, METADATA, bearer, client
 from tests.fakes.jwks import FakeJwks, Signer, rsa_signer, token
 from tests.fakes.settings import ISSUER, RESOURCE_URL, settings
+
+
+def offered(answer: Any) -> list[str]:
+    return sorted(tool["name"] for tool in answer["result"]["tools"])
 
 
 def initialize(c: TestClient, t: str, version: str) -> Any:
@@ -61,14 +66,14 @@ def test_initialize_and_list_tools(
         assert init.json()["result"]["protocolVersion"] == version
         tools = list_tools(c, t, version)
         assert tools.status_code == 200
-        assert tools.json()["result"]["tools"] == []
+        assert offered(tools.json()) == list(names())
 
 
 def test_a_single_exchange_under_2026_07_28(jwks: FakeJwks, signer: Signer, logs: Logs) -> None:
     with client(jwks) as c:
         response = list_tools(c, token(signer), "2026-07-28")
     assert response.status_code == 200
-    assert response.json()["result"]["tools"] == []
+    assert offered(response.json()) == list(names())
 
 
 def test_the_origin_header_changes_nothing(jwks: FakeJwks, signer: Signer, logs: Logs) -> None:
@@ -86,7 +91,9 @@ def test_the_origin_header_changes_nothing(jwks: FakeJwks, signer: Signer, logs:
                 json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
             )
             answers.append((response.status_code, response.json()))
-    assert answers == [(200, {"jsonrpc": "2.0", "id": 2, "result": {"tools": []}})] * 4
+    assert [status for status, _ in answers] == [200] * 4
+    assert all(answer == answers[0][1] for _, answer in answers)
+    assert offered(answers[0][1]) == list(names())
 
 
 def test_no_session_state_between_processes(jwks: FakeJwks, signer: Signer, logs: Logs) -> None:
