@@ -103,7 +103,7 @@ Out of scope: issuing tokens or signing users in, including second factors; seve
 - marks itself as an access token: header `typ` `at+jwt` or `application/at+jwt` (compared case-insensitively), or claim `typ` `Bearer`;
 - is at most 8 KiB long.
 
-It SHALL answer a missing or refused token with 401, a token lacking a required scope with 403 `insufficient_scope`, and a token it can't check because no signing keys are available with 503 and `Retry-After`.
+It SHALL answer a missing or refused token with 401, a token lacking a required scope with 403 `insufficient_scope`, and a token it can't check because no signing keys are available with 503 and `Retry-After: 30`.
 
 **Related URS**: REQ-002-URS-NF001, REQ-002-URS-NF004
 
@@ -113,7 +113,7 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 - Accepted: a token expired within the leeway; header `typ` `application/at+jwt` and `AT+JWT`.
 - A token with a `jku` header causes no fetch from that URL.
 - Without the required scope: 403 with `insufficient_scope`.
-- JWKS unreachable and no keys cached: 503.
+- JWKS unreachable and no keys cached, or a JWKS without usable signing keys: 503 with `Retry-After: 30`.
 - A leeway above 60 s stops Erpel at start.
 - Verification: test.
 - Evidence: Erpel's test suite.
@@ -127,7 +127,7 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 **Definition of Done**:
 
 - A request without a token gets 401 whose `WWW-Authenticate` names the metadata URL; the metadata has the four fields with the configured values.
-- The metadata is served with a garbage bearer token in the request.
+- The metadata is served with a garbage bearer token in the request, and with a token while the JWKS is unreachable.
 - Verification: test.
 - Evidence: Erpel's test suite.
 
@@ -160,14 +160,15 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 
 #### REQ-002-PRS-NF005: Configuration from the environment
 
-**Description**: Erpel SHALL take its whole configuration from environment variables, validate it at start, and refuse to start with a message naming each missing or invalid variable, without printing the value of a secret. The resource, issuer and JWKS URLs SHALL use `https` (plain `http` only for a loopback host), and the resource URL SHALL be in canonical form (lower-case scheme and host, no default port, no trailing slash, query or fragment). An `http` ERPNext URL to a host other than loopback SHALL log a warning at start.
+**Description**: Erpel SHALL take its whole configuration from environment variables, validate it at start, and refuse to start with a message naming each missing or invalid variable, without printing the value of a secret. The resource, issuer and JWKS URLs SHALL use `https` (plain `http` only for a loopback host), and the resource URL SHALL be in canonical form (lower-case scheme and host, no default port, a path without a trailing slash, no query or fragment). An `http` ERPNext URL to a host other than loopback, and an `ERPEL_` variable Erpel doesn't know, SHALL each log a warning at start.
 
 **Related URS**: REQ-002-URS-NF008, REQ-002-URS-NF006, REQ-002-URS-NF001
 
 **Definition of Done**:
 
-- Starting without each required variable stops Erpel with its name; an invalid URL, leeway, algorithm, time zone or operation name stops it with name and rule.
-- `http://id.example.com/…` as issuer or JWKS URL, and `https://ERP.example.com/mcp/` as resource URL, stop Erpel.
+- Starting without each required variable stops Erpel with its name; an invalid URL, leeway, algorithm, time zone or operation name, or an empty scope list, stops it with name and rule.
+- `http://id.example.com/…` as issuer or JWKS URL, and `https://ERP.example.com/mcp/` or `https://erp.example.com` as resource URL, stop Erpel.
+- `http://erp.internal` as ERPNext URL, and a variable `ERPEL_TOOL`, each start Erpel with a warning in the `start` line.
 - The message for an invalid API secret doesn't contain the secret.
 - The configuration guide lists every variable; the code reads no other.
 - Verification: test and inspection.
@@ -202,15 +203,16 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 
 #### REQ-002-PRS-NF008: Log
 
-**Description**: Erpel SHALL write its log to standard output as one JSON object per line, including lines from the libraries and the HTTP server, with these events:
+**Description**: Erpel SHALL write its log to standard output as one JSON object per line, including lines from the libraries and the HTTP server, with the events below. `ERPEL_LOG_LEVEL` filters only the `library` lines; Erpel's own events are always written.
 
 | Event | When | Fields besides `time`, `level`, `event` |
 | :- | :- | :- |
-| `start` | at start | version, resource URL, issuer, client, subject, company, leeway, offered operations |
+| `start` | at start | version, resource URL, issuer, client, subject, company, leeway, offered operations, warnings |
 | `operation` | each operation | operation, arguments (strings cut to 200 characters), `sub`, `sid` (null when the token has none), outcome (document number, row count, or the refusal as in REQ-001-PRS-F008), duration, number of ERPNext calls and their total duration |
 | `rejection` | each rejection | status, reason, `sub` and client where the signature was valid |
 | `jwks` | each JWKS fetch | outcome, number of keys |
-| `error` | an unexpected exception | operation if any, exception type, message without secrets |
+| `error` | an unexpected exception, or a configuration Erpel refuses | operation if any, exception type, message and traceback without secrets; for a refused configuration, the problems |
+| `library` | a line from a library or the HTTP server | logger, message, and the exception type and traceback if any |
 
 **Related URS**: REQ-002-URS-NF005
 
@@ -220,6 +222,7 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 - With a fake ERPNext that delays each answer by 1 s, a create making three ERPNext calls logs 3 calls and an ERPNext duration of at least 3 s, within its total duration.
 - A newline or quote in an argument doesn't break the line.
 - Every captured line of a test run parses as JSON and has a known event.
+- With `ERPEL_LOG_LEVEL=ERROR`, `start` and `rejection` lines are still written, and library lines below error are not.
 - Verification: test.
 - Evidence: Erpel's test suite.
 

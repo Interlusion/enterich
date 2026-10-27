@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-26 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: describes the planned interface; nothing is built yet |
+| **Status** | Draft: the service variables are built; the ERPNext variables are read and validated, but no operation uses them yet |
 
 Erpel reads its whole configuration from environment variables at start and refuses to start if one is missing or invalid, naming the variable (spec REQ-002-PRS-NF005). There is no configuration file. Variables are part of the versioned interface ([ADR-004](../arc42/adr/ADR-004-releases-and-image.md)).
 
@@ -14,12 +14,12 @@ Erpel reads its whole configuration from environment variables at start and refu
 
 | Variable | Required | Default | Meaning |
 | :- | :- | :- | :- |
-| `ERPEL_RESOURCE_URL` | yes |  | The MCP endpoint exactly as clients enter it, e.g. `https://erp.example.com/mcp`: `https`, lower-case host, no default port, no trailing slash, query or fragment. Tokens must carry it in `aud`; the metadata's `resource` is this value |
+| `ERPEL_RESOURCE_URL` | yes |  | The MCP endpoint exactly as clients enter it, e.g. `https://erp.example.com/mcp`: `https`, lower-case host, no default port, a path without a trailing slash, no query or fragment. Tokens must carry it in `aud`; the metadata's `resource` is this value |
 | `ERPEL_ISSUER` | yes |  | The authorization server's issuer, `https`, e.g. `https://id.example.com/realms/example` |
 | `ERPEL_JWKS_URL` | yes |  | Its signing keys, `https`, e.g. `https://id.example.com/realms/example/protocol/openid-connect/certs` |
 | `ERPEL_CLIENT_ID` | yes |  | The OAuth client the agent's tokens are issued to (`azp` or `client_id`) |
 | `ERPEL_SUBJECT` | yes |  | The agent identity's `sub` (for Keycloak, the ID of the user or of the client's service account) |
-| `ERPEL_REQUIRED_SCOPES` | no | `openid` | Space-separated; required in the token and published as `scopes_supported`. Publishing them matters: a client that finds no `scopes_supported` requests every scope the authorization server advertises, and the sign-in fails with `invalid_scope` when the client isn't allowed one |
+| `ERPEL_REQUIRED_SCOPES` | no | `openid` | Space-separated, at least one; required in the token and published as `scopes_supported`. Publishing them matters: a client that finds no `scopes_supported` requests every scope the authorization server advertises, and the sign-in fails with `invalid_scope` when the client isn't allowed one |
 | `ERPEL_TOKEN_ALGORITHMS` | no | `RS256` | Comma-separated; only RS, PS, ES and EdDSA algorithms |
 | `ERPEL_CLOCK_LEEWAY` | no | `5` | Seconds, 0–60 ([ADR-003](../arc42/adr/ADR-003-local-token-check.md)) |
 
@@ -46,7 +46,7 @@ Erpel ignores proxy settings from the environment (`HTTP_PROXY`, `HTTPS_PROXY`) 
 | `ERPEL_TIMEZONE` | no | `UTC` | IANA time zone name, e.g. `Europe/Berlin`; defines "today" for defaults and the overdue state |
 | `ERPEL_HOST` | no | `0.0.0.0` | Listen address |
 | `ERPEL_PORT` | no | `8000` | Listen port |
-| `ERPEL_LOG_LEVEL` | no | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`; no level logs secrets or tokens |
+| `ERPEL_LOG_LEVEL` | no | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, for the lines of libraries and the HTTP server; Erpel's own events are always written. No level logs secrets or tokens |
 
 ## What the site must provide
 

@@ -1,0 +1,66 @@
+[project]
+name = "erpel"
+version = "0.1.0"
+description = "An MCP server for ERPNext with a fixed tool list and the rights of one agent user"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = "==3.14.*"
+dependencies = [
+    "mcp==2.3.0",
+    "httpx2>=2.16.0",
+    "pydantic>=2.14.1",
+    "pyjwt[crypto]>=2.15.1",
+    "starlette>=1.10.0",
+    "uvicorn>=0.54.0",
+    "tzdata>=2026.5",
+]
+
+[project.scripts]
+erpel = "erpel.__main__:main"
+
+[dependency-groups]
+# What the image's test stage installs.
+test = [
+    "coverage>=7.17.0",
+    "pytest>=9.1.1",
+    "syrupy>=6.1.1",
+]
+dev = [
+    { include-group = "test" },
+    "actionlint-py>=1.7.12.25",
+    "basedpyright>=1.40.2",
+    "mdformat>=1.0.0",
+    "mdformat-gfm>=1.0.0",
+    "pip-audit>=2.10.1",
+    "ruff>=0.17.3",
+    "zizmor>=1.31.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "S", "SIM", "RUF", "PT", "ASYNC", "TRY", "BLE", "N"]
+# Refusal reasons and configuration rules are short fixed strings.
+ignore = ["TRY003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S104", "S105", "S106"]
+
+[tool.basedpyright]
+typeCheckingMode = "strict"
+pythonVersion = "3.14"
+include = ["src", "tests"]
+
+[tool.pytest]
+testpaths = ["tests"]
+addopts = ["--strict-markers"]
+
+[tool.coverage.run]
+branch = true
+source = ["erpel"]

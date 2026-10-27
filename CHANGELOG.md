@@ -7,3 +7,5 @@ All notable changes to Erpel are recorded here. The format follows [Keep a Chang
 ### Added
 
 - Requirement specifications (REQ-001 core, REQ-002 service, REQ-003 to REQ-007 by accounting area), architecture, ADRs 001–007, guides (including Keycloak as authorization server) and backlog.
+- The service without operations: configuration from `ERPEL_*` variables (REQ-002-PRS-NF005), the token check with JWKS cache (REQ-002-PRS-NF001, REQ-002-PRS-NF007), protected resource metadata (REQ-002-PRS-NF002), MCP over stateless Streamable HTTP with an empty tool list (REQ-002-PRS-NF003), the JSON log with `start`, `rejection`, `jwks` and `error` events (REQ-002-PRS-NF008, REQ-002-PRS-NF009), the 1 MiB body limit (REQ-002-PRS-NF011) and `/healthz` (REQ-002-PRS-NF012).
+- Container image (runtime and test stages, amd64 and arm64), CI and Dependabot.
