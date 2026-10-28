@@ -3,13 +3,14 @@
 
 import json
 from collections.abc import AsyncIterator
+from decimal import Decimal
 
 import anyio
 import pytest
 
 from erpel import erpnext
 from erpel.erpnext import Erpnext, ErpnextError
-from tests.fakes.erpnext import FakeErpnext, error, item
+from tests.fakes.erpnext import FakeErpnext, customer, error, item, sales_invoice
 from tests.fakes.settings import API_KEY, API_SECRET, settings
 
 pytestmark = pytest.mark.anyio
@@ -242,3 +243,35 @@ async def test_the_client_counts_calls_and_their_time(fake: FakeErpnext) -> None
         await client.get_doc("Item", "SKU-1")
     assert meter.calls == 2
     assert meter.seconds >= 0.1
+
+
+async def test_writes_send_json_with_decimals_as_numbers(fake: FakeErpnext) -> None:
+    fake.add("Customer", customer("CUST-0001"))
+    client = Erpnext(settings(), fake.transport())
+    row = {"item_code": "SKU-1", "qty": Decimal("2.5"), "rate": Decimal("0.000001")}
+    saved = await client.insert("Sales Invoice", {"customer": "CUST-0001", "items": [row]})
+    [post] = fake.received
+    assert post.headers["content-type"] == "application/json"
+    assert post.body["items"] == [{"item_code": "SKU-1", "qty": 2.5, "rate": 0.000001}]
+    assert saved["name"] in fake.docs["Sales Invoice"]
+
+
+async def test_an_update_names_the_document_in_one_path_segment(fake: FakeErpnext) -> None:
+    name = "a/b?c=d#e"
+    fake.add("Customer", customer("CUST-0001"))
+    fake.add("Sales Invoice", sales_invoice(name, docstatus=0))
+    client = Erpnext(settings(), fake.transport())
+    modified = fake.docs["Sales Invoice"][name]["modified"]
+    saved = await client.update("Sales Invoice", name, {"remarks": "x", "modified": modified})
+    assert saved["remarks"] == "x"
+
+
+@pytest.mark.parametrize("body", [b'{"message": [1]}', b'{"message": {}}'])
+async def test_tax_rows_that_arent_records_are_a_faulty_answer(
+    fake: FakeErpnext, body: bytes
+) -> None:
+    fake.raw = (200, body)
+    with pytest.raises(ErpnextError):
+        await Erpnext(settings(), fake.transport()).tax_rows(
+            "Sales Taxes and Charges Template", "T"
+        )

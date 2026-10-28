@@ -1,8 +1,10 @@
 """A fake ERPNext v16 REST API: records every request, answers from memory."""
 
+import copy
 import json
 import re
 from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
 from typing import Any, cast
 from urllib.parse import unquote
 
@@ -59,6 +61,19 @@ FIELDS: dict[str, set[str]] = {
         "return_against",
         "remarks",
     },
+    "Sales Invoice Item": {
+        "item_code",
+        "item_name",
+        "description",
+        "qty",
+        "uom",
+        "rate",
+        "amount",
+        "income_account",
+        "item_tax_template",
+        "cost_center",
+        "is_free_item",
+    },
     "Sales Taxes and Charges Template": {
         "title",
         "is_default",
@@ -111,6 +126,16 @@ class FakeErpnext:
         default_factory=dict[str, list[dict[str, Any]]]
     )
     prepared: set[str] = field(default_factory=set[str])
+    # The site's today, which a draft without set_posting_time gets at every save
+    today: str = "2026-10-29"
+    # item code -> price list rate
+    prices: dict[str, float] = field(default_factory=dict[str, float])
+    # item code -> the rate a price pricing rule sets
+    rules: dict[str, float] = field(default_factory=dict[str, float])
+    # item code -> the free item a product pricing rule adds
+    free_items: dict[str, str] = field(default_factory=dict[str, str])
+    comments: list[dict[str, Any]] = field(default_factory=list[dict[str, Any]])
+    saves: int = 0
 
     def add(self, doctype: str, doc: dict[str, Any]) -> dict[str, Any]:
         self.docs.setdefault(doctype, {})[doc["name"]] = doc
@@ -140,11 +165,29 @@ class FakeErpnext:
         if request.url.path in self.failures:
             status, failure = self.failures.pop(request.url.path)
             return httpx2.Response(status, json=failure, headers=headers)
-        if request.url.path.startswith("/api/resource/") and request.method == "GET":
-            doctype = unquote(request.url.path.removeprefix("/api/resource/"))
-            if problem := _unknown_field(doctype, params):
-                return httpx2.Response(417, json=error(417, "DataError", problem))
-            return httpx2.Response(200, json={"data": self._list(doctype, params)}, headers=headers)
+        if request.url.path.startswith("/api/resource/"):
+            # One segment per DocType and name, each percent-decoded on its own
+            raw = request.url.raw_path.decode().partition("?")[0]
+            doctype, *rest = [unquote(s) for s in raw.removeprefix("/api/resource/").split("/")]
+            if request.method == "GET" and not rest:
+                if problem := _unknown_field(doctype, params):
+                    return httpx2.Response(417, json=error(417, "DataError", problem))
+                data = self._list(doctype, params)
+                return httpx2.Response(200, json={"data": data}, headers=headers)
+            if request.method == "POST" and not rest:
+                return self._insert(doctype, cast("dict[str, Any]", body))
+            if request.method == "PUT" and len(rest) == 1:
+                return self._update(doctype, rest[0], cast("dict[str, Any]", body))
+        if request.url.path == TAXES_METHOD and request.method == "GET":
+            template = self.docs.get(params["master_doctype"], {}).get(params["master_name"])
+            if template is None:
+                return httpx2.Response(404, json=error(404, "DoesNotExistError", "Not found"))
+            rows = [{k: v for k, v in r.items() if k != "doctype"} for r in template["taxes"]]
+            return httpx2.Response(200, json={"message": rows})
+        if request.url.path == COMMENT_METHOD and request.method in ("POST", "PUT"):
+            comment = cast("dict[str, Any]", body)
+            self.comments.append(comment)
+            return httpx2.Response(200, json={"message": {"name": "c1", **comment}})
         if request.url.path == "/api/method/frappe.desk.query_report.run":
             return httpx2.Response(200, json={"message": self._report(params)}, headers=headers)
         if request.url.path == "/api/method/frappe.client.get":
@@ -153,6 +196,75 @@ class FakeErpnext:
                 return httpx2.Response(404, json=error(404, "DoesNotExistError", "Not found"))
             return httpx2.Response(200, json={"message": doc}, headers=headers)
         return httpx2.Response(404, json=error(404, "DoesNotExistError", "No such route"))
+
+    def _insert(self, doctype: str, body: dict[str, Any]) -> httpx2.Response:
+        name = f"ACC-SINV-2026-{101 + len(self.docs.get(doctype, {})):05d}"
+        doc = {"doctype": doctype, "name": name, "owner": "agent@example.com", **body}
+        return self._save(doctype, copy.deepcopy(doc))
+
+    def _update(self, doctype: str, name: str, body: dict[str, Any]) -> httpx2.Response:
+        stored = self.docs.get(doctype, {}).get(name)
+        if stored is None:
+            return httpx2.Response(404, json=error(404, "DoesNotExistError", "Not found"))
+        if _timestamp(body.get("modified")) != _timestamp(stored["modified"]):
+            message = (
+                f"Error: Document has been modified after you have opened it "
+                f"({stored['modified']}, {body.get('modified')}). "
+                "Please refresh to get the latest document."
+            )
+            return httpx2.Response(417, json=error(417, "TimestampMismatchError", message))
+        if stored["docstatus"] != 0:
+            message = "Not allowed to change fields after submission"
+            return httpx2.Response(417, json=error(417, "UpdateAfterSubmitError", message))
+        doc = copy.deepcopy(stored)
+        doc.update({k: copy.deepcopy(v) for k, v in body.items() if k != "modified"})
+        return self._save(doctype, doc)
+
+    def _save(self, doctype: str, doc: dict[str, Any]) -> httpx2.Response:
+        """Save a sales invoice draft as v16 does: posting date, prices, pricing rules, totals."""
+        party = self.docs.get("Customer", {}).get(doc.get("customer", ""))
+        if party is None:
+            message = f"Could not find Customer: {doc.get('customer')}"
+            return httpx2.Response(417, json=error(417, "LinkValidationError", message))
+        if not doc.get("set_posting_time"):
+            doc["posting_date"] = self.today
+        if not doc.get("due_date"):
+            doc["due_date"] = str(date.fromisoformat(doc["posting_date"]) + timedelta(days=30))
+        rows = [r for r in _rows(doc, "items") if not r.get("is_free_item")]
+        for row in rows:
+            code = row["item_code"]
+            rate = self.rules.get(code, row.get("rate") or self.prices.get(code, 0.0))
+            # Rounded to the field's precision: the site's float precision, the currency's
+            row.update(qty=round(row["qty"], 3), rate=round(rate, 2), is_free_item=0)
+            row["pricing_rules"] = '[\n "PRLE-0001"\n]' if code in self.rules else ""
+        for code in [r["item_code"] for r in rows if r["item_code"] in self.free_items]:
+            rows.append(
+                {"item_code": self.free_items[code], "qty": 1, "rate": 0.0, "is_free_item": 1}
+            )
+        for row in rows:
+            row.update(doctype="Sales Invoice Item", amount=round(row["qty"] * row["rate"], 2))
+            row.setdefault("uom", "Nos")
+        net_total = round(sum(r["amount"] for r in rows), 2)
+        taxes = _rows(doc, "taxes")
+        for tax in taxes:
+            tax["tax_amount"] = round(net_total * tax["rate"] / 100, 2)
+        total_taxes = round(sum(t["tax_amount"] for t in taxes), 2)
+        self.saves += 1
+        doc.update(
+            items=rows,
+            taxes=taxes,
+            customer_name=party["customer_name"],
+            currency="EUR",
+            net_total=net_total,
+            total_taxes_and_charges=total_taxes,
+            grand_total=round(net_total + total_taxes, 2),
+            outstanding_amount=round(net_total + total_taxes, 2),
+            status="Draft",
+            docstatus=0,
+            modified=f"2026-10-28 12:00:00.{self.saves:06d}",
+        )
+        self.add(doctype, doc)
+        return httpx2.Response(200, json={"data": doc})
 
     def _list(self, doctype: str, params: dict[str, str]) -> list[dict[str, Any]]:
         docs = list(self.docs.get(doctype, {}).values())
@@ -165,8 +277,22 @@ class FakeErpnext:
         docs.sort(key=lambda d: str(d.get(order[0], "")), reverse=order[-1] == "desc")
         start = int(params.get("limit_start", 0))
         length = int(params.get("limit_page_length", 20))
-        fields = json.loads(params.get("fields", '["name"]'))
-        return [{f: d.get(f) for f in fields} for d in docs[start : start + length]]
+        fields: list[str] = json.loads(params.get("fields", '["name"]'))
+        tables = {f.partition(".")[0] for f in fields if "." in f}
+        if not tables:
+            return [{f: d.get(f) for f in fields} for d in docs[start : start + length]]
+        # A child field joins its table: one row per child row, the field under its own name
+        [table] = tables
+        joined: list[dict[str, Any]] = []
+        for doc in docs:
+            for row in cast("list[dict[str, Any]]", doc.get(table) or [{}]):
+                joined.append(
+                    {
+                        f.rpartition(".")[2]: (row if "." in f else doc).get(f.rpartition(".")[2])
+                        for f in fields
+                    }
+                )
+        return joined[start : start + length]
 
     def _report(self, params: dict[str, str]) -> dict[str, Any]:
         name = params["report_name"]
@@ -175,6 +301,22 @@ class FakeErpnext:
         rows = [dict(row) for row in self.reports.get(name, [])]
         total = ["Total"] + [""] * 5  # Frappe appends the total row as a list
         return {"result": [*rows, total] if rows else rows, "columns": [], "add_total_row": 1}
+
+
+def _timestamp(value: Any) -> datetime | None:
+    """`modified` as `check_if_latest` compares it: parsed, not as text."""
+    try:
+        return datetime.fromisoformat(value) if isinstance(value, str) else None
+    except ValueError:
+        return None
+
+
+def _rows(doc: dict[str, Any], table: str) -> list[dict[str, Any]]:
+    return cast("list[dict[str, Any]]", doc.get(table) or [])
+
+
+TAXES_METHOD = "/api/method/erpnext.controllers.accounts_controller.get_taxes_and_charges"
+COMMENT_METHOD = "/api/method/frappe.desk.form.utils.add_comment"
 
 
 def _unknown_field(doctype: str, params: dict[str, str]) -> str | None:
@@ -410,6 +552,17 @@ def tax_template(name: str = "VAT 19% - EX", **overrides: Any) -> dict[str, Any]
         "is_default": 0,
         "tax_category": None,
         "disabled": 0,
+        "taxes": [
+            {
+                "doctype": "Sales Taxes and Charges",
+                "charge_type": "On Net Total",
+                "account_head": "1776 - VAT 19% - EX",
+                "description": "VAT 19%",
+                "rate": 19.0,
+                "included_in_print_rate": 0,
+                "cost_center": "Main - EX",
+            }
+        ],
     }
     doc.update(overrides)
     return doc

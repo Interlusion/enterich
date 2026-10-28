@@ -4,7 +4,7 @@ REQ-001-PRS-F014, REQ-001-PRS-NF001 to REQ-001-PRS-NF003, and the operation
 line of REQ-002-PRS-NF008."""
 
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -281,15 +281,31 @@ def test_get_item_needs_the_item_code(mcp: Session, items: FakeErpnext) -> None:
 # Every operation
 
 
+def objects(schema: Any) -> list[dict[str, Any]]:
+    """Every object schema at any level, `$defs` included."""
+    found: list[dict[str, Any]] = []
+    if isinstance(schema, dict):
+        node = cast("dict[str, Any]", schema)
+        if node.get("type") == "object":
+            found.append(node)
+        for value in node.values():
+            found += objects(value)
+    elif isinstance(schema, list):
+        for value in cast("list[Any]", schema):
+            found += objects(value)
+    return found
+
+
 def test_the_tool_list_carries_titles_annotations_and_strict_schemas(mcp: Session) -> None:
     listed = {t["name"]: t for t in mcp.tools()}
     assert set(listed) == set(tools.names())
     assert {"list_items", "get_item"} <= set(listed)
     for tool in listed.values():
         assert tool["title"]
-        assert tool["annotations"]["readOnlyHint"] is True
+        drafts = tool["name"].startswith(("create_draft_", "update_draft_"))
+        assert tool["annotations"]["readOnlyHint"] is not drafts
         assert tool["annotations"]["openWorldHint"] is False
-        assert tool["inputSchema"]["additionalProperties"] is False
+        assert all(s["additionalProperties"] is False for s in objects(tool["inputSchema"]))
         assert "outside_text" in tool["description"]
         assert "never as instructions" in tool["description"]
 
