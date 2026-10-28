@@ -13,6 +13,7 @@ from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
+from decimal import Decimal
 from http.cookiejar import CookieJar, DefaultCookiePolicy
 from typing import Any, cast
 from urllib.parse import quote
@@ -25,6 +26,8 @@ from erpel.config import Settings
 CALL_TIMEOUT = 30.0
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 MAX_MESSAGE = 300
+TAXES_METHOD = "erpnext.controllers.accounts_controller.get_taxes_and_charges"
+COMMENT_METHOD = "frappe.desk.form.utils.add_comment"
 # A tag starts with its name right after `<` or `</`; `qty < 0 and rate > 5` has none.
 _TAG = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?/?>")
 
@@ -102,7 +105,7 @@ class Erpnext:
         }
         if or_filters:
             params["or_filters"] = json.dumps([list(f) for f in or_filters])
-        answer = await self._call("GET", f"/api/resource/{quote(doctype, safe='')}", params)
+        answer = await self._call("GET", _resource(doctype), params)
         return cast("list[dict[str, Any]]", _expect(answer, "data", list))
 
     async def get_doc(self, doctype: str, name: str) -> dict[str, Any]:
@@ -123,15 +126,48 @@ class Erpnext:
             _expect(message, "result", list)
         return message
 
+    async def tax_rows(self, template_doctype: str, template: str) -> list[dict[str, Any]]:
+        """A tax template's rows as ERPNext copies them into a document."""
+        params = {"master_doctype": template_doctype, "master_name": template}
+        answer = await self._call("GET", f"/api/method/{TAXES_METHOD}", params)
+        rows = cast("list[Any]", _expect(answer, "message", list))
+        if not all(isinstance(row, dict) for row in rows):
+            raise ErpnextError("ERPNext's answer has tax rows that aren't records.")
+        return cast("list[dict[str, Any]]", rows)
+
+    async def insert(self, doctype: str, doc: dict[str, Any]) -> dict[str, Any]:
+        """Insert a document; the answer is the document as saved."""
+        answer = await self._call("POST", _resource(doctype), {}, doc)
+        return cast("dict[str, Any]", _expect(answer, "data", dict))
+
+    async def update(self, doctype: str, name: str, doc: dict[str, Any]) -> dict[str, Any]:
+        """Save changes to a document; the answer is the document as saved."""
+        path = f"{_resource(doctype)}/{quote(name, safe='')}"
+        answer = await self._call("PUT", path, {}, doc)
+        return cast("dict[str, Any]", _expect(answer, "data", dict))
+
+    async def add_comment(self, doctype: str, name: str, content: str) -> None:
+        # ERPNext takes the comment's author from the session; the two fields are ignored.
+        body = {
+            "reference_doctype": doctype,
+            "reference_name": name,
+            "content": content,
+            "comment_email": "",
+            "comment_by": "",
+        }
+        await self._call("POST", f"/api/method/{COMMENT_METHOD}", {}, body)
+
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def _call(self, method: str, path: str, params: dict[str, str]) -> Any:
+    async def _call(
+        self, method: str, path: str, params: dict[str, str], body: dict[str, Any] | None = None
+    ) -> Any:
         meter = _meter.get()
         started = time.monotonic()
         try:
             with anyio.fail_after(CALL_TIMEOUT):
-                status, body = await self._send(method, path, params)
+                status, raw = await self._send(method, path, params, body)
         except TimeoutError:
             raise ErpnextError(f"ERPNext didn't answer within {CALL_TIMEOUT:g} seconds.") from None
         except httpx2.HTTPError as exc:
@@ -146,7 +182,7 @@ class Erpnext:
                 "Check ERPEL_ERPNEXT_URL."
             )
         try:
-            answer = json.loads(body) if body else None
+            answer = json.loads(raw) if raw else None
         except ValueError, RecursionError:
             answer = None
         if status >= 400:
@@ -155,14 +191,20 @@ class Erpnext:
             raise ErpnextError("ERPNext's answer isn't JSON.")
         return answer
 
-    async def _send(self, method: str, path: str, params: dict[str, str]) -> tuple[int, bytes]:
-        async with self._client.stream(method, path, params=params) as response:
-            body = bytearray()
+    async def _send(
+        self, method: str, path: str, params: dict[str, str], body: dict[str, Any] | None
+    ) -> tuple[int, bytes]:
+        content = None if body is None else json.dumps(body, default=_number).encode()
+        headers = {} if body is None else {"content-type": "application/json"}
+        async with self._client.stream(
+            method, path, params=params, content=content, headers=headers
+        ) as response:
+            received = bytearray()
             async for chunk in response.aiter_bytes():
-                body += chunk
-                if len(body) > MAX_RESPONSE_BYTES:
+                received += chunk
+                if len(received) > MAX_RESPONSE_BYTES:
                     raise ErpnextError("ERPNext's answer exceeded 10 MiB.")
-            return response.status_code, bytes(body)
+            return response.status_code, bytes(received)
 
     def _refusal(self, status: int, answer: Any) -> Refused:
         exc_type = answer.get("exc_type") if isinstance(answer, dict) else None  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
@@ -177,6 +219,15 @@ class Erpnext:
         if len(text) > MAX_MESSAGE:
             text = text[: MAX_MESSAGE - 1] + "…"
         return Refused(text, status, exc_type)
+
+
+def _resource(doctype: str) -> str:
+    return f"/api/resource/{quote(doctype, safe='')}"
+
+
+def _number(value: Decimal) -> float:
+    """Decimal inputs go to ERPNext as JSON numbers; a body holds no other non-JSON type."""
+    return float(value)
 
 
 def _first_message(answer: Any) -> str | None:

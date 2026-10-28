@@ -52,9 +52,27 @@ Search = Annotated[str, Field(min_length=1, max_length=140)]
 Limit = Annotated[int, Field(ge=1, le=100, strict=True)]
 Offset = Annotated[int, Field(ge=0, le=10_000, strict=True)]
 Flag = Annotated[bool, Field(strict=True)]
-Quantity = Annotated[Decimal, Field(gt=0, le=10_000, decimal_places=6)]
-Rate = Annotated[Decimal, Field(ge=0, le=1_000_000_000, decimal_places=6)]
+# ERPNext rounds quantities to the site's float precision, 3 by default
+Quantity = Annotated[Decimal, Field(gt=0, le=10_000, decimal_places=3)]
+Rate = Annotated[Decimal, Field(gt=0, le=1_000_000_000, decimal_places=6)]
 Amount = Annotated[Decimal, Field(ge=0, le=1_000_000_000, decimal_places=3)]
+Remarks = Annotated[str, Field(max_length=1000)]
+
+
+def _modified(value: str) -> str:
+    try:
+        datetime.fromisoformat(value)  # refuses 2026-13-45
+    except ValueError:
+        raise ValueError("must be `modified` as Erpel returned it") from None
+    return value
+
+
+# ERPNext's `modified` as Erpel returned it; on a whole second it comes without fraction
+Modified = Annotated[
+    str,
+    Field(pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$"),
+    AfterValidator(_modified),
+]
 
 _ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 
