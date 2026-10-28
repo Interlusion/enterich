@@ -90,6 +90,8 @@ TABLES: dict[str, dict[str, str]] = {
     "Sales Invoice": {"items": "Sales Invoice Item", "taxes": "Sales Taxes and Charges"},
     "Sales Taxes and Charges Template": {"taxes": "Sales Taxes and Charges"},
 }
+# Payment Terms Template -> credit days of its one term
+TERMS = {"Net 30": 30, "Net 14": 14}
 
 
 @dataclass
@@ -228,8 +230,8 @@ class FakeErpnext:
             return httpx2.Response(417, json=error(417, "LinkValidationError", message))
         if not doc.get("set_posting_time"):
             doc["posting_date"] = self.today
-        if not doc.get("due_date"):
-            doc["due_date"] = str(date.fromisoformat(doc["posting_date"]) + timedelta(days=30))
+        if problem := _due_date(doc, party):
+            return httpx2.Response(417, json=error(417, "ValidationError", problem))
         rows = [r for r in _rows(doc, "items") if not r.get("is_free_item")]
         for row in rows:
             code = row["item_code"]
@@ -301,6 +303,34 @@ class FakeErpnext:
         rows = [dict(row) for row in self.reports.get(name, [])]
         total = ["Total"] + [""] * 5  # Frappe appends the total row as a list
         return {"result": [*rows, total] if rows else rows, "columns": [], "add_total_row": 1}
+
+
+def _due_date(doc: dict[str, Any], party: dict[str, Any]) -> str | None:
+    """The due date and payment schedule as v16 sets them at every save; the refusal of
+    validate_due_date, if any. `payment_terms_template` "" stays empty (update_if_missing)."""
+    posting = date.fromisoformat(doc["posting_date"])
+    if doc.get("payment_terms_template") is None:
+        doc["payment_terms_template"] = party.get("payment_terms")
+    template = doc["payment_terms_template"]
+    if not doc.get("due_date"):  # get_due_date: the invoice's terms, else the party's
+        days = TERMS.get(template or party.get("payment_terms") or "", 0)
+        doc["due_date"] = str(posting + timedelta(days=days))
+    schedule = _rows(doc, "payment_schedule")
+    if schedule:  # set_due_date
+        doc["due_date"] = max(str(row["due_date"]) for row in schedule)
+    elif template:  # set_payment_schedule
+        due = posting + timedelta(days=TERMS[template])
+        doc["payment_schedule"] = [{"due_date": str(due), "invoice_portion": 100}]
+    else:
+        doc["payment_schedule"] = [{"due_date": doc["due_date"], "invoice_portion": 100}]
+    due = date.fromisoformat(doc["due_date"])
+    if due < posting:
+        return "Due Date cannot be before Posting Date"
+    if template:
+        latest = posting + timedelta(days=TERMS[template])
+        if latest != posting and due > latest:
+            return f"Due Date cannot be after {latest.strftime('%d-%m-%Y')}"
+    return None
 
 
 def _timestamp(value: Any) -> datetime | None:
