@@ -60,7 +60,12 @@ Erpel neither creates nor checks the agent user's rights; ERPNext enforces them.
 
 Adding a permission rule for a DocType in ERPNext replaces its standard rules with the site's own; copy the existing rules first.
 
+- **Reports:** a report operation also needs the agent's role on the report. A standard report can't be saved outside developer mode, so grant the role through Role Permission for Page and Report. Its list of roles replaces the report's own: enter the roles that use the report today as well, or they lose it.
+
+- **No automatic prepared reports:** ERPNext turns a report into a prepared report for good once a run takes longer than 15 seconds, and Erpel then refuses it. For each report Erpel runs (Accounts Receivable, Accounts Payable, General Ledger, Trial Balance), set Disable Prepared Report Automation in the System Console with Commit ticked, since the report form can't save a standard report: `frappe.db.set_value("Report", "Accounts Receivable", "disable_prepared_report_automation", 1)`. A report already turned also needs `prepared_report` set back to 0.
+
 - **Site settings:**
+
   - Document sharing is on by default and lets any user with share rights pass the agent user further rights: turn it off (System Settings, `disable_document_sharing`).
   - Turn on API request logging (System Settings, `log_api_requests`): it records path, user and method of the agent user's calls in ERPNext, next to Erpel's own log.
   - Where the Frappe version has a built-in MCP endpoint with generic tools, turn it off (`disable_mcp_server`); set it before an upgrade brings the endpoint, so it never opens silently.

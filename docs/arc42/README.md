@@ -298,7 +298,7 @@ The quality goals of section 1, made testable. Each scenario names what happens,
 | ERPNext API or report output changes between versions | Fake ERPNext mirrors v16 responses; report operations verified against a real v16 site when built |
 | Two identical creates at the same instant both pass the duplicate check | Accepted ([REQ-001 assumptions](../specs/req-001-core.md#assumptions)): one agent works in sequence, and a person reviews every draft |
 | A site gives the agent user select instead of read; lists silently lose fields | Configuration guide's rights table; integration test against a real site (backlog) |
-| A site runs a report as a prepared report | Erpel refuses with a clear message instead of waiting |
+| A site runs a report as a prepared report, or ERPNext turns one into it after a run over 15 seconds | Erpel refuses with a clear message instead of waiting; the configuration guide says how to turn off the automatic switch |
 | The authorization server's agent-only login flow is missing or wrong; a person's session then gets a token through the agent's client | Erpel's subject check refuses it in any case (tested in Erpel); the Keycloak guide gives the flow and a check, marked untested |
 | An authorization server issues long-lived access tokens; disabling the identity there acts late | Deployment requirement in the configuration and Keycloak guides; optional maximum lifetime in the backlog |
 | A later Frappe version turns on its built-in MCP server with generic tools | Configuration guide: turn it off before the upgrade |

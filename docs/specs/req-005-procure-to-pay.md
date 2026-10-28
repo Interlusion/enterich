@@ -156,7 +156,7 @@ Supplier names are not in report rows; `get_supplier` gives them.
 | suppliers | Supplier; Address through its Dynamic Link to the supplier | — | `name` |
 | purchase invoices | Purchase Invoice | `company` | `posting_date` desc, `name` desc |
 | `list_purchase_tax_templates` | Purchase Taxes and Charges Template | `company` | `name` |
-| `report_accounts_payable` | Accounts Payable | `company`, `report_date`, `party_type` Supplier, `ageing_based_on` | ERPNext's |
+| `report_accounts_payable` | Accounts Payable | `company`, `report_date`, `party_type` Supplier, `party` (a list holding `supplier`, when given), `ageing_based_on` (`Due Date` or `Posting Date`), `age_as_on` `Report Date`, `range` `30, 60, 90, 120` | ERPNext's |
 | duplicate check with `bill_no` | Purchase Invoice | `company`, `docstatus` 0 or 1, `supplier`, `bill_no` | — |
 | duplicate check without `bill_no` | Purchase Invoice | `company`, `docstatus` 0, `supplier`, `posting_date` | — |
 
@@ -167,7 +167,7 @@ Supplier names are not in report rows; `get_supplier` gives them.
 | `list_suppliers`, `get_supplier` | Supplier, Address: read |
 | `list_purchase_invoices`, `get_purchase_invoice` | Purchase Invoice: read |
 | `list_purchase_tax_templates` | Purchase Taxes and Charges Template: read |
-| `report_accounts_payable` | Purchase Invoice, Payment Ledger Entry: read, report; the role added to the Accounts Payable report |
+| `report_accounts_payable` | Purchase Invoice: read, report; Journal Entry: read (the report lists them for due dates; with select only, they arrive without); the role added to the Accounts Payable report |
 | `create_draft_purchase_invoice`, `update_draft_purchase_invoice` | Purchase Invoice: read, create, write; Supplier, Address, Item, Account, Cost Center, Purchase Taxes and Charges Template: read (ERPNext reads them while saving); Company, Currency, UOM, Price List, Payment Terms Template, Project: select |
 
 Warnings are added to a draft as a comment, which needs no further right (REQ-001-PRS-F015).
