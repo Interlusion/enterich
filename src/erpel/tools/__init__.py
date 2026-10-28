@@ -54,9 +54,14 @@ class Operation[I: Inputs]:
 
 
 def operations() -> list[Operation[Any]]:
-    from erpel.tools import master_data, order_to_cash, procure_to_pay
+    from erpel.tools import master_data, order_to_cash, procure_to_pay, record_to_report
 
-    return [*master_data.OPERATIONS, *order_to_cash.OPERATIONS, *procure_to_pay.OPERATIONS]
+    return [
+        *master_data.OPERATIONS,
+        *order_to_cash.OPERATIONS,
+        *procure_to_pay.OPERATIONS,
+        *record_to_report.OPERATIONS,
+    ]
 
 
 def names() -> tuple[str, ...]:
@@ -129,6 +134,27 @@ async def get_named(
     if company and doc.get("company") != context.settings.company:
         raise unknown
     return doc
+
+
+async def report_rows(
+    context: Context, report: str, filters: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """A report's rows that are records; a prepared report is refused without waiting, a
+    snapshot report as not current, and a total row Frappe appends as a list is left out."""
+    answer = await context.erpnext.run_report(report, filters)
+    if answer.get("prepared_report"):
+        raise Refusal(
+            f"ERPNext runs {report} as a prepared report, and Erpel doesn't wait for one; the "
+            "operator can turn that off (see Erpel's configuration guide)."
+        )
+    if answer.get("snapshot_report"):
+        raise Refusal(
+            f"ERPNext runs {report} as a snapshot report on data synced earlier, which Erpel "
+            "doesn't take for current data; the operator can turn that off (see Erpel's "
+            "configuration guide)."
+        )
+    listed = cast("list[Any]", answer["result"])
+    return [cast("dict[str, Any]", row) for row in listed if isinstance(row, dict)]
 
 
 async def _run(op: Operation[Any], context: Context, arguments: dict[str, Any]) -> CallToolResult:

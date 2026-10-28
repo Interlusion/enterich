@@ -70,26 +70,32 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-006-PRS-F003: General Ledger
 
-**Description**: Erpel SHALL offer `report_general_ledger` as the catalogue below defines it, for at most 366 days per call.
+**Description**: Erpel SHALL offer `report_general_ledger` as the catalogue below defines it, for at most 366 days per call, both dates included. It SHALL check a given `account` (of the assigned company) and `party` as name inputs (REQ-001-PRS-F009) before the report. It SHALL take ERPNext's opening, total and closing rows by their position, not their label; `opening` and `closing` come from ERPNext's rows, `totals` are Erpel's sums over all entries (REQ-001's ERPNext calls). It SHALL return each row's `balance` only when `account` or `party` is given, the only case in which ERPNext counts the balance before `from_date`, and SHALL name in `currency` the account's or party's currency when ERPNext shows the amounts in it.
 
 **Related URS**: REQ-006-URS-F001
 
 **Definition of Done**:
 
-- A range over 366 days is refused before any ERPNext call.
+- A range of 366 days, both dates included, is answered; one of 367 is refused before any ERPNext call.
+- With `account` or `party` given, the rows' `balance` is ERPNext's; without either, it is null, and `opening` holds the opening entries.
+- An account in another currency than the company's returns its amounts with that `currency`; otherwise `currency` is null.
+- An unknown account, another company's account and an unknown party are refused naming the input, before the report.
+- An answer whose first row or last two rows aren't summary rows (with a posting date) is refused as a faulty answer.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
 - Evidence: Erpel's test suite; the integration test against a real ERPNext v16 site (backlog).
 
 #### REQ-006-PRS-F004: Trial Balance
 
-**Description**: Erpel SHALL offer `report_trial_balance` as the catalogue below defines it, finding the fiscal year from the dates itself.
+**Description**: Erpel SHALL offer `report_trial_balance` as the catalogue below defines it, finding the fiscal year from the dates itself as ERPNext does: among enabled fiscal years, those assigned to the assigned company first, then those assigned to no company.
 
 **Related URS**: REQ-006-URS-F001
 
 **Definition of Done**:
 
 - Dates in one fiscal year return its trial balance with `fiscal_year` named; dates in no fiscal year, or in two, are refused.
+- A fiscal year assigned only to other companies doesn't count; one assigned to the company comes before one assigned to none.
+- ERPNext's total row isn't among the rows; `totals` are Erpel's sums over the root accounts' rows, as decimals.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
 - Evidence: Erpel's test suite; the integration test against a real ERPNext v16 site (backlog).
@@ -150,11 +156,11 @@ REQ-001's [Operation Conventions](req-001-core.md#operation-conventions) apply.
 | `list_accounts` | `search` (ID, account name, account number), `root_type` (Asset, Liability, Equity, Income, Expense), `include_groups`, `include_disabled`, `limit`, `offset` | `name`, `account_number`, `account_name`, `root_type`, `account_type`, `parent_account`, `is_group`, `disabled` |
 | `list_cost_centers` | `search` (ID, cost centre name, number), `include_groups`, `include_disabled`, `limit`, `offset` | `name`, `cost_center_number`, `cost_center_name`, `parent_cost_center`, `is_group`, `disabled` |
 | `list_journal_entries` | `state` (draft, submitted, cancelled), `voucher_type` (one of ERPNext v16's voucher types, below), `from_date`, `to_date`, `limit`, `offset` | `name`, `voucher_type`, `posting_date`, `total_debit`, `total_credit`, *`user_remark`*, `docstatus`, `owner`, `modified` |
-| `get_journal_entry` | **`name`** | as above, plus *`cheque_no`*, `cheque_date`, `accounts` \[`account`, `party_type`, `party`, `debit_in_account_currency`, `credit_in_account_currency`, `cost_center`, `reference_type`, `reference_name`, *`user_remark`*\], `url`, `truncated` |
-| `report_general_ledger` | **`from_date`**, **`to_date`** (at most 366 days apart), `account`, `party_type` (Customer, Supplier), `party`, `voucher_no`, `limit`, `offset` | `opening`, rows \[`posting_date`, `account`, `debit`, `credit`, `balance`, `voucher_type`, `voucher_no`, `party_type`, `party`, *`against`*, *`remarks`*\], `totals`, `closing` |
-| `report_trial_balance` | **`from_date`**, **`to_date`** (within one fiscal year), `show_zero_values` (default false), `limit`, `offset` | `fiscal_year`, rows \[`account`, `account_name`, `parent_account`, `is_group`, `opening_debit`, `opening_credit`, `debit`, `credit`, `closing_debit`, `closing_credit`\] |
+| `get_journal_entry` | **`name`** | as above, plus *`cheque_no`*, `cheque_date`, `accounts` \[`account`, `account_currency`, `party_type`, `party`, `debit_in_account_currency`, `credit_in_account_currency`, `cost_center`, `reference_type`, `reference_name`, *`user_remark`*\], `url`, `truncated` |
+| `report_general_ledger` | **`from_date`**, **`to_date`** (at most 366 days, both included), `account`, `party_type` (Customer, Supplier), `party`, `voucher_no`, `limit`, `offset` | `opening`, rows \[`posting_date`, `account`, `debit`, `credit`, `balance`, `voucher_type`, `voucher_no`, `party_type`, `party`, *`against`*, *`remarks`*\], `totals`, `closing`, `currency`; `opening`, `totals` and `closing` each {`debit`, `credit`, `balance`}; `currency` null for the company's currency |
+| `report_trial_balance` | **`from_date`**, **`to_date`** (within one fiscal year), `show_zero_values` (default false), `limit`, `offset` | `fiscal_year`, rows \[`account`, `account_name` (number and name, as ERPNext shows it), `parent_account`, `is_group`, `opening_debit`, `opening_credit`, `debit`, `credit`, `closing_debit`, `closing_credit`\], `totals` {`opening_debit`, `opening_credit`, `debit`, `credit`, `closing_debit`, `closing_credit`} |
 
-`party` requires `party_type`. Party names are not in report rows; `get_customer` and `get_supplier` give them.
+`party` requires `party_type`. Party names are not in report rows; `get_customer` and `get_supplier` give them. A year of a busy ledger without `account` can exceed the answer limit (REQ-002-PRS-NF011); the operation's description says to narrow it by account.
 
 ERPNext v16's voucher types: Journal Entry, Inter Company Journal Entry, Bank Entry, Cash Entry, Credit Card Entry, Debit Note, Credit Note, Contra Entry, Excise Entry, Write Off Entry, Opening Entry, Depreciation Entry, Asset Disposal, Periodic Accounting Entry, Exchange Rate Revaluation, Exchange Gain Or Loss, Deferred Revenue, Deferred Expense.
 
@@ -176,8 +182,9 @@ ERPNext v16's voucher types: Journal Entry, Inter Company Journal Entry, Bank En
 | `list_accounts` | Account | `company` | `name` |
 | `list_cost_centers` | Cost Center | `company` | `name` |
 | journal entries | Journal Entry | `company` | `posting_date` desc, `name` desc |
-| `report_general_ledger` | General Ledger | `company`, dates | ERPNext's |
-| `report_trial_balance` | Fiscal Year (to find the year), Trial Balance | `company`, `fiscal_year`, dates | ERPNext's |
+| `report_general_ledger` | the given `account` and `party` (`frappe.client.get`), then General Ledger | `company`, `from_date`, `to_date`, `account` and `party` as one-item lists when given, `include_default_book_entries` 1, `show_remarks` 1; no `categorize_by` | ERPNext's |
+| `report_trial_balance` | Fiscal Year with `companies.company` (one row per company row, at most 1,000), to find the year | `disabled` 0, `year_start_date` ≤ `from_date`, `year_end_date` ≥ `from_date` | `year_start_date` desc |
+| `report_trial_balance` | Trial Balance | `company`, `fiscal_year`, `from_date`, `to_date`, `show_zero_values`, `with_period_closing_entry_for_opening` 1, `with_period_closing_entry_for_current_period` 1, `include_default_book_entries` 1, `show_net_values` 1, `show_group_accounts` 1 | ERPNext's |
 | duplicate check | Journal Entry | `company`, `docstatus` 0, `posting_date` | — |
 
 ### Rights
@@ -187,7 +194,7 @@ ERPNext v16's voucher types: Journal Entry, Inter Company Journal Entry, Bank En
 | `list_accounts` | Account: read |
 | `list_cost_centers` | Cost Center: read |
 | `list_journal_entries`, `get_journal_entry` | Journal Entry: read |
-| `report_general_ledger` | GL Entry: read, report; the role added to the General Ledger report |
+| `report_general_ledger` | GL Entry: read, report; Account read; Customer or Supplier read when `party` is given; the role added to the General Ledger report |
 | `report_trial_balance` | GL Entry: read, report; Account, Fiscal Year: read; the role added to the Trial Balance report |
 | `create_draft_journal_entry`, `update_draft_journal_entry` | Journal Entry: read, create, write; Account, Cost Center: read; Company, Customer, Supplier, Sales Invoice, Purchase Invoice: select (for parties and references in rows) |
 
@@ -207,6 +214,11 @@ Checked against ERPNext v16.52 source:
 - ERPNext refuses a reference date without a reference number, for every voucher type, and a Bank Entry without both.
 - Bank reconciliation offers every submitted journal entry booked against the bank account and not yet cleared, whatever its voucher type (Opening Entry excepted).
 - The voucher types listed in the catalogue are ERPNext v16's options.
+- Reports answer in the agent user's language: the General Ledger's and Trial Balance's summary labels, the General Ledger's `party_type` and remarks are translated (configuration guide: English).
+- The General Ledger without `categorize_by` returns one opening row, the entries, a total row and a closing row; the summary rows have no posting date and a quoted, translated label as `account`. `balance` is a running balance from the opening row. Only with `account` or `party` does it read entries before `from_date` into the opening; otherwise the opening holds only opening entries. Entries marked as opening (`is_opening`, as an Opening Entry or an opening invoice) count in the opening row, not among the entries, unless `show_opening_entries` is set, which would also list those dated after `to_date`. With an account or a single party in another currency than the company's, the amounts, opening and closing are in that currency, named in each row's `presentation_currency` (`set_account_currency`, `convert_to_presentation_currency`). An unknown account or party is refused without naming the input, and another company's account passes ERPNext's check with an empty ledger. `account` and `party` are lists; a group account includes its children. Without `include_default_book_entries`, entries of the company's default finance book are left out; without `show_remarks`, remarks are.
+- The Trial Balance requires `fiscal_year` and moves dates outside it to its bounds with a message, without refusing. Without the desk's defaults (`with_period_closing_entry_for_opening`, `with_period_closing_entry_for_current_period`, `include_default_book_entries`, `show_net_values`, `show_group_accounts`, all 1) it leaves out period closing entries and group accounts and doesn't net opening and closing. Its rows end with an empty row (with `show_zero_values`) and a total row; the group flag is `is_group_account`, and `account_name` is "number - name".
+- ERPNext finds a fiscal year among enabled ones, those assigned to the company first, then those assigned to none (`get_fiscal_years`).
+- With select only, a list leaves out a child table's fields and non-search fields, so a Fiscal Year row without its end date is a faulty answer.
 
 Not checked yet:
 

@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-26 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: every variable is built; the operations so far are those of master data, order to cash and procure to pay |
+| **Status** | Draft: every variable is built; the operations so far are those of master data, order to cash, procure to pay and the reads of record to report |
 
 Erpel reads its whole configuration from environment variables at start and refuses to start if one is missing or invalid, naming the variable (spec REQ-002-PRS-NF005). There is no configuration file. Variables are part of the versioned interface ([ADR-004](../arc42/adr/ADR-004-releases-and-image.md)).
 
@@ -52,7 +52,7 @@ Erpel ignores proxy settings from the environment (`HTTP_PROXY`, `HTTPS_PROXY`) 
 
 Erpel neither creates nor checks the agent user's rights; ERPNext enforces them. The site provides:
 
-- **An agent user** used by nothing else, with an API key and secret.
+- **An agent user** used by nothing else, with an API key and secret, and English as its language: ERPNext answers in the user's language, and Erpel reads report rows whose labels and values it translates.
 - **A User Permission** on the assigned company, marked as default.
 - **A role without** submit, cancel, amend, delete, share, import or export on any DocType.
 - **Never** give the agent user System Manager, Accounts User, Accounts Manager, write on Item Price or on any Settings DocType, or any right on User, Role, Role Profile, User Permission, DocPerm or Custom DocPerm: each would let it post or change the rules it runs under.
@@ -63,6 +63,8 @@ Adding a permission rule for a DocType in ERPNext replaces its standard rules wi
 - **Reports:** a report operation also needs the agent's role on the report. A standard report can't be saved outside developer mode, so grant the role through Role Permission for Page and Report. Its list of roles replaces the report's own: enter the roles that use the report today as well, or they lose it.
 
 - **No automatic prepared reports:** ERPNext turns a report into a prepared report for good once a run takes longer than 15 seconds, and Erpel then refuses it. For each report Erpel runs (Accounts Receivable, Accounts Payable, General Ledger, Trial Balance), set Disable Prepared Report Automation in the System Console with Commit ticked, since the report form can't save a standard report: `frappe.db.set_value("Report", "Accounts Receivable", "disable_prepared_report_automation", 1)`. A report already turned also needs `prepared_report` set back to 0.
+
+- **No snapshot reports:** a standard report can be set to run on a copy synced to DuckDB (Snapshot Report on the report); its answer is then only as current as the last sync, and Erpel refuses it. Keep it off for the reports Erpel runs.
 
 - **Site settings:**
 
