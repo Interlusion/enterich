@@ -195,6 +195,38 @@ async def test_closing_the_client_closes_its_connections(fake: FakeErpnext) -> N
         await client.get_doc("Item", "SKU-1")
 
 
+@pytest.mark.parametrize("message", [{"columns": []}, {"result": None}, {"result": "rows"}])
+async def test_a_report_answer_without_rows_is_refused(
+    fake: FakeErpnext, message: dict[str, object]
+) -> None:
+    fake.fail("/api/method/frappe.desk.query_report.run", 200, {"message": message})
+    with pytest.raises(ErpnextError, match="no result"):
+        await Erpnext(settings(), fake.transport()).run_report("Accounts Receivable", {})
+
+
+async def test_a_prepared_report_answer_passes_without_rows(fake: FakeErpnext) -> None:
+    fake.prepared.add("Accounts Receivable")
+    answer = await Erpnext(settings(), fake.transport()).run_report("Accounts Receivable", {})
+    assert answer["prepared_report"] is True
+
+
+async def test_the_fake_refuses_fields_v16_lacks(fake: FakeErpnext) -> None:
+    client = Erpnext(settings(), fake.transport())
+    with pytest.raises(ErpnextError, match="item_cod"):
+        await client.get_list(
+            "Item", fields=["item_cod"], order_by="name asc", start=0, page_length=1
+        )
+    with pytest.raises(ErpnextError, match="Dynamic Link"):
+        await client.get_list(
+            "Item",
+            fields=["name"],
+            filters=[["Dynamic Link", "link_name", "=", "x"]],
+            order_by="name asc",
+            start=0,
+            page_length=1,
+        )
+
+
 async def test_refusal_texts_never_carry_the_credentials(fake: FakeErpnext) -> None:
     body = error(401, "AuthenticationError", f"token {API_KEY}:{API_SECRET} is invalid")
     text = await failure(fake, 401, body)

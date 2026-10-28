@@ -89,6 +89,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 **Definition of Done**:
 
 - The report call carries exactly the fixed filters of the ERPNext calls table; `total_outstanding` equals the sum over all rows when `limit` returns fewer.
+- An `as_of_date` in the past ages the rows from that date, not from today; ERPNext's total row is not among the rows.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
 - Evidence: Erpel's test suite; the integration test against a real ERPNext v16 site (backlog).
@@ -151,8 +152,8 @@ Customer names are not in report rows; `get_customer` gives them.
 | customers | Customer; Address through its Dynamic Link to the customer | — | `name` |
 | sales invoices | Sales Invoice | `company` | `posting_date` desc, `name` desc |
 | `list_sales_tax_templates` | Sales Taxes and Charges Template | `company` | `name` |
-| `report_accounts_receivable` | Accounts Receivable | `company`, `report_date`, `party_type` Customer, `ageing_based_on` | ERPNext's |
-| duplicate check | Sales Invoice | `company`, `docstatus` 0, `customer`, `posting_date` | — |
+| `report_accounts_receivable` | Accounts Receivable | `company`, `report_date`, `party_type` Customer, `party` (a list holding `customer`, when given), `ageing_based_on` (`Due Date` or `Posting Date`), `age_as_on` `Report Date`, `range` `30, 60, 90, 120` | ERPNext's |
+| duplicate check | Sales Invoice, with `name`, `items.item_code` and `items.qty` (one row per item) in one call | `company`, `docstatus` 0, `customer`, `posting_date` | — |
 
 ### Rights
 
@@ -161,7 +162,7 @@ Customer names are not in report rows; `get_customer` gives them.
 | `list_customers`, `get_customer` | Customer, Address: read |
 | `list_sales_invoices`, `get_sales_invoice` | Sales Invoice: read |
 | `list_sales_tax_templates` | Sales Taxes and Charges Template: read |
-| `report_accounts_receivable` | Sales Invoice, Payment Ledger Entry: read, report; the role added to the Accounts Receivable report |
+| `report_accounts_receivable` | Sales Invoice: read, report; Journal Entry: read (the report lists them for due dates; with select only, they arrive without); the role added to the Accounts Receivable report |
 | `create_draft_sales_invoice`, `update_draft_sales_invoice` | Sales Invoice: read, create, write; Customer, Address, Item, Account, Cost Center, Sales Taxes and Charges Template: read (ERPNext reads them while saving); Company, Currency, UOM, Price List, Payment Terms Template, Project: select |
 
 Warnings are added to a draft as a comment, which needs no further right (REQ-001-PRS-F015).
@@ -177,11 +178,16 @@ Warnings are added to a draft as a comment, which needs no further right (REQ-00
 Checked against ERPNext v16.52 source:
 
 - An invoice saved with `set_posting_time` 0 gets today as posting date.
+- Saving through `/api/resource` runs `set_missing_values`: customer name, currency, accounts and the customer's payment terms template are filled in.
+- ERPNext adds a template's tax rows on save only when Accounts Settings say so (`add_taxes_from_taxes_and_charges_template`); Erpel therefore sends them itself.
+- A PUT carrying `modified` is refused with `TimestampMismatchError` when the stored draft has another; rows given in a PUT replace the stored ones.
+- Without `age_as_on`, Accounts Receivable ages from today whatever the report date; without `range`, it uses 30, 60, 90, 120. It appends a total row as a list, and a prepared report answers with `prepared_report` set, with an earlier run's rows or none. It reads Sales Invoice and Journal Entry through permission-checked lists, Payment Ledger Entry without a permission check.
+- A list call can filter Address by its Dynamic Link rows, and can return Sales Invoice Item fields, one row per item.
 
 Not checked yet:
 
 - The rights in the Rights section are the minimum; the integration test proves them (REQ-002-PRS-NF013).
-- ERPNext computes `due_date` from the customer's payment terms when it isn't given.
+- ERPNext computes `due_date` from the customer's payment terms when it isn't given (the template is filled in; the date computation runs through several validation steps).
 
 ## Open Questions
 

@@ -110,6 +110,19 @@ class Erpnext:
         answer = await self._call("GET", "/api/method/frappe.client.get", params)
         return cast("dict[str, Any]", _expect(answer, "message", dict))
 
+    async def run_report(self, report: str, filters: dict[str, Any]) -> dict[str, Any]:
+        params = {
+            "report_name": report,
+            "filters": json.dumps(filters),
+            # A site's saved filters never replace Erpel's.
+            "are_default_filters": "false",
+        }
+        answer = await self._call("GET", "/api/method/frappe.desk.query_report.run", params)
+        message = cast("dict[str, Any]", _expect(answer, "message", dict))
+        if not message.get("prepared_report"):
+            _expect(message, "result", list)
+        return message
+
     async def aclose(self) -> None:
         await self._client.aclose()
 

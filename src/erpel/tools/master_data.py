@@ -1,6 +1,6 @@
 """Master data: items (REQ-003)."""
 
-from typing import Any, cast
+from typing import Any
 
 from erpel.shapes import (
     Flag,
@@ -10,10 +10,12 @@ from erpel.shapes import (
     Offset,
     Search,
     cut_rows,
+    cut_texts,
     form_url,
     like_pattern,
     page,
-    split_outside,
+    rows_of,
+    shape,
 )
 from erpel.tools import Context, Operation, get_named
 
@@ -35,20 +37,7 @@ class GetItem(Inputs):
 
 
 def _item(doc: dict[str, Any]) -> dict[str, Any]:
-    record = {
-        "item_code": doc.get("item_code"),
-        "item_name": doc.get("item_name"),
-        "item_group": doc.get("item_group"),
-        "stock_uom": doc.get("stock_uom"),
-        "is_stock_item": bool(doc.get("is_stock_item")),
-        "disabled": bool(doc.get("disabled")),
-    }
-    return split_outside(record, OUTSIDE)
-
-
-def _rows(doc: dict[str, Any], table: str) -> list[dict[str, Any]]:
-    rows = doc.get(table)
-    return cast("list[dict[str, Any]]", rows) if isinstance(rows, list) else []
+    return shape(doc, LIST_FIELDS, outside=OUTSIDE, flags={"is_stock_item", "disabled"})
 
 
 async def list_items(inputs: ListItems, context: Context) -> dict[str, Any]:
@@ -72,23 +61,23 @@ async def list_items(inputs: ListItems, context: Context) -> dict[str, Any]:
 async def get_item(inputs: GetItem, context: Context) -> dict[str, Any]:
     doc = await get_named(context, "Item", inputs.item_code, field="item_code", what="the item")
     company = context.settings.company
-    defaults = next((r for r in _rows(doc, "item_defaults") if r.get("company") == company), None)
-    taxes, cut = cut_rows(_rows(doc, "taxes"))
+    defaults = next((r for r in rows_of(doc, "item_defaults") if r.get("company") == company), None)
+    taxes, cut = cut_rows(rows_of(doc, "taxes"))
     record = _item(doc)
-    return {
-        **record,
-        **{field: defaults and defaults.get(field) for field in DEFAULT_FIELDS},
-        "item_tax_templates": [
-            split_outside({k: row.get(k) for k in TAX_FIELDS}, set()) for row in taxes
-        ],
-        "modified": doc.get("modified"),
-        # ERPNext finds names case-insensitively; the link carries the stored one.
-        "url": form_url(
-            context.settings.erpnext_public_url, "Item", str(doc.get("name", inputs.item_code))
-        ),
-        "truncated": ["item_tax_templates"] if cut else [],
-        "outside_text": {**record["outside_text"], "description": doc.get("description")},
-    }
+    return cut_texts(
+        {
+            **record,
+            **{field: defaults and defaults.get(field) for field in DEFAULT_FIELDS},
+            "item_tax_templates": [shape(row, TAX_FIELDS) for row in taxes],
+            "modified": doc.get("modified"),
+            # ERPNext finds names case-insensitively; the link carries the stored one.
+            "url": form_url(
+                context.settings.erpnext_public_url, "Item", str(doc.get("name", inputs.item_code))
+            ),
+            "truncated": ["item_tax_templates"] if cut else [],
+            "outside_text": {**record["outside_text"], "description": doc.get("description")},
+        }
+    )
 
 
 OPERATIONS: list[Operation[Any]] = [

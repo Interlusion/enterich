@@ -365,7 +365,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - An `offset` of 10,001, a quantity with 7 decimal places and a `to_date` before `from_date` are refused naming the input and the rule.
 - A `search` for `50%` matches the text `50%` only, not any text starting with `50`.
 - Debits of 0.1 and 0.2 against a credit of 0.3 are equal: numbers are compared as decimals.
-- List results carry `count`, `offset`, `has_more` and `records`; get results carry `modified`, `url` and `truncated`; yes/no fields are booleans.
+- List and report results carry `count`, `offset`, `has_more` and `records`; get results carry `modified`, `url` and `truncated`; yes/no fields are booleans.
 - Each `state` sends exactly the filter of the States table.
 - An update clearing a field its area spec doesn't name as clearable is refused.
 - Verification: test.
@@ -414,13 +414,14 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-NF003: Result limits
 
-**Description**: Every tool result SHALL stay under 100,000 characters. A get SHALL cut each child table to its first 100 rows and list the cut tables in `truncated`; a list or report whose result would still be larger SHALL be refused with a message to narrow it.
+**Description**: Every tool result SHALL stay under 100,000 characters. A get SHALL cut each child table to its first 100 rows and each text field of the record and its rows to 500 characters, and list what it cut in `truncated`; a list or report whose result would still be larger SHALL be refused with a message to narrow it, and a get with a message that the document is too large.
 
 **Related URS**: REQ-001-URS-NF003
 
 **Definition of Done**:
 
 - A get of an invoice with 500 rows returns 100 with `truncated: ["items"]`.
+- A get of an invoice whose 100 rows carry descriptions of 2,000 characters returns them cut to 500, with `truncated: ["items.description"]`.
 - An oversized report result gives the narrowing message.
 - Verification: test.
 - Evidence: Erpel's test suite.
@@ -451,7 +452,8 @@ Numbers are read as decimals, never as binary floating point. Every operation re
 ### Results
 
 - **Lists:** `{count, offset, has_more, records}`, where `records` holds the records in the fixed order of the area spec's ERPNext calls table and `count` is their number.
-- **Gets:** the record with `modified`, `url`, its child tables of at most 100 rows each, and `truncated` (the names of cut tables, usually empty).
+- **Reports:** as lists, with the report's rows in `records`, paged by Erpel over all rows, and beside them the totals the area spec names.
+- **Gets:** the record with `modified`, `url`, its child tables of at most 100 rows each, and `truncated` (usually empty): the names of cut tables, and of cut text fields as `<field>` or `<table>.<field>`.
 - **Every record and child row** carries an `outside_text` object, empty when it has no such field.
 - **Yes/no fields** (ERPNext's Check fields, stored as 0 and 1) are returned as `true` and `false`.
 - **`url`** is the document's form in ERPNext, built as ERPNext v16 builds it: the public URL, `/desk/`, the DocType in lower case with hyphens for spaces, and the name percent-encoded as one segment (`/desk/sales-invoice/SINV-2026-00001`).
@@ -472,7 +474,7 @@ Document `state` inputs map to ERPNext as follows. No `state` means all, unless 
 
 ### ERPNext calls
 
-Lists use `/api/resource/<DocType>` with the fields of their area catalogue; gets use `frappe.client.get`; reports use `frappe.desk.query_report.run` with `are_default_filters` false, so a site's saved report filters never replace Erpel's. Each area spec's ERPNext calls table names, for its reads and duplicate checks, the DocType or report, the fixed filters and the order. Creates and updates make these further calls: `get_taxes_and_charges` for a given tax template's rows, `frappe.client.get` for the draft before an update, `/api/resource` to write (POST for a create, PUT for an update), and `frappe.desk.form.utils.add_comment` for warnings (REQ-001-PRS-F015), which needs only read on the draft. Every list of a company's records and every report filters by the assigned company (REQ-001-PRS-F007). A site that runs a report as a prepared report gets a refusal saying so; Erpel doesn't wait for prepared reports.
+Lists use `/api/resource/<DocType>` with the fields of their area catalogue; gets use `frappe.client.get`; reports use `frappe.desk.query_report.run` with `are_default_filters` false, so a site's saved report filters never replace Erpel's. Each area spec's ERPNext calls table names, for its reads and duplicate checks, the DocType or report, the fixed filters and the order. Creates and updates make these further calls: `get_taxes_and_charges` for a given tax template's rows, `frappe.client.get` for the draft before an update, `/api/resource` to write (POST for a create, PUT for an update), and `frappe.desk.form.utils.add_comment` for warnings (REQ-001-PRS-F015), which needs only read on the draft. Every list of a company's records and every report filters by the assigned company (REQ-001-PRS-F007). Erpel leaves out the total row ERPNext appends to a report's rows and computes the totals its area spec names itself. A site that runs a report as a prepared report gets a refusal saying so; Erpel doesn't wait for prepared reports. ERPNext turns a report into a prepared report for good after one run longer than 15 seconds; the configuration guide says how a site prevents that.
 
 ### Drafts
 
