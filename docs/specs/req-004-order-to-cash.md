@@ -141,8 +141,8 @@ Customer names are not in report rows; `get_customer` gives them.
 
 | Operation | Inputs | Sent to ERPNext |
 | :- | :- | :- |
-| `create_draft_sales_invoice` | **`customer`**; `posting_date` (default today), `due_date` (default from payment terms); **`items`** (1–20) \[**`item_code`**, **`qty`**, `rate`, `uom`, `income_account`, `cost_center`\]; `taxes_and_charges`; `remarks`; `allow_duplicate` | the given fields; `set_posting_time` 1 when `posting_date` is given; `taxes` from the template; `company`; `docstatus` 0 |
-| `update_draft_sales_invoice` | **`name`**, **`modified`**; at least one of `posting_date`, `due_date`, `items`, `taxes_and_charges`, `remarks` | the given fields; `set_posting_time` 1 when `posting_date` is given; `taxes` when `taxes_and_charges` is given (none when it is cleared); `modified` |
+| `create_draft_sales_invoice` | **`customer`**; `posting_date` (default today), `due_date` (default from payment terms); **`items`** (1–20) \[**`item_code`**, **`qty`**, `rate`, `uom`, `income_account`, `cost_center`\]; `taxes_and_charges`; `remarks`; `allow_duplicate` | the given fields; `set_posting_time` 1 when `posting_date` is given; `payment_terms_template` "" when `due_date` is given (REQ-001-PRS-F017); `taxes` from the template; `company`; `docstatus` 0 |
+| `update_draft_sales_invoice` | **`name`**, **`modified`**; at least one of `posting_date`, `due_date`, `items`, `taxes_and_charges`, `remarks` | the given fields; `set_posting_time` 1 when `posting_date` is given; `payment_terms_template`, `payment_schedule` and `due_date` as REQ-001-PRS-F017 says; `taxes` when `taxes_and_charges` is given (none when it is cleared); `modified` |
 
 - Clearable on update: `remarks`, `taxes_and_charges` (with its rows).
 - The customer isn't changed by an update: ERPNext would keep the first customer's address, payment terms, price list and receivable account. A draft for another customer is a new draft.
