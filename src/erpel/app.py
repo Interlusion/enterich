@@ -8,9 +8,10 @@ The wrapper serves only three paths: the MCP endpoint (POST only, at most
 
 import json
 import logging
-import traceback
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from importlib.metadata import version
+from typing import Protocol
 
 import httpx2
 from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser
@@ -19,9 +20,10 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from erpel import log
+from erpel import log, tools
 from erpel.auth import JWKS_RETRY_INTERVAL, JwksCache, KeysUnavailable, Verifier, last_refusal
 from erpel.config import Settings
+from erpel.erpnext import Erpnext
 
 MAX_BODY = 1024 * 1024
 RETRY_AFTER = str(int(JWKS_RETRY_INTERVAL))  # a retry before that finds no new keys
@@ -29,15 +31,22 @@ METADATA_PREFIX = "/.well-known/oauth-protected-resource"
 MAX_LOGGED_ID = 64
 
 
-def create_app(settings: Settings, jwks_client: httpx2.AsyncClient | None = None) -> ASGIApp:
+def create_app(
+    settings: Settings,
+    jwks_client: httpx2.AsyncClient | None = None,
+    *,
+    erpnext_transport: httpx2.AsyncBaseTransport | None = None,
+) -> ASGIApp:
     client = jwks_client or httpx2.AsyncClient(
         trust_env=False, timeout=10.0, follow_redirects=False
     )
+    erpnext = Erpnext(settings, erpnext_transport)
     verifier = Verifier(settings, JwksCache(settings.jwks_url, client))
     server = MCPServer(
         name="erpel",
         version=version("erpel"),
         token_verifier=verifier,
+        tools=tools.build(settings, erpnext),
         auth=AuthSettings(
             issuer_url=settings.issuer,  # pyright: ignore[reportArgumentType] - pydantic parses the string
             resource_server_url=settings.resource_url,  # pyright: ignore[reportArgumentType]
@@ -55,18 +64,33 @@ def create_app(settings: Settings, jwks_client: httpx2.AsyncClient | None = None
         transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
         host=settings.host,
     )
-    return Wrapper(inner, settings.mcp_path)
+    # A client handed in belongs to the caller, who closes it.
+    owned = [erpnext] if jwks_client else [erpnext, client]
+    return Wrapper(inner, settings.mcp_path, secrets=settings.secrets, clients=owned)
+
+
+class _Closable(Protocol):
+    async def aclose(self) -> None: ...
 
 
 class Wrapper:
-    def __init__(self, inner: ASGIApp, mcp_path: str) -> None:
+    def __init__(
+        self,
+        inner: ASGIApp,
+        mcp_path: str,
+        *,
+        secrets: Sequence[str] = (),
+        clients: Sequence[_Closable] = (),
+    ) -> None:
         self._inner = inner
         self._mcp_path = mcp_path
         self._metadata_path = METADATA_PREFIX + mcp_path
+        self._secrets = secrets
+        self._clients = clients
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "lifespan":
-            await self._inner(scope, receive, send)
+            await self._inner(scope, receive, self._closing(send))
             return
         if scope["type"] != "http":
             await send({"type": "websocket.close", "code": 1008})
@@ -87,6 +111,17 @@ class Wrapper:
             await self._mcp(scope, receive, send)
         else:
             await _respond(send, 404, {"error": "not found"})
+
+    def _closing(self, send: Send) -> Send:
+        """Close the outgoing clients before the server reports its shutdown complete."""
+
+        async def closing(message: Message) -> None:
+            if message["type"] == "lifespan.shutdown.complete":
+                for client in self._clients:
+                    await client.aclose()
+            await send(message)
+
+        return closing
 
     async def _mcp(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["method"] != "POST":
@@ -132,13 +167,7 @@ class Wrapper:
             )
             return
         except Exception as exc:  # noqa: BLE001 - logged once here, not again by uvicorn
-            log.event(
-                "error",
-                logging.ERROR,
-                exception=type(exc).__name__,
-                message=str(exc)[:300],
-                traceback=traceback.format_exc(),
-            )
+            log.failure(exc, self._secrets)
             if not response.held and not response.started:
                 await _respond(send, 500, {"error": "internal error"})
         for message in response.held:

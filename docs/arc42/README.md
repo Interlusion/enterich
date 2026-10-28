@@ -1,6 +1,6 @@
 # Erpel architecture
 
-Compact [arc42](https://arc42.org/): all twelve sections in this file, until one of them outgrows it. The service around the operations is built, the operations are not yet; this describes the design the requirement specifications ([index](../specs/README.md)) and the [ADRs](adr/README.md) set out. When code exists and disagrees, the code wins and this file is fixed.
+Compact [arc42](https://arc42.org/): all twelve sections in this file, until one of them outgrows it. The service around the operations is built, and the operations of the first area, master data; this describes the design the requirement specifications ([index](../specs/README.md)) and the [ADRs](adr/README.md) set out. When code exists and disagrees, the code wins and this file is fixed.
 
 Diagrams are Mermaid, rendered by GitHub.
 
@@ -85,7 +85,7 @@ flowchart LR
 
 ## 5. Building block view
 
-*Built: `config`, `app`, `auth`, `log`. Not yet: `erpnext`, `shapes`, `tools/*`.*
+*Built: `config`, `app`, `auth`, `log`, `erpnext`, `shapes`, and `tools/` with master data. Not yet: the other areas.*
 
 ```mermaid
 flowchart TB
@@ -294,6 +294,7 @@ The quality goals of section 1, made testable. Each scenario names what happens,
 | Clients change behaviour (approval prompts, scope handling, refresh) | Nothing relies on client approval; behaviour verified with a real client before each release that touches auth |
 | MCP SDK breaking releases or new protocol revisions | Exact pin, separate update pull requests, tests per revision, ADR-002 triggers |
 | The SDK behaves differently from what its API suggests: three cases found before any code (extra arguments ignored, no leeway on `expires_at`, the verifier not seeing every rejection) | Each case has a test of Erpel's own behaviour, so a later SDK change shows up; ADR-002 and ADR-003 record the workarounds |
+| Erpel takes the raw arguments and returns tool errors through SDK parts that aren't its documented API (`ArgModelBase`, `FuncMetadata`, a returned `CallToolResult`) | Tests fail when unknown arguments stop arriving or an error loses its text; SDK updates come in their own pull requests |
 | ERPNext API or report output changes between versions | Fake ERPNext mirrors v16 responses; report operations verified against a real v16 site when built |
 | Two identical creates at the same instant both pass the duplicate check | Accepted ([REQ-001 assumptions](../specs/req-001-core.md#assumptions)): one agent works in sequence, and a person reviews every draft |
 | A site gives the agent user select instead of read; lists silently lose fields | Configuration guide's rights table; integration test against a real site (backlog) |

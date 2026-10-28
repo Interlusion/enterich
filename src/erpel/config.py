@@ -80,6 +80,14 @@ class Settings(BaseModel):
     log_level: LogLevel
     warnings: tuple[str, ...] = ()
 
+    @property
+    def secrets(self) -> tuple[str, str]:
+        """The values no answer or log line may carry."""
+        return (
+            self.erpnext_api_key.get_secret_value(),
+            self.erpnext_api_secret.get_secret_value(),
+        )
+
 
 class ConfigError(Exception):
     """Erpel can't start; `problems` names each variable and its rule."""
@@ -109,7 +117,7 @@ def load(env: Mapping[str, str], operations: Collection[str]) -> Settings:
         "token_algorithms": reader.algorithms(),
         "clock_leeway": reader.integer("CLOCK_LEEWAY", "5", 0, MAX_CLOCK_LEEWAY),
         "erpnext_url": erpnext.geturl().rstrip("/") if erpnext else "",
-        "erpnext_host": reader.optional("ERPNEXT_HOST", erpnext.netloc if erpnext else ""),
+        "erpnext_host": reader.host("ERPNEXT_HOST", erpnext.netloc if erpnext else ""),
         "erpnext_public_url": public.geturl().rstrip("/") if public else "",
         "erpnext_api_key": SecretStr(reader.text("ERPNEXT_API_KEY")),
         "erpnext_api_secret": SecretStr(reader.text("ERPNEXT_API_SECRET")),
@@ -153,6 +161,26 @@ class _Reader:
     def optional(self, name: str, default: str) -> str:
         value = self.env.get(name)
         return default if value is None else value.strip()
+
+    def host(self, name: str, default: str) -> str:
+        """A Host header value: a host name or IP address, optionally with a port."""
+        if name not in self.env:
+            return default  # checked as part of its URL
+        value = self.optional(name, default)
+        try:
+            parsed = urlsplit(f"//{value}")
+            parsed.port  # noqa: B018 - raises for a port that isn't a number
+        except ValueError:
+            parsed = None
+        if (
+            parsed is None
+            or parsed.netloc != value
+            or parsed.username is not None
+            or value.endswith(":")
+            or not _valid_host(parsed.hostname)
+        ):
+            self.fail(name, "must be a host name or IP address, optionally with a port")
+        return value
 
     def integer(self, name: str, default: str, low: int, high: int) -> int:
         raw = self.optional(name, default)

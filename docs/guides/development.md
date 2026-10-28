@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-24 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: the service, tests, image and CI are built; `erpnext.py`, `shapes.py`, `tools/` and the fake ERPNext are not yet |
+| **Status** | Draft: everything below is built except the areas after master data in `tools/`, and `python -m tests.fakes` (the fakes run in tests only) |
 
 ## Repository layout
 

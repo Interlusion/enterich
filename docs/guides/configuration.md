@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-26 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: the service variables are built; the ERPNext variables are read and validated, but no operation uses them yet |
+| **Status** | Draft: every variable is built; the operations so far are those of master data |
 
 Erpel reads its whole configuration from environment variables at start and refuses to start if one is missing or invalid, naming the variable (spec REQ-002-PRS-NF005). There is no configuration file. Variables are part of the versioned interface ([ADR-004](../arc42/adr/ADR-004-releases-and-image.md)).
 
@@ -30,7 +30,7 @@ The three URLs may use plain `http` only for a loopback host (tests and local de
 | Variable | Required | Default | Meaning |
 | :- | :- | :- | :- |
 | `ERPEL_ERPNEXT_URL` | yes |  | Base URL Erpel calls. An `http://` address sends the API key unencrypted: use it only on a network you trust (Erpel logs a warning at start for any host but loopback) |
-| `ERPEL_ERPNEXT_HOST` | no | host of `ERPEL_ERPNEXT_URL` | `Host` header sent, for a site served under another name than the address Erpel calls |
+| `ERPEL_ERPNEXT_HOST` | no | host of `ERPEL_ERPNEXT_URL` | `Host` header sent, for a site served under another name than the address Erpel calls: a host name or IP address, optionally with a port |
 | `ERPEL_ERPNEXT_PUBLIC_URL` | yes |  | Base URL people open ERPNext at; used for links in results |
 | `ERPEL_ERPNEXT_API_KEY` | yes |  | The agent user's API key (secret) |
 | `ERPEL_ERPNEXT_API_SECRET` | yes |  | The agent user's API secret (secret) |
