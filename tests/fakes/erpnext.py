@@ -130,6 +130,48 @@ FIELDS: dict[str, set[str]] = {
         "disabled",
         "company",
     },
+    "Account": {
+        "account_number",
+        "account_name",
+        "root_type",
+        "account_type",
+        "parent_account",
+        "is_group",
+        "disabled",
+        "company",
+    },
+    "Cost Center": {
+        "cost_center_number",
+        "cost_center_name",
+        "parent_cost_center",
+        "is_group",
+        "disabled",
+        "company",
+    },
+    "Journal Entry": {
+        "voucher_type",
+        "posting_date",
+        "total_debit",
+        "total_credit",
+        "user_remark",
+        "cheque_no",
+        "cheque_date",
+        "company",
+    },
+    "Journal Entry Account": {
+        "account",
+        "account_currency",
+        "party_type",
+        "party",
+        "debit_in_account_currency",
+        "credit_in_account_currency",
+        "cost_center",
+        "reference_type",
+        "reference_name",
+        "user_remark",
+    },
+    "Fiscal Year": {"year", "disabled", "year_start_date", "year_end_date"},
+    "Fiscal Year Company": {"company"},
     "Dynamic Link": {"link_doctype", "link_name"},
 }
 # DocType -> {table field: child DocType}
@@ -140,7 +182,11 @@ TABLES: dict[str, dict[str, str]] = {
     "Sales Taxes and Charges Template": {"taxes": "Sales Taxes and Charges"},
     "Purchase Invoice": {"items": "Purchase Invoice Item", "taxes": "Purchase Taxes and Charges"},
     "Purchase Taxes and Charges Template": {"taxes": "Purchase Taxes and Charges"},
+    "Journal Entry": {"accounts": "Journal Entry Account"},
+    "Fiscal Year": {"companies": "Fiscal Year Company"},
 }
+# Reports whose JSON sets add_total_row: Frappe appends a total row as a list
+TOTAL_ROW_REPORTS = {"Accounts Receivable", "Accounts Payable"}
 # invoice DocType -> (party DocType, naming series)
 INVOICES = {
     "Sales Invoice": ("Customer", "ACC-SINV-2026-"),
@@ -187,6 +233,11 @@ class FakeErpnext:
         default_factory=dict[str, list[dict[str, Any]]]
     )
     prepared: set[str] = field(default_factory=set[str])
+    # DocTypes the agent user may only select: lists filter on every field but return only
+    # `name` here (v16 returns the search fields), never a child table's fields
+    select_only: set[str] = field(default_factory=set[str])
+    # reports set as snapshot reports, answered from the last DuckDB sync
+    snapshots: set[str] = field(default_factory=set[str])
     # The site's today, which a draft without set_posting_time gets at every save
     today: str = "2026-10-29"
     # item code -> price list rate
@@ -368,6 +419,8 @@ class FakeErpnext:
         start = int(params.get("limit_start", 0))
         length = int(params.get("limit_page_length", 20))
         fields: list[str] = json.loads(params.get("fields", '["name"]'))
+        if doctype in self.select_only:
+            fields = ["name"]
         tables = {f.partition(".")[0] for f in fields if "." in f}
         if not tables:
             return [{f: d.get(f) for f in fields} for d in docs[start : start + length]]
@@ -389,6 +442,10 @@ class FakeErpnext:
         if name in self.prepared:
             return {"prepared_report": True, "doc": None}
         rows = [dict(row) for row in self.reports.get(name, [])]
+        if name in self.snapshots:
+            return {"result": rows, "snapshot_report": True, "snapshot_at": "2026-10-28 03:00:00"}
+        if name not in TOTAL_ROW_REPORTS:
+            return {"result": rows, "columns": [], "add_total_row": 0}
         total = ["Total"] + [""] * 5  # Frappe appends the total row as a list
         return {"result": [*rows, total] if rows else rows, "columns": [], "add_total_row": 1}
 
@@ -857,3 +914,222 @@ def payable(voucher_no: str, outstanding: float, **overrides: Any) -> dict[str, 
     }
     row.update(overrides)
     return row
+
+
+def account(name: str, **overrides: Any) -> dict[str, Any]:
+    """An Account of the company, as a list returns it; `name` is "<number> - <name> - EX"."""
+    number, _, rest = name.partition(" - ")
+    doc: dict[str, Any] = {
+        "doctype": "Account",
+        "name": name,
+        "account_number": number,
+        "account_name": rest.rsplit(" - ", 1)[0],
+        "root_type": "Asset",
+        "account_type": "Bank",
+        "parent_account": "1200 - Bank Accounts - EX",
+        "is_group": 0,
+        "disabled": 0,
+        "company": COMPANY,
+    }
+    doc.update(overrides)
+    return doc
+
+
+def cost_center(name: str, **overrides: Any) -> dict[str, Any]:
+    """A Cost Center of the company."""
+    doc: dict[str, Any] = {
+        "doctype": "Cost Center",
+        "name": name,
+        "cost_center_number": None,
+        "cost_center_name": name.rsplit(" - ", 1)[0],
+        "parent_cost_center": "Example GmbH - EX",
+        "is_group": 0,
+        "disabled": 0,
+        "company": COMPANY,
+    }
+    doc.update(overrides)
+    return doc
+
+
+def journal_entry(name: str = "ACC-JV-2026-00001", **overrides: Any) -> dict[str, Any]:
+    """A Journal Entry as frappe.client.get returns it."""
+    doc: dict[str, Any] = {
+        "doctype": "Journal Entry",
+        "name": name,
+        "company": COMPANY,
+        "voucher_type": "Journal Entry",
+        "posting_date": "2026-10-01",
+        "total_debit": 500.0,
+        "total_credit": 500.0,
+        "user_remark": "Rent October",
+        "cheque_no": "REF-77",
+        "cheque_date": "2026-10-01",
+        "docstatus": 1,
+        "owner": "bookkeeper@example.com",
+        "modified": "2026-10-01 09:00:00.000000",
+        "accounts": [
+            {
+                "doctype": "Journal Entry Account",
+                "account": "6310 - Rent - EX",
+                "account_currency": "EUR",
+                "party_type": None,
+                "party": None,
+                "debit_in_account_currency": 500.0,
+                "credit_in_account_currency": 0.0,
+                "debit": 500.0,
+                "credit": 0.0,
+                "cost_center": "Main - EX",
+                "reference_type": None,
+                "reference_name": None,
+                "user_remark": None,
+            },
+            {
+                "doctype": "Journal Entry Account",
+                "account": "1200 - Bank - EX",
+                "account_currency": "EUR",
+                "party_type": None,
+                "party": None,
+                "debit_in_account_currency": 0.0,
+                "credit_in_account_currency": 500.0,
+                "debit": 0.0,
+                "credit": 500.0,
+                "cost_center": "Main - EX",
+                "reference_type": None,
+                "reference_name": None,
+                "user_remark": "Paid by transfer",
+            },
+        ],
+    }
+    doc.update(overrides)
+    return doc
+
+
+def fiscal_year(
+    name: str, start: str, end: str, *companies: str, **overrides: Any
+) -> dict[str, Any]:
+    """A Fiscal Year, assigned to the given companies (none: to every company)."""
+    doc: dict[str, Any] = {
+        "doctype": "Fiscal Year",
+        "name": name,
+        "year": name,
+        "disabled": 0,
+        "year_start_date": start,
+        "year_end_date": end,
+        "companies": [{"doctype": "Fiscal Year Company", "company": c} for c in companies],
+    }
+    doc.update(overrides)
+    return doc
+
+
+def ledger_entry(voucher_no: str, debit: float, credit: float, **overrides: Any) -> dict[str, Any]:
+    """An entry row of General Ledger as its execute() returns it, with columns Erpel drops."""
+    row: dict[str, Any] = {
+        "gl_entry": f"GLE-{voucher_no}",
+        "posting_date": "2026-10-01",
+        "account": "1200 - Bank - EX",
+        "party_type": None,
+        "party": None,
+        "voucher_type": "Journal Entry",
+        "voucher_subtype": "Journal Entry",
+        "voucher_no": voucher_no,
+        "cost_center": "Main - EX",
+        "project": None,
+        "against_voucher_type": None,
+        "against_voucher": None,
+        "account_currency": "EUR",
+        "against": "6310 - Rent - EX",
+        "is_opening": "No",
+        "creation": "2026-10-01 09:00:00",
+        "debit": debit,
+        "credit": credit,
+        "debit_in_account_currency": debit,
+        "credit_in_account_currency": credit,
+        "remarks": "Rent October",
+        "bill_no": "",
+        "presentation_currency": None,
+    }
+    row.update(overrides)
+    return row
+
+
+def ledger(
+    entries: list[dict[str, Any]],
+    opening: tuple[float, float] = (0.0, 0.0),
+    labels: tuple[str, str, str] = ("Opening", "Total", "Closing (Opening + Total)"),
+    currency: str | None = None,
+) -> list[dict[str, Any]]:
+    """General Ledger's rows without categorize_by: opening, the entries with a running
+    balance, total and closing, the summary rows labelled in the user's language. With
+    `currency`, the account's or party's currency ERPNext switched the amounts to."""
+
+    def summary(label: str, debit: float, credit: float) -> dict[str, Any]:
+        return {
+            "account": f"'{label}'",
+            "debit": debit,
+            "credit": credit,
+            "debit_in_account_currency": debit,
+            "credit_in_account_currency": credit,
+            "balance": debit - credit,
+            "account_currency": currency or "EUR",
+            "presentation_currency": currency,
+        }
+
+    balance = opening[0] - opening[1]
+    rows = [summary(labels[0], *opening)]
+    for entry in entries:
+        balance += entry["debit"] - entry["credit"]
+        rows.append({**entry, "balance": balance, "presentation_currency": currency})
+    debit = sum(e["debit"] for e in entries)
+    credit = sum(e["credit"] for e in entries)
+    rows.append(summary(labels[1], debit, credit))
+    rows.append(summary(labels[2], opening[0] + debit, opening[1] + credit))
+    return rows
+
+
+def balance_row(
+    account_name: str, parent: str | None, group: bool, **values: float
+) -> dict[str, Any]:
+    """An account row of Trial Balance as its execute() returns it."""
+    number, _, rest = account_name.partition(" - ")
+    row: dict[str, Any] = {
+        "account": account_name,
+        "parent_account": parent,
+        "indent": 0 if parent is None else 1,
+        "from_date": "2026-01-01",
+        "to_date": "2026-10-31",
+        "currency": "EUR",
+        "is_group_account": int(group),
+        "acc_name": rest.rsplit(" - ", 1)[0],
+        "acc_number": number,
+        "account_name": f"{number} - {rest.rsplit(' - ', 1)[0]}",
+        "has_value": True,
+    }
+    for name in ("opening_debit", "opening_credit", "debit", "credit"):
+        row[name] = values.get(name, 0.0)
+    row["closing_debit"] = row["opening_debit"] + row["debit"]
+    row["closing_credit"] = row["opening_credit"] + row["credit"]
+    row.update({k: v for k, v in values.items() if k.startswith("closing")})
+    return row
+
+
+def balance_total(rows: list[dict[str, Any]], label: str = "Total") -> dict[str, Any]:
+    """Trial Balance's total row: the sum of the root accounts' rows."""
+    fields = (
+        "opening_debit",
+        "opening_credit",
+        "debit",
+        "credit",
+        "closing_debit",
+        "closing_credit",
+    )
+    roots = [r for r in rows if not r.get("parent_account")]
+    return {
+        "account": f"'{label}'",
+        "account_name": f"'{label}'",
+        "warn_if_negative": True,
+        **{f: sum(r[f] for r in roots) for f in fields},
+        "parent_account": None,
+        "indent": 0,
+        "has_value": True,
+        "currency": "EUR",
+    }
