@@ -96,25 +96,27 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-004-PRS-F005: Sales invoice drafts
 
-**Description**: Erpel SHALL offer `create_draft_sales_invoice` and `update_draft_sales_invoice` as the catalogue below defines them, and SHALL send `set_posting_time` 1 whenever it sends a `posting_date`.
+**Description**: Erpel SHALL offer `create_draft_sales_invoice` and `update_draft_sales_invoice` as the catalogue below defines them; it SHALL send `set_posting_time` 1 whenever it sends a `posting_date`, and SHALL send no `rate` for a row given without one, so that ERPNext prices it.
 
 **Related URS**: REQ-004-URS-F002
 
 **Definition of Done**:
 
 - An update that sets `posting_date` on a draft created without one keeps it.
+- A row given without `rate` is sent without one, and the result shows the rate ERPNext set.
 - Verification: test.
 - Evidence: Erpel's test suite.
 
 #### REQ-004-PRS-F006: Duplicate match for sales invoices
 
-**Description**: For REQ-001-PRS-F005, a sales invoice create SHALL match a draft of the assigned company with the same customer, the same posting date (the given one, or today) and the same items (item codes and quantities, in any order).
+**Description**: For REQ-001-PRS-F005, a sales invoice create SHALL match a draft of the assigned company with the same customer, the same posting date (the given one, or today) and the same items (item codes and quantities, in any order, leaving out free-item rows a pricing rule added).
 
 **Related URS**: REQ-004-URS-F002, REQ-001-URS-F007
 
 **Definition of Done**:
 
 - A create matching an existing draft is refused naming it; one that differs in a quantity, an item or the date goes through.
+- A create matches a draft that has an added free-item row as well.
 - Verification: test.
 - Evidence: Erpel's test suite.
 
@@ -139,11 +141,13 @@ Customer names are not in report rows; `get_customer` gives them.
 
 | Operation | Inputs | Sent to ERPNext |
 | :- | :- | :- |
-| `create_draft_sales_invoice` | **`customer`**; `posting_date` (default today), `due_date` (default from payment terms); **`items`** (1–20) \[**`item_code`**, **`qty`**, **`rate`**, `uom`, `income_account`, `cost_center`\]; `taxes_and_charges`; `remarks`; `allow_duplicate` | the given fields; `set_posting_time` 1 when `posting_date` is given; `taxes` from the template; `company`; `docstatus` 0 |
-| `update_draft_sales_invoice` | **`name`**, **`modified`**; at least one of `customer`, `posting_date`, `due_date`, `items`, `taxes_and_charges`, `remarks` | the given fields; `set_posting_time` 1 when `posting_date` is given; `taxes` when `taxes_and_charges` is given (none when it is cleared); `modified` |
+| `create_draft_sales_invoice` | **`customer`**; `posting_date` (default today), `due_date` (default from payment terms); **`items`** (1–20) \[**`item_code`**, **`qty`**, `rate`, `uom`, `income_account`, `cost_center`\]; `taxes_and_charges`; `remarks`; `allow_duplicate` | the given fields; `set_posting_time` 1 when `posting_date` is given; `taxes` from the template; `company`; `docstatus` 0 |
+| `update_draft_sales_invoice` | **`name`**, **`modified`**; at least one of `posting_date`, `due_date`, `items`, `taxes_and_charges`, `remarks` | the given fields; `set_posting_time` 1 when `posting_date` is given; `taxes` when `taxes_and_charges` is given (none when it is cleared); `modified` |
 
 - Clearable on update: `remarks`, `taxes_and_charges` (with its rows).
-- Results add: `customer`, `posting_date`, `due_date`, `currency`, `net_total`, `total_taxes_and_charges`, `grand_total`, `taxes` \[`account_head`, `rate`, `tax_amount`\], the row count.
+- The customer isn't changed by an update: ERPNext would keep the first customer's address, payment terms, price list and receivable account. A draft for another customer is a new draft.
+- A row without `rate` gets the rate ERPNext sets from the price list and its pricing rules, as in the form. Erpel never sends `ignore_pricing_rule`, so a site's pricing rules apply to every row; REQ-001-PRS-F016 warns where they replaced a given rate.
+- Results add: `customer`, `posting_date`, `due_date`, `currency`, `net_total`, `total_taxes_and_charges`, `grand_total`, `taxes` \[`account_head`, `rate`, `tax_amount`\], `items` \[`item_code`, `qty`, `rate`, `amount`, `is_free_item`\].
 
 ### ERPNext calls
 
@@ -153,7 +157,7 @@ Customer names are not in report rows; `get_customer` gives them.
 | sales invoices | Sales Invoice | `company` | `posting_date` desc, `name` desc |
 | `list_sales_tax_templates` | Sales Taxes and Charges Template | `company` | `name` |
 | `report_accounts_receivable` | Accounts Receivable | `company`, `report_date`, `party_type` Customer, `party` (a list holding `customer`, when given), `ageing_based_on` (`Due Date` or `Posting Date`), `age_as_on` `Report Date`, `range` `30, 60, 90, 120` | ERPNext's |
-| duplicate check | Sales Invoice, with `name`, `items.item_code` and `items.qty` (one row per item) in one call | `company`, `docstatus` 0, `customer`, `posting_date` | — |
+| duplicate check | Sales Invoice, with `name`, `items.item_code`, `items.qty` and `items.is_free_item` (one row per item) in one call | `company`, `docstatus` 0, `customer`, `posting_date` | — |
 
 ### Rights
 
@@ -177,8 +181,12 @@ Warnings are added to a draft as a comment, which needs no further right (REQ-00
 
 Checked against ERPNext v16.52 source:
 
-- An invoice saved with `set_posting_time` 0 gets today as posting date.
-- Saving through `/api/resource` runs `set_missing_values`: customer name, currency, accounts and the customer's payment terms template are filled in.
+- An invoice saved with `set_posting_time` 0 gets today, in the site's time zone (System Settings), as posting date at every save.
+- Saving through `/api/resource` runs `set_missing_values`: customer name, currency, price list, accounts and the customer's payment terms template are filled in. POST and PUT answer with the saved document under `data`.
+- A row saved without a rate, or at 0, gets the price list rate with the pricing rules applied. A given rate is kept unless a price pricing rule matches the row; then the rule sets the rate anew at every save and its name goes into the row's `pricing_rules`. Product pricing rules append free-item rows (`is_free_item`).
+- The customer's address, contact, payment terms, price list and accounts are filled in on save only where the draft has none (`update_if_missing`); a customer address of another customer is refused (`validate_party_address_and_contact`).
+- ERPNext looks up prices and pricing rules without a permission check, and creates or changes an Item Price from a draft only for a user with write on Item Price; the agent user has none.
+- A due date before the posting date, or later than the payment terms allow, is refused on save unless the user is a credit controller.
 - ERPNext adds a template's tax rows on save only when Accounts Settings say so (`add_taxes_from_taxes_and_charges_template`); Erpel therefore sends them itself.
 - A PUT carrying `modified` is refused with `TimestampMismatchError` when the stored draft has another; rows given in a PUT replace the stored ones.
 - Without `age_as_on`, Accounts Receivable ages from today whatever the report date; without `range`, it uses 30, 60, 90, 120. It appends a total row as a list, and a prepared report answers with `prepared_report` set, with an earlier run's rows or none. It reads Sales Invoice and Journal Entry through permission-checked lists, Payment Ledger Entry without a permission check.

@@ -362,7 +362,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 **Definition of Done**:
 
-- An `offset` of 10,001, a quantity with 7 decimal places and a `to_date` before `from_date` are refused naming the input and the rule.
+- An `offset` of 10,001, a quantity with 4 decimal places and a `to_date` before `from_date` are refused naming the input and the rule.
 - A `search` for `50%` matches the text `50%` only, not any text starting with `50`.
 - Debits of 0.1 and 0.2 against a credit of 0.3 are equal: numbers are compared as decimals.
 - List and report results carry `count`, `offset`, `has_more` and `records`; get results carry `modified`, `url` and `truncated`; yes/no fields are booleans.
@@ -383,6 +383,21 @@ Only a fixed list of operations, without generic method calls, closes these door
 - A draft with a tax template and zero tax gets the comment of REQ-001-PRS-F012.
 - Markup in a warning reaches ERPNext escaped, as text.
 - A failing comment call yields a result with the draft and a note that the comment is missing.
+- Verification: test.
+- Evidence: Erpel's test suite.
+
+#### REQ-001-PRS-F016: Rates ERPNext set
+
+**Description**: An invoice create or update result SHOULD carry a warning for each item row whose given rate ERPNext saved as another with a pricing rule applied (the row names it in `pricing_rules`), and for each row other than a free item that ERPNext saved at rate 0 (no price found). Rows are matched in the order given; free-item rows a pricing rule added are not matched. At most 20 rows are named; one more warning says how many further rows there are.
+
+**Related URS**: REQ-001-URS-F002, REQ-001-URS-F009
+
+**Definition of Done**:
+
+- A row given at 48 that a pricing rule saves at 45 returns a warning naming the row, the item and both rates.
+- A row without a rate, for an item without a price, returns the rate-0 warning.
+- A given rate ERPNext keeps, a given rate ERPNext only rounded to the currency's precision (12.345 saved as 12.35), and a free-item row a pricing rule added, return no warning.
+- An update of a draft with 30 rows at rate 0 names 20 of them and says 10 more rows follow.
 - Verification: test.
 - Evidence: Erpel's test suite.
 
@@ -414,7 +429,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-NF003: Result limits
 
-**Description**: Every tool result SHALL stay under 100,000 characters. A get SHALL cut each child table to its first 100 rows and each text field of the record and its rows to 500 characters, and list what it cut in `truncated`; a list or report whose result would still be larger SHALL be refused with a message to narrow it, and a get with a message that the document is too large.
+**Description**: Every tool result SHALL stay under 100,000 characters. A get SHALL cut each child table to its first 100 rows and each text field of the record and its rows to 500 characters, and list what it cut in `truncated`; a create or update result SHALL cut its child tables the same way; a list or report whose result would still be larger SHALL be refused with a message to narrow it, and a get with a message that the document is too large.
 
 **Related URS**: REQ-001-URS-NF003
 
@@ -422,6 +437,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 - A get of an invoice with 500 rows returns 100 with `truncated: ["items"]`.
 - A get of an invoice whose 100 rows carry descriptions of 2,000 characters returns them cut to 500, with `truncated: ["items.description"]`.
+- An update of a draft with 500 rows returns 100 with `truncated: ["items"]`.
 - An oversized report result gives the narrowing message.
 - Verification: test.
 - Evidence: Erpel's test suite.
@@ -441,10 +457,11 @@ What every operation of the area specs follows (REQ-001-PRS-F014). Each area spe
 | `include_groups` | boolean | default false; group records (accounts, cost centres) are left out unless true |
 | `from_date`, `to_date` | string | ISO date `YYYY-MM-DD`; `from_date` ≤ `to_date` |
 | Name inputs | string | REQ-001-PRS-F010 |
-| `modified` | string | exactly as Erpel returned it (`YYYY-MM-DD HH:MM:SS.ffffff`), sent back unchanged |
+| `modified` | string | as Erpel returned it (`YYYY-MM-DD HH:MM:SS`, with up to 6 decimal places of seconds; ERPNext leaves them out on a whole second), sent back unchanged |
 | `allow_duplicate` | boolean | create operations only; default false; REQ-001-PRS-F005 |
-| Quantities | number | > 0 and ≤ 10,000, at most 6 decimal places |
-| Rates | number | ≥ 0 and ≤ 1,000,000,000, at most 6 decimal places |
+| Quantities | number | > 0 and ≤ 10,000, at most 3 decimal places (ERPNext rounds quantities to 3 by default) |
+| Rates | number | > 0 and ≤ 1,000,000,000, at most 6 decimal places (ERPNext takes a rate of 0 as none given) |
+| `remarks`, `user_remark` | string | at most 1,000 characters |
 | Debit, credit | number | ≥ 0 and ≤ 1,000,000,000, at most 3 decimal places |
 
 Numbers are read as decimals, never as binary floating point. Every operation rejects inputs not in its schema, at every level. Row and quantity limits start low on purpose: raising them later is a minor change, lowering them a breaking one ([ADR-004](../arc42/adr/ADR-004-releases-and-image.md)).
@@ -457,7 +474,7 @@ Numbers are read as decimals, never as binary floating point. Every operation re
 - **Every record and child row** carries an `outside_text` object, empty when it has no such field.
 - **Yes/no fields** (ERPNext's Check fields, stored as 0 and 1) are returned as `true` and `false`.
 - **`url`** is the document's form in ERPNext, built as ERPNext v16 builds it: the public URL, `/desk/`, the DocType in lower case with hyphens for spaces, and the name percent-encoded as one segment (`/desk/sales-invoice/SINV-2026-00001`).
-- **Creates and updates:** the draft's `name`, `modified`, `status`, `docstatus`, `company`, the further fields its area spec lists, `url`, and `warnings`.
+- **Creates and updates:** the draft's `name`, `modified`, `status`, `docstatus`, `company`, the further fields its area spec lists, `url`, `warnings`, and `truncated`: its child tables are cut to 100 rows each, as in gets.
 
 ### States
 
@@ -474,7 +491,7 @@ Document `state` inputs map to ERPNext as follows. No `state` means all, unless 
 
 ### ERPNext calls
 
-Lists use `/api/resource/<DocType>` with the fields of their area catalogue; gets use `frappe.client.get`; reports use `frappe.desk.query_report.run` with `are_default_filters` false, so a site's saved report filters never replace Erpel's. Each area spec's ERPNext calls table names, for its reads and duplicate checks, the DocType or report, the fixed filters and the order. Creates and updates make these further calls: `get_taxes_and_charges` for a given tax template's rows, `frappe.client.get` for the draft before an update, `/api/resource` to write (POST for a create, PUT for an update), and `frappe.desk.form.utils.add_comment` for warnings (REQ-001-PRS-F015), which needs only read on the draft. Every list of a company's records and every report filters by the assigned company (REQ-001-PRS-F007). Erpel leaves out the total row ERPNext appends to a report's rows and computes the totals its area spec names itself. A site that runs a report as a prepared report gets a refusal saying so; Erpel doesn't wait for prepared reports. ERPNext turns a report into a prepared report for good after one run longer than 15 seconds; the configuration guide says how a site prevents that.
+Lists use `/api/resource/<DocType>` with the fields of their area catalogue; gets use `frappe.client.get`; reports use `frappe.desk.query_report.run` with `are_default_filters` false, so a site's saved report filters never replace Erpel's. Each area spec's ERPNext calls table names, for its reads and duplicate checks, the DocType or report, the fixed filters and the order. Creates and updates make these further calls: `get_taxes_and_charges` for a given tax template's rows, `frappe.client.get` for the draft before an update, `/api/resource` to write (POST for a create, PUT for an update), and `frappe.desk.form.utils.add_comment` (POST) for warnings (REQ-001-PRS-F015), which needs only read on the draft. Every list of a company's records and every report filters by the assigned company (REQ-001-PRS-F007). Erpel leaves out the total row ERPNext appends to a report's rows and computes the totals its area spec names itself. A site that runs a report as a prepared report gets a refusal saying so; Erpel doesn't wait for prepared reports. ERPNext turns a report into a prepared report for good after one run longer than 15 seconds; the configuration guide says how a site prevents that.
 
 ### Drafts
 
@@ -495,7 +512,8 @@ Lists use `/api/resource/<DocType>` with the fields of their area catalogue; get
 
 Checked against Frappe and ERPNext v16.52 source:
 
-- An update that sends `modified` is refused with `TimestampMismatchError` when the stored value differs (`Document.check_if_latest`).
+- An update that sends `modified` is refused with `TimestampMismatchError` when the stored value differs (`Document.check_if_latest`); the two are compared as timestamps. `modified` has microseconds, and ERPNext's JSON leaves out `.000000` on a whole second.
+- ERPNext rounds every number it saves to its field's precision: quantities to the site's float precision (3 unless System Settings say otherwise), rates and amounts to the currency's.
 - Saving a submitted document needs the submit right (`check_docstatus_transition`).
 - ERPNext fills tax rows from a template on insert only when a site setting says so (`add_taxes_from_taxes_and_charges_template`); Erpel therefore fills them itself.
 - With only the select right on a DocType, lists return only its search fields; the operations need read (configuration guide).
