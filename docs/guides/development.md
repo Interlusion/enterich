@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-24 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: everything below is built except the areas after master data in `tools/`, and `python -m tests.fakes` (the fakes run in tests only) |
+| **Status** | Draft: everything below is built except, in `tools/`, the sales invoice drafts and the areas after order to cash, and `python -m tests.fakes` (the fakes run in tests only) |
 
 ## Repository layout
 

@@ -54,9 +54,9 @@ class Operation[I: Inputs]:
 
 
 def operations() -> list[Operation[Any]]:
-    from erpel.tools import master_data
+    from erpel.tools import master_data, order_to_cash
 
-    return [*master_data.OPERATIONS]
+    return [*master_data.OPERATIONS, *order_to_cash.OPERATIONS]
 
 
 def names() -> tuple[str, ...]:
@@ -111,18 +111,24 @@ def _tool(op: Operation[Any], context: Context) -> Tool:
 
 
 async def get_named(
-    context: Context, doctype: str, name: str, *, field: str, what: str
+    context: Context, doctype: str, name: str, *, field: str, what: str, company: bool = False
 ) -> dict[str, Any]:
-    """The document a name input names; unknown or unpermitted per REQ-001-PRS-F009."""
+    """The document a name input names; unknown or unpermitted per REQ-001-PRS-F009.
+
+    With `company`, another company's document answers the same (REQ-001-PRS-F007).
+    """
+    unknown = Refusal(
+        f"{field}: {what} {name!r} doesn't exist, or the agent user isn't permitted to read it."
+    )
     try:
-        return await context.erpnext.get_doc(doctype, name)
+        doc = await context.erpnext.get_doc(doctype, name)
     except Refused as refused:
         if refused.status in (403, 404):
-            raise Refusal(
-                f"{field}: {what} {name!r} doesn't exist, "
-                "or the agent user isn't permitted to read it."
-            ) from None
+            raise unknown from None
         raise
+    if company and doc.get("company") != context.settings.company:
+        raise unknown
+    return doc
 
 
 async def _run(op: Operation[Any], context: Context, arguments: dict[str, Any]) -> CallToolResult:
@@ -157,8 +163,8 @@ async def _attempt(
     text = to_text(result)
     if text is None:
         return _refused(
-            "The result would exceed 100,000 characters; narrow the request "
-            "(a search, a filter or a smaller limit)."
+            "The result would exceed 100,000 characters: narrow a list or report (a search, "
+            "a filter or a smaller limit); a single document this large is too large to return."
         )
     return text, _outcome(op, result)
 
