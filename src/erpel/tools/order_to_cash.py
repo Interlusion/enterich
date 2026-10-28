@@ -1,7 +1,6 @@
 """Order to cash: customers, sales invoices, sales tax templates, receivables (REQ-004)."""
 
-from decimal import Decimal
-from typing import Annotated, Any, Literal, Self, cast
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import Field, model_validator
 
@@ -18,93 +17,73 @@ from erpel.shapes import (
     Rate,
     Remarks,
     Search,
-    cut_rows,
-    cut_texts,
-    decimal,
-    form_url,
     in_order,
-    invoice_state,
-    like_pattern,
-    page,
-    rows_of,
-    shape,
     today,
 )
-from erpel.tools import Context, Operation, Refusal, drafts, get_named
+from erpel.tools import Context, Operation, drafts, invoicing
+from erpel.tools.invoicing import AgeingBasedOn
 
-CUSTOMER_FIELDS = (
-    "name",
-    "customer_name",
-    "customer_type",
-    "customer_group",
-    "tax_id",
-    "default_currency",
-    "disabled",
+SALES = invoicing.Side(
+    party="Customer",
+    party_field="customer",
+    party_fields=(
+        "name",
+        "customer_name",
+        "customer_type",
+        "customer_group",
+        "tax_id",
+        "default_currency",
+        "disabled",
+    ),
+    party_outside=frozenset({"customer_name", "tax_id"}),
+    invoice="Sales Invoice",
+    invoice_fields=(
+        "name",
+        "customer",
+        "customer_name",
+        "posting_date",
+        "due_date",
+        "currency",
+        "net_total",
+        "grand_total",
+        "outstanding_amount",
+        "status",
+        "docstatus",
+        "is_return",
+        "owner",
+        "modified",
+    ),
+    invoice_outside=frozenset({"customer_name", "remarks"}),
+    item_fields=(
+        "item_code",
+        "item_name",
+        "description",
+        "qty",
+        "uom",
+        "rate",
+        "amount",
+        "income_account",
+        "item_tax_template",
+        "cost_center",
+    ),
+    item_outside=frozenset({"item_name", "description"}),
+    tax_fields=("charge_type", "account_head", "rate", "tax_amount", "description"),
+    template="Sales Taxes and Charges Template",
+    report="Accounts Receivable",
+    aged_fields=(
+        "party",
+        "voucher_type",
+        "voucher_no",
+        "posting_date",
+        "due_date",
+        "invoiced",
+        "paid",
+        "credit_note",
+        "outstanding",
+        "currency",
+        "age",
+    ),
 )
-CUSTOMER_OUTSIDE = {"customer_name", "tax_id"}
-ADDRESS_FIELDS = (
-    "name",
-    "address_type",
-    "is_primary_address",
-    "address_line1",
-    "address_line2",
-    "city",
-    "pincode",
-    "country",
-)
-ADDRESS_OUTSIDE = {"address_line1", "address_line2", "city", "pincode"}
-INVOICE_FIELDS = (
-    "name",
-    "customer",
-    "customer_name",
-    "posting_date",
-    "due_date",
-    "currency",
-    "net_total",
-    "grand_total",
-    "outstanding_amount",
-    "status",
-    "docstatus",
-    "is_return",
-    "owner",
-    "modified",
-)
-INVOICE_DETAIL_FIELDS = (
-    "taxes_and_charges",
-    "total_taxes_and_charges",
-    "return_against",
-    "remarks",
-)
-INVOICE_OUTSIDE = {"customer_name", "remarks"}
-INVOICE_ITEM_FIELDS = (
-    "item_code",
-    "item_name",
-    "description",
-    "qty",
-    "uom",
-    "rate",
-    "amount",
-    "income_account",
-    "item_tax_template",
-    "cost_center",
-)
-INVOICE_ITEM_OUTSIDE = {"item_name", "description"}
-TAX_FIELDS = ("charge_type", "account_head", "rate", "tax_amount", "description")
-TEMPLATE_FIELDS = ("name", "title", "is_default", "tax_category", "disabled")
-RECEIVABLE_FIELDS = (
-    "party",
-    "voucher_type",
-    "voucher_no",
-    "posting_date",
-    "due_date",
-    "invoiced",
-    "paid",
-    "credit_note",
-    "outstanding",
-    "currency",
-    "age",
-)
-SALES_TEMPLATE = "Sales Taxes and Charges Template"
 DRAFT_FIELDS = (
     "customer",
     "posting_date",
@@ -115,9 +94,6 @@ DRAFT_FIELDS = (
     "grand_total",
 )
 DRAFT_MATCH = "customer, posting date and items"
-AGEING = tuple(f"range{i}" for i in range(6))  # range0: not yet due; then ERPNext's 30, 60, 90, 120
-AGEING_BASED_ON = {"due_date": "Due Date", "posting_date": "Posting Date"}
-MAX_ADDRESSES = 100
 
 
 class ListCustomers(Inputs):
@@ -158,7 +134,7 @@ class ListSalesTaxTemplates(Inputs):
 class ReportAccountsReceivable(Inputs):
     as_of_date: Day | None = None
     customer: Name | None = None
-    ageing_based_on: Literal["due_date", "posting_date"] = "due_date"
+    ageing_based_on: AgeingBasedOn = "due_date"
     limit: Limit = 20
     offset: Offset = 0
 
@@ -204,162 +180,62 @@ class UpdateDraftSalesInvoice(Inputs):
         return self
 
 
-def _customer(doc: dict[str, Any]) -> dict[str, Any]:
-    return shape(doc, CUSTOMER_FIELDS, outside=CUSTOMER_OUTSIDE, flags={"disabled"})
-
-
-def _invoice(doc: dict[str, Any]) -> dict[str, Any]:
-    return shape(doc, INVOICE_FIELDS, outside=INVOICE_OUTSIDE, flags={"is_return"})
-
-
 async def list_customers(inputs: ListCustomers, context: Context) -> dict[str, Any]:
-    or_filters: list[list[Any]] = []
-    if inputs.search is not None:
-        pattern = like_pattern(inputs.search)
-        or_filters = [["name", "like", pattern], ["customer_name", "like", pattern]]
-    rows = await context.erpnext.get_list(
-        "Customer",
-        fields=CUSTOMER_FIELDS,
-        filters=[] if inputs.include_disabled else [["disabled", "=", 0]],
-        or_filters=or_filters,
-        order_by="name asc",
-        start=inputs.offset,
-        page_length=inputs.limit + 1,
+    return await invoicing.list_parties(
+        SALES,
+        context,
+        search=inputs.search,
+        include_disabled=inputs.include_disabled,
+        limit=inputs.limit,
+        offset=inputs.offset,
     )
-    return page([_customer(row) for row in rows], inputs.offset, inputs.limit)
 
 
 async def get_customer(inputs: GetCustomer, context: Context) -> dict[str, Any]:
-    doc = await get_named(context, "Customer", inputs.name, field="name", what="the customer")
-    name = str(doc.get("name", inputs.name))
-    addresses = await context.erpnext.get_list(
-        "Address",
-        fields=ADDRESS_FIELDS,
-        filters=[
-            ["Dynamic Link", "link_doctype", "=", "Customer"],
-            ["Dynamic Link", "link_name", "=", name],
-        ],
-        order_by="name asc",
-        start=0,
-        page_length=MAX_ADDRESSES + 1,
-    )
-    record = shape(
-        doc, (*CUSTOMER_FIELDS, "payment_terms"), outside=CUSTOMER_OUTSIDE, flags={"disabled"}
-    )
-    outside = record.pop("outside_text")
-    return cut_texts(
-        {
-            **record,
-            "addresses": [
-                shape(a, ADDRESS_FIELDS, outside=ADDRESS_OUTSIDE, flags={"is_primary_address"})
-                for a in addresses[:MAX_ADDRESSES]
-            ],
-            "modified": doc.get("modified"),
-            "url": form_url(context.settings.erpnext_public_url, "Customer", name),
-            "truncated": ["addresses"] if len(addresses) > MAX_ADDRESSES else [],
-            "outside_text": outside,
-        }
-    )
+    return await invoicing.get_party(SALES, context, inputs.name)
 
 
 async def list_sales_invoices(inputs: ListSalesInvoices, context: Context) -> dict[str, Any]:
-    filters: list[list[Any]] = [["company", "=", context.settings.company]]
-    if inputs.customer is not None:
-        filters.append(["customer", "=", inputs.customer])
-    if inputs.state is not None:
-        filters += invoice_state(inputs.state, today(context.settings.timezone))
-    if inputs.from_date is not None:
-        filters.append(["posting_date", ">=", inputs.from_date.isoformat()])
-    if inputs.to_date is not None:
-        filters.append(["posting_date", "<=", inputs.to_date.isoformat()])
-    rows = await context.erpnext.get_list(
-        "Sales Invoice",
-        fields=INVOICE_FIELDS,
-        filters=filters,
-        order_by="posting_date desc, name desc",
-        start=inputs.offset,
-        page_length=inputs.limit + 1,
+    return await invoicing.list_invoices(
+        SALES,
+        context,
+        party=inputs.customer,
+        state=inputs.state,
+        from_date=inputs.from_date,
+        to_date=inputs.to_date,
+        limit=inputs.limit,
+        offset=inputs.offset,
     )
-    return page([_invoice(row) for row in rows], inputs.offset, inputs.limit)
 
 
 async def get_sales_invoice(inputs: GetSalesInvoice, context: Context) -> dict[str, Any]:
-    doc = await get_named(
-        context, "Sales Invoice", inputs.name, field="name", what="the sales invoice", company=True
-    )
-    items, items_cut = cut_rows(rows_of(doc, "items"))
-    taxes, taxes_cut = cut_rows(rows_of(doc, "taxes"))
-    record = shape(
-        doc, (*INVOICE_FIELDS, *INVOICE_DETAIL_FIELDS), outside=INVOICE_OUTSIDE, flags={"is_return"}
-    )
-    outside = record.pop("outside_text")
-    return cut_texts(
-        {
-            **record,
-            "items": [shape(r, INVOICE_ITEM_FIELDS, outside=INVOICE_ITEM_OUTSIDE) for r in items],
-            "taxes": [shape(r, TAX_FIELDS) for r in taxes],
-            "url": form_url(
-                context.settings.erpnext_public_url,
-                "Sales Invoice",
-                str(doc.get("name", inputs.name)),
-            ),
-            "truncated": [t for t, cut in (("items", items_cut), ("taxes", taxes_cut)) if cut],
-            "outside_text": outside,
-        }
-    )
+    return await invoicing.get_invoice(SALES, context, inputs.name)
 
 
 async def list_sales_tax_templates(
     inputs: ListSalesTaxTemplates, context: Context
 ) -> dict[str, Any]:
-    filters: list[list[Any]] = [["company", "=", context.settings.company]]
-    if not inputs.include_disabled:
-        filters.append(["disabled", "=", 0])
-    rows = await context.erpnext.get_list(
-        "Sales Taxes and Charges Template",
-        fields=TEMPLATE_FIELDS,
-        filters=filters,
-        order_by="name asc",
-        start=inputs.offset,
-        page_length=inputs.limit + 1,
+    return await invoicing.list_templates(
+        SALES,
+        context,
+        include_disabled=inputs.include_disabled,
+        limit=inputs.limit,
+        offset=inputs.offset,
     )
-    records = [shape(row, TEMPLATE_FIELDS, flags={"is_default", "disabled"}) for row in rows]
-    return page(records, inputs.offset, inputs.limit)
 
 
 async def report_accounts_receivable(
     inputs: ReportAccountsReceivable, context: Context
 ) -> dict[str, Any]:
-    filters: dict[str, Any] = {
-        "company": context.settings.company,
-        "report_date": (inputs.as_of_date or today(context.settings.timezone)).isoformat(),
-        "party_type": "Customer",
-        "ageing_based_on": AGEING_BASED_ON[inputs.ageing_based_on],
-        "age_as_on": "Report Date",
-        "range": "30, 60, 90, 120",
-    }
-    if inputs.customer is not None:
-        filters["party"] = [inputs.customer]
-    answer = await context.erpnext.run_report("Accounts Receivable", filters)
-    if answer.get("prepared_report"):
-        raise Refusal(
-            "ERPNext runs Accounts Receivable as a prepared report, and Erpel doesn't wait for "
-            "one; the operator can turn that off (see Erpel's configuration guide)."
-        )
-    # ERPNext appends its total row as a list; the rows themselves are objects.
-    listed = cast("list[Any]", answer["result"])
-    rows = [cast("dict[str, Any]", row) for row in listed if isinstance(row, dict)]
-    total: Decimal = sum((decimal(row.get("outstanding")) for row in rows), Decimal(0))
-    shown = rows[inputs.offset : inputs.offset + inputs.limit + 1]
-    records = [
-        {
-            **{f: row.get(f) for f in RECEIVABLE_FIELDS},
-            "ageing": {r: row.get(r) for r in AGEING},
-            "outside_text": {},
-        }
-        for row in shown
-    ]
-    return {**page(records, inputs.offset, inputs.limit), "total_outstanding": total}
+    return await invoicing.aged_report(
+        SALES,
+        context,
+        as_of_date=inputs.as_of_date,
+        party=inputs.customer,
+        ageing_based_on=inputs.ageing_based_on,
+        limit=inputs.limit,
+        offset=inputs.offset,
+    )
 
 
 def _invoice_body(
@@ -388,7 +264,7 @@ async def create_draft_sales_invoice(
 ) -> dict[str, Any]:
     taxes = None
     if inputs.taxes_and_charges is not None:
-        taxes = await drafts.tax_rows(context, SALES_TEMPLATE, inputs.taxes_and_charges)
+        taxes = await drafts.tax_rows(context, SALES.template, inputs.taxes_and_charges)
     doc = _invoice_body(inputs, taxes)
     posting_date = inputs.posting_date or today(context.settings.timezone)
     matches = await drafts.duplicates(
@@ -416,7 +292,7 @@ async def update_draft_sales_invoice(
     )
     taxes = None
     if inputs.taxes_and_charges:
-        taxes = await drafts.tax_rows(context, SALES_TEMPLATE, inputs.taxes_and_charges)
+        taxes = await drafts.tax_rows(context, SALES.template, inputs.taxes_and_charges)
     doc = _invoice_body(inputs, taxes)
     saved = await drafts.save_update(
         context, "Sales Invoice", inputs.name, {**doc, "modified": inputs.modified}
