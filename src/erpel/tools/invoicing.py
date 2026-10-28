@@ -4,7 +4,7 @@ templates and the aged report (REQ-004 for sales, REQ-005 for purchases)."""
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 from erpel.shapes import (
     InvoiceState,
@@ -20,7 +20,7 @@ from erpel.shapes import (
     split_outside,
     today,
 )
-from erpel.tools import Context, Refusal, get_named
+from erpel.tools import Context, get_named, report_rows
 
 ADDRESS_FIELDS = (
     "name",
@@ -237,15 +237,7 @@ async def aged_report(
     }
     if party is not None:
         filters["party"] = [party]
-    answer = await context.erpnext.run_report(side.report, filters)
-    if answer.get("prepared_report"):
-        raise Refusal(
-            f"ERPNext runs {side.report} as a prepared report, and Erpel doesn't wait for "
-            "one; the operator can turn that off (see Erpel's configuration guide)."
-        )
-    # ERPNext appends its total row as a list; the rows themselves are objects.
-    listed = cast("list[Any]", answer["result"])
-    rows = [cast("dict[str, Any]", row) for row in listed if isinstance(row, dict)]
+    rows = await report_rows(context, side.report, filters)
     total: Decimal = sum((decimal(row.get("outstanding")) for row in rows), Decimal(0))
     shown = rows[offset : offset + limit + 1]
     records = [
