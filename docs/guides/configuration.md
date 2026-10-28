@@ -67,6 +67,7 @@ Adding a permission rule for a DocType in ERPNext replaces its standard rules wi
 - **Site settings:**
 
   - Document sharing is on by default and lets any user with share rights pass the agent user further rights: turn it off (System Settings, `disable_document_sharing`).
+  - For purchase invoice drafts, keep Purchase Order Required and Purchase Receipt Required at No (Buying Settings), or allow the suppliers invoices without them (`allow_purchase_invoice_creation_without_purchase_order`, `allow_purchase_invoice_creation_without_purchase_receipt`): otherwise ERPNext refuses drafts without one at their first save: every draft for a required purchase order, drafts with stock or asset items for a required purchase receipt.
   - Turn on API request logging (System Settings, `log_api_requests`): it records path, user and method of the agent user's calls in ERPNext, next to Erpel's own log.
   - Where the Frappe version has a built-in MCP endpoint with generic tools, turn it off (`disable_mcp_server`); set it before an upgrade brings the endpoint, so it never opens silently.
 
