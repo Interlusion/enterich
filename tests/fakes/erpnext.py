@@ -81,6 +81,55 @@ FIELDS: dict[str, set[str]] = {
         "disabled",
         "company",
     },
+    "Supplier": {
+        "supplier_name",
+        "supplier_type",
+        "supplier_group",
+        "tax_id",
+        "default_currency",
+        "disabled",
+        "payment_terms",
+    },
+    "Purchase Invoice": {
+        "company",
+        "supplier",
+        "supplier_name",
+        "bill_no",
+        "bill_date",
+        "posting_date",
+        "due_date",
+        "currency",
+        "net_total",
+        "grand_total",
+        "outstanding_amount",
+        "status",
+        "is_return",
+        "taxes_and_charges",
+        "total_taxes_and_charges",
+        "return_against",
+        "remarks",
+        "update_stock",
+    },
+    "Purchase Invoice Item": {
+        "item_code",
+        "item_name",
+        "description",
+        "qty",
+        "uom",
+        "rate",
+        "amount",
+        "expense_account",
+        "item_tax_template",
+        "cost_center",
+        "is_free_item",
+    },
+    "Purchase Taxes and Charges Template": {
+        "title",
+        "is_default",
+        "tax_category",
+        "disabled",
+        "company",
+    },
     "Dynamic Link": {"link_doctype", "link_name"},
 }
 # DocType -> {table field: child DocType}
@@ -89,7 +138,19 @@ TABLES: dict[str, dict[str, str]] = {
     "Address": {"links": "Dynamic Link"},
     "Sales Invoice": {"items": "Sales Invoice Item", "taxes": "Sales Taxes and Charges"},
     "Sales Taxes and Charges Template": {"taxes": "Sales Taxes and Charges"},
+    "Purchase Invoice": {"items": "Purchase Invoice Item", "taxes": "Purchase Taxes and Charges"},
+    "Purchase Taxes and Charges Template": {"taxes": "Purchase Taxes and Charges"},
 }
+# invoice DocType -> (party DocType, naming series)
+INVOICES = {
+    "Sales Invoice": ("Customer", "ACC-SINV-2026-"),
+    "Purchase Invoice": ("Supplier", "ACC-PINV-2026-"),
+}
+STOCK_NOT_BILLED = "2100 - Stock Received But Not Billed - EX"
+# The accounts a purchase row can name; a link is saved in the stored name's case
+ACCOUNTS = {a.lower(): a for a in ("5000 - Cost - EX", "4930 - Office - EX", STOCK_NOT_BILLED)}
+# Payment Terms Template -> credit days of its one term
+TERMS = {"Net 30": 30, "Net 14": 14}
 
 
 @dataclass
@@ -134,6 +195,11 @@ class FakeErpnext:
     rules: dict[str, float] = field(default_factory=dict[str, float])
     # item code -> the free item a product pricing rule adds
     free_items: dict[str, str] = field(default_factory=dict[str, str])
+    # Item codes of stock items under perpetual inventory: their expense account on a
+    # purchase invoice becomes Stock Received But Not Billed (set_expense_account)
+    stock_items: set[str] = field(default_factory=set[str])
+    # Accounts Settings' check_supplier_invoice_uniqueness
+    unique_bills: bool = False
     comments: list[dict[str, Any]] = field(default_factory=list[dict[str, Any]])
     saves: int = 0
 
@@ -198,7 +264,7 @@ class FakeErpnext:
         return httpx2.Response(404, json=error(404, "DoesNotExistError", "No such route"))
 
     def _insert(self, doctype: str, body: dict[str, Any]) -> httpx2.Response:
-        name = f"ACC-SINV-2026-{101 + len(self.docs.get(doctype, {})):05d}"
+        name = f"{INVOICES[doctype][1]}{101 + len(self.docs.get(doctype, {})):05d}"
         doc = {"doctype": doctype, "name": name, "owner": "agent@example.com", **body}
         return self._save(doctype, copy.deepcopy(doc))
 
@@ -221,15 +287,21 @@ class FakeErpnext:
         return self._save(doctype, doc)
 
     def _save(self, doctype: str, doc: dict[str, Any]) -> httpx2.Response:
-        """Save a sales invoice draft as v16 does: posting date, prices, pricing rules, totals."""
-        party = self.docs.get("Customer", {}).get(doc.get("customer", ""))
+        """Save an invoice draft as v16 does: posting date, due date, prices, pricing rules,
+        accounts, totals."""
+        party_type, _ = INVOICES[doctype]
+        party_field = party_type.lower()
+        party = self.docs.get(party_type, {}).get(doc.get(party_field, ""))
         if party is None:
-            message = f"Could not find Customer: {doc.get('customer')}"
+            message = f"Could not find {party_type}: {doc.get(party_field)}"
             return httpx2.Response(417, json=error(417, "LinkValidationError", message))
         if not doc.get("set_posting_time"):
             doc["posting_date"] = self.today
-        if not doc.get("due_date"):
-            doc["due_date"] = str(date.fromisoformat(doc["posting_date"]) + timedelta(days=30))
+        if self.unique_bills and doc.get("bill_no") and (other := self._same_bill(doc)):
+            message = f"Supplier Invoice No exists in Purchase Invoice {other}"
+            return httpx2.Response(417, json=error(417, "ValidationError", message))
+        if problem := _due_date(doctype, doc, party):
+            return httpx2.Response(417, json=error(417, "ValidationError", problem))
         rows = [r for r in _rows(doc, "items") if not r.get("is_free_item")]
         for row in rows:
             code = row["item_code"]
@@ -242,8 +314,13 @@ class FakeErpnext:
                 {"item_code": self.free_items[code], "qty": 1, "rate": 0.0, "is_free_item": 1}
             )
         for row in rows:
-            row.update(doctype="Sales Invoice Item", amount=round(row["qty"] * row["rate"], 2))
+            row.update(doctype=f"{doctype} Item", amount=round(row["qty"] * row["rate"], 2))
             row.setdefault("uom", "Nos")
+            if doctype == "Purchase Invoice":
+                account = row.get("expense_account") or "5000 - Cost - EX"
+                row["expense_account"] = ACCOUNTS.get(account.lower(), account)
+                if row["item_code"] in self.stock_items and not doc.get("update_stock"):
+                    row["expense_account"] = STOCK_NOT_BILLED
         net_total = round(sum(r["amount"] for r in rows), 2)
         taxes = _rows(doc, "taxes")
         for tax in taxes:
@@ -253,7 +330,7 @@ class FakeErpnext:
         doc.update(
             items=rows,
             taxes=taxes,
-            customer_name=party["customer_name"],
+            **{f"{party_field}_name": party[f"{party_field}_name"]},
             currency="EUR",
             net_total=net_total,
             total_taxes_and_charges=total_taxes,
@@ -265,6 +342,19 @@ class FakeErpnext:
         )
         self.add(doctype, doc)
         return httpx2.Response(200, json={"data": doc})
+
+    def _same_bill(self, doc: dict[str, Any]) -> str | None:
+        """Another invoice of the supplier with the bill number in the same (calendar) year."""
+        for other in self.docs.get("Purchase Invoice", {}).values():
+            if (
+                other["name"] != doc["name"]
+                and other["docstatus"] < 2
+                and other.get("supplier") == doc.get("supplier")
+                and other.get("bill_no") == doc["bill_no"]
+                and other["posting_date"][:4] == doc["posting_date"][:4]
+            ):
+                return str(other["name"])
+        return None
 
     def _list(self, doctype: str, params: dict[str, str]) -> list[dict[str, Any]]:
         docs = list(self.docs.get(doctype, {}).values())
@@ -301,6 +391,38 @@ class FakeErpnext:
         rows = [dict(row) for row in self.reports.get(name, [])]
         total = ["Total"] + [""] * 5  # Frappe appends the total row as a list
         return {"result": [*rows, total] if rows else rows, "columns": [], "add_total_row": 1}
+
+
+def _due_date(doctype: str, doc: dict[str, Any], party: dict[str, Any]) -> str | None:
+    """The due date and payment schedule as v16 sets them at every save; the refusal of
+    validate_due_date, if any. `payment_terms_template` "" stays empty (update_if_missing)."""
+    posting = date.fromisoformat(doc["posting_date"])
+    bill = doc.get("bill_date") if doctype == "Purchase Invoice" else None
+    start = date.fromisoformat(bill) if bill else posting
+    if doc.get("payment_terms_template") is None:
+        doc["payment_terms_template"] = party.get("payment_terms")
+    template = doc["payment_terms_template"]
+    if not doc.get("due_date"):  # get_due_date: the invoice's terms, else the party's
+        days = TERMS.get(template or party.get("payment_terms") or "", 0)
+        doc["due_date"] = str(max(start + timedelta(days=days), posting))
+    schedule = _rows(doc, "payment_schedule")
+    if schedule:  # set_due_date
+        doc["due_date"] = max(str(row["due_date"]) for row in schedule)
+    elif template:  # set_payment_schedule
+        due = start + timedelta(days=TERMS[template])
+        doc["payment_schedule"] = [{"due_date": str(due), "invoice_portion": 100}]
+    else:
+        doc["payment_schedule"] = [{"due_date": doc["due_date"], "invoice_portion": 100}]
+    due = date.fromisoformat(doc["due_date"])
+    earliest = start if doctype == "Purchase Invoice" else posting
+    if due < earliest:
+        named = "Supplier Invoice Date" if doctype == "Purchase Invoice" else "Posting Date"
+        return f"Due Date cannot be before {named}"
+    if template:
+        latest = start + timedelta(days=TERMS[template])
+        if latest != earliest and due > latest:
+            return f"Due Date cannot be after {latest.strftime('%d-%m-%Y')}"
+    return None
 
 
 def _timestamp(value: Any) -> datetime | None:
@@ -593,6 +715,145 @@ def receivable(voucher_no: str, outstanding: float, **overrides: Any) -> dict[st
         "range4": 0.0,
         "range5": 0.0,
         "total_due": outstanding,
+    }
+    row.update(overrides)
+    return row
+
+
+def supplier(name: str = "SUPP-0001", **overrides: Any) -> dict[str, Any]:
+    """A Supplier as frappe.client.get returns it."""
+    doc: dict[str, Any] = {
+        "doctype": "Supplier",
+        "name": name,
+        "supplier_name": f"Supplier {name}",
+        "supplier_type": "Company",
+        "supplier_group": "Services",
+        "tax_id": "DE987654321",
+        "default_currency": "EUR",
+        "disabled": 0,
+        "payment_terms": "Net 14",
+        "tax_withholding_category": None,
+        "tax_withholding_group": None,
+        "modified": "2026-10-20 10:00:00.000000",
+    }
+    doc.update(overrides)
+    return doc
+
+
+def purchase_invoice(name: str = "ACC-PINV-2026-00001", **overrides: Any) -> dict[str, Any]:
+    """A Purchase Invoice as frappe.client.get returns it."""
+    doc: dict[str, Any] = {
+        "doctype": "Purchase Invoice",
+        "name": name,
+        "company": COMPANY,
+        "supplier": "SUPP-0001",
+        "supplier_name": "Supplier SUPP-0001",
+        "bill_no": "R-4711",
+        "bill_date": "2026-09-28",
+        "posting_date": "2026-10-01",
+        "due_date": "2026-10-12",
+        "currency": "EUR",
+        "net_total": 200.0,
+        "grand_total": 238.0,
+        "outstanding_amount": 238.0,
+        "status": "Unpaid",
+        "docstatus": 1,
+        "is_return": 0,
+        "update_stock": 0,
+        "owner": "agent@example.com",
+        "modified": "2026-10-01 09:00:00.000000",
+        "taxes_and_charges": "Input VAT 19% - EX",
+        "total_taxes_and_charges": 38.0,
+        "return_against": None,
+        "remarks": "Office supplies",
+        "items": [
+            {
+                "doctype": "Purchase Invoice Item",
+                "item_code": "PAPER",
+                "item_name": "Paper A4",
+                "description": "<p>Paper A4, 500 sheets</p>",
+                "qty": 10.0,
+                "uom": "Nos",
+                "rate": 20.0,
+                "amount": 200.0,
+                "expense_account": "5000 - Cost - EX",
+                "item_tax_template": None,
+                "cost_center": "Main - EX",
+                "is_free_item": 0,
+            }
+        ],
+        "taxes": [
+            {
+                "doctype": "Purchase Taxes and Charges",
+                "charge_type": "On Net Total",
+                "account_head": "1576 - Input VAT 19% - EX",
+                "add_deduct_tax": "Add",
+                "category": "Total",
+                "rate": 19.0,
+                "tax_amount": 38.0,
+                "description": "Input VAT 19%",
+            }
+        ],
+    }
+    doc.update(overrides)
+    return doc
+
+
+def purchase_tax_template(name: str = "Input VAT 19% - EX", **overrides: Any) -> dict[str, Any]:
+    """A Purchase Taxes and Charges Template."""
+    doc: dict[str, Any] = {
+        "doctype": "Purchase Taxes and Charges Template",
+        "name": name,
+        "title": name.rsplit(" - ", 1)[0],
+        "company": COMPANY,
+        "is_default": 0,
+        "tax_category": None,
+        "disabled": 0,
+        "taxes": [
+            {
+                "doctype": "Purchase Taxes and Charges",
+                "charge_type": "On Net Total",
+                "account_head": "1576 - Input VAT 19% - EX",
+                "add_deduct_tax": "Add",
+                "category": "Total",
+                "description": "Input VAT 19%",
+                "rate": 19.0,
+                "included_in_print_rate": 0,
+                "cost_center": "Main - EX",
+            }
+        ],
+    }
+    doc.update(overrides)
+    return doc
+
+
+def payable(voucher_no: str, outstanding: float, **overrides: Any) -> dict[str, Any]:
+    """A row of Accounts Payable as its execute() returns it, with columns Erpel drops."""
+    row: dict[str, Any] = {
+        "party_type": "Supplier",
+        "party": "SUPP-0001",
+        "party_account": "1600 - Creditors - EX",
+        "cost_center": "Main - EX",
+        "voucher_type": "Purchase Invoice",
+        "voucher_no": voucher_no,
+        "posting_date": "2026-10-01",
+        "due_date": "2026-10-15",
+        "bill_no": "R-4711",
+        "bill_date": "2026-09-28",
+        "invoiced": outstanding,
+        "paid": 0.0,
+        "credit_note": 0.0,
+        "outstanding": outstanding,
+        "currency": "EUR",
+        "age": 13,
+        "range0": 0.0,
+        "range1": outstanding,
+        "range2": 0.0,
+        "range3": 0.0,
+        "range4": 0.0,
+        "range5": 0.0,
+        "total_due": outstanding,
+        "supplier_group": "Services",
     }
     row.update(overrides)
     return row

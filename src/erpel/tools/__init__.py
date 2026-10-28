@@ -54,9 +54,9 @@ class Operation[I: Inputs]:
 
 
 def operations() -> list[Operation[Any]]:
-    from erpel.tools import master_data, order_to_cash
+    from erpel.tools import master_data, order_to_cash, procure_to_pay
 
-    return [*master_data.OPERATIONS, *order_to_cash.OPERATIONS]
+    return [*master_data.OPERATIONS, *order_to_cash.OPERATIONS, *procure_to_pay.OPERATIONS]
 
 
 def names() -> tuple[str, ...]:

@@ -153,6 +153,7 @@ def test_a_create_sends_exactly_the_catalogued_body(mcp: Session, erp: FakeErpne
         "set_posting_time": 1,
         "due_date": "2026-12-02",
         "items": [row],
+        "payment_terms_template": "",
         "taxes_and_charges": "VAT 19% - EX",
         "taxes": VAT_ROWS,
         "remarks": "Order 4711",
@@ -483,6 +484,8 @@ def test_an_update_sends_exactly_the_catalogued_body(mcp: Session, erp: FakeErpn
         "posting_date": "2026-11-02",
         "set_posting_time": 1,
         "due_date": "2026-12-02",
+        "payment_terms_template": "",
+        "payment_schedule": [],
         "items": [row],
         "remarks": "Order 4712",
         "modified": MODIFIED,
@@ -679,3 +682,65 @@ def test_rows_at_rate_0_are_named_up_to_20(mcp: Session, erp: FakeErpnext) -> No
     assert "10 more rows" in more
     [comment] = comments(erp)
     assert comment["content"].endswith(more)
+
+
+# Due dates (REQ-001-PRS-F017)
+
+
+def test_a_due_date_later_than_the_terms_is_saved(mcp: Session) -> None:
+    result = create(mcp, due_date="2027-01-31")
+    assert not result.error, result.text
+    assert result.data["due_date"] == "2027-01-31"
+
+
+def test_an_update_with_a_due_date_saves_it(mcp: Session, erp: FakeErpnext) -> None:
+    created = create(mcp).data  # its schedule comes from the customer's Net 30
+    assert erp.docs["Sales Invoice"][created["name"]]["payment_schedule"]
+    result = update(mcp, created["name"], created["modified"], due_date="2026-12-15")
+    assert not result.error, result.text
+    assert result.data["due_date"] == "2026-12-15"
+
+
+def test_an_update_of_the_posting_date_recounts_the_due_date(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    created = create(mcp).data
+    result = update(mcp, created["name"], created["modified"], posting_date="2026-11-02").data
+    assert result["due_date"] == "2026-12-02"
+    put = saves(erp)[-1]
+    assert put.body == {
+        "posting_date": "2026-11-02",
+        "set_posting_time": 1,
+        "payment_schedule": [],
+        "due_date": None,
+        "modified": created["modified"],
+    }
+
+
+def test_a_floating_draft_can_be_updated_on_a_later_day(mcp: Session, erp: FakeErpnext) -> None:
+    yesterday = "2026-10-28"
+    erp.add("Customer", customer("CUST-0003", payment_terms=None))
+    draft = sales_invoice(
+        "ACC-SINV-2026-00020",
+        customer="CUST-0003",
+        docstatus=0,
+        status="Draft",
+        set_posting_time=0,
+        posting_date=yesterday,
+        due_date=yesterday,
+        payment_terms_template=None,
+        payment_schedule=[{"due_date": yesterday, "invoice_portion": 100}],
+        modified=MODIFIED,
+    )
+    erp.add("Sales Invoice", draft)
+    result = update(mcp, "ACC-SINV-2026-00020", remarks="Checked")
+    assert not result.error, result.text
+    assert (result.data["posting_date"], result.data["due_date"]) == (TODAY, TODAY)
+
+
+def test_an_update_without_a_date_keeps_the_due_date(mcp: Session, erp: FakeErpnext) -> None:
+    created = create(mcp, due_date="2026-12-20").data
+    result = update(mcp, created["name"], created["modified"], remarks="Checked").data
+    assert result["due_date"] == "2026-12-20"
+    put = saves(erp)[-1]
+    assert put.body == {"remarks": "Checked", "modified": created["modified"]}

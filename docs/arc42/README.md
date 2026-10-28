@@ -1,6 +1,6 @@
 # Erpel architecture
 
-Compact [arc42](https://arc42.org/): all twelve sections in this file, until one of them outgrows it. The service around the operations is built, the operations of master data and of order to cash; this describes the design the requirement specifications ([index](../specs/README.md)) and the [ADRs](adr/README.md) set out. When code exists and disagrees, the code wins and this file is fixed.
+Compact [arc42](https://arc42.org/): all twelve sections in this file, until one of them outgrows it. The service around the operations is built, the operations of master data, order to cash and procure to pay; this describes the design the requirement specifications ([index](../specs/README.md)) and the [ADRs](adr/README.md) set out. When code exists and disagrees, the code wins and this file is fixed.
 
 Diagrams are Mermaid, rendered by GitHub.
 
@@ -85,7 +85,7 @@ flowchart LR
 
 ## 5. Building block view
 
-*Built: `config`, `app`, `auth`, `log`, `erpnext`, `shapes`, and `tools/` with master data and order to cash. Not yet: the other areas.*
+*Built: `config`, `app`, `auth`, `log`, `erpnext`, `shapes`, and `tools/` with master data, order to cash and procure to pay. Not yet: the other areas.*
 
 ```mermaid
 flowchart TB
@@ -112,7 +112,7 @@ flowchart TB
 | `config` | Reads and validates every `ERPEL_*` variable once at start; secrets kept out of `repr` |
 | `app` | The outer ASGI wrapper (method check, 1 MiB body limit, `/healthz`, `rejection` log from the response status, 503 when no signing keys are available) around the SDK's MCP app with `AuthSettings`; registers only the operations `ERPEL_TOOLS` allows |
 | `auth` | The token verifier of ADR-003; returns the SDK's `AccessToken` with `sub`, `sid` and `expires_at = exp + leeway` |
-| `tools/` | One module per accounting area, named like its spec (`master_data`, `order_to_cash`, `procure_to_pay`, `record_to_report`, `bank_and_cash`): each operation with its input model, ERPNext call and result shape; `drafts` holds what every draft operation shares (tax rows, duplicate check, update checks, warnings and their comment) |
+| `tools/` | One module per accounting area, named like its spec (`master_data`, `order_to_cash`, `procure_to_pay`, `record_to_report`, `bank_and_cash`): each operation with its input model, ERPNext call and result shape; `drafts` holds what every draft operation shares (tax rows, duplicate check, update checks, warnings and their comment), `invoicing` the reads the sales and purchase side share (parties, invoices, tax templates, the aged report) |
 | `shapes` | Shared input types (names, dates, decimals, limits, keys) with extra properties forbidden, list paging, child-table cutting, the `outside_text` split |
 | `erpnext` | One `httpx2` client with `trust_env=False`: base URL, Host, token header, 30 s per call, 10 MiB per response, no redirects; maps refusals to [REQ-001-PRS-F008](../specs/req-001-core.md#req-001-prs-f008-refusals-reported) messages; encodes name inputs |
 | `log` | JSON-lines logging for Erpel's events and the SDK's and uvicorn's loggers |

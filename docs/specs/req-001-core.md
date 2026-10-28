@@ -401,6 +401,22 @@ Only a fixed list of operations, without generic method calls, closes these door
 - Verification: test.
 - Evidence: Erpel's test suite.
 
+#### REQ-001-PRS-F017: Due dates of invoice drafts
+
+**Description**: Invoice drafts SHALL get the due date the agent gives, or else the one ERPNext counts from the payment terms and the current dates, as the form does. With a given `due_date`, a create or update SHALL send `payment_terms_template` "" with it, so that the date stands as the only payment term. An update SHALL send `payment_schedule` as an empty table, so that ERPNext rebuilds it, when it gives `due_date`, `posting_date` or `bill_date`, or when the draft's posting date is not fixed (`set_posting_time` 0) and not today; without a given `due_date` it SHALL then send `due_date` empty, so that ERPNext counts it again.
+
+**Related URS**: REQ-001-URS-F002
+
+**Definition of Done**:
+
+- A create with a due date later than the party's payment terms allow is saved with that due date.
+- An update with a due date saves it, also on a draft whose payment schedule came from payment terms.
+- An update of the posting date, or of a purchase invoice's `bill_date`, saves the due date counted from the payment terms and the new date.
+- A draft created without a posting date, for a party without payment terms, can be updated on a later day; its due date moves with its posting date.
+- An update that gives no date, of a draft whose posting date stays, sends no schedule and keeps the due date.
+- Verification: test.
+- Evidence: Erpel's test suite.
+
 ## PRS — Non-Functional
 
 #### REQ-001-PRS-NF001: Outside text marked
@@ -513,6 +529,7 @@ Lists use `/api/resource/<DocType>` with the fields of their area catalogue; get
 Checked against Frappe and ERPNext v16.52 source:
 
 - An update that sends `modified` is refused with `TimestampMismatchError` when the stored value differs (`Document.check_if_latest`); the two are compared as timestamps. `modified` has microseconds, and ERPNext's JSON leaves out `.000000` on a whole second.
+- At every save, an invoice takes its due date from its payment schedule, the latest date in it, and builds the schedule only while it is empty: from the payment terms template, or as one term on the due date (`set_due_date`, `set_payment_schedule`). A REST update never empties it; the form does when a date changes. A due date later than the payment terms allow is refused unless the user is a credit controller (`validate_due_date_with_template`); with `payment_terms_template` empty there's no such check, and an empty template stays empty (`update_if_missing` fills only empty values). A save without `due_date` counts it from the payment terms of the invoice, else of the party, its group, or the company (`get_due_date`).
 - ERPNext rounds every number it saves to its field's precision: quantities to the site's float precision (3 unless System Settings say otherwise), rates and amounts to the currency's.
 - Saving a submitted document needs the submit right (`check_docstatus_transition`).
 - ERPNext fills tax rows from a template on insert only when a site setting says so (`add_taxes_from_taxes_and_charges_template`); Erpel therefore fills them itself.

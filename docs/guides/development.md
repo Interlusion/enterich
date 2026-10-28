@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-24 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: everything below is built except, in `tools/`, the areas after order to cash, and `python -m tests.fakes` (the fakes run in tests only) |
+| **Status** | Draft: everything below is built except, in `tools/`, the areas after procure to pay, and `python -m tests.fakes` (the fakes run in tests only) |
 
 ## Repository layout
 
@@ -20,7 +20,8 @@ src/erpel/
   tools/             one module per accounting area, named like its spec:
                      master_data, order_to_cash, procure_to_pay,
                      record_to_report, bank_and_cash; drafts.py holds
-                     what every draft operation shares
+                     what every draft operation shares, invoicing.py
+                     the reads the sales and purchase side share
 tests/
   unit/              per module
   e2e/               Erpel against a fake JWKS and a fake ERPNext, named
