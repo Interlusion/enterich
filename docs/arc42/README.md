@@ -1,6 +1,6 @@
 # Erpel architecture
 
-Compact [arc42](https://arc42.org/): all twelve sections in this file, until one of them outgrows it. The service around the operations is built, the operations of master data and of order to cash; this describes the design the requirement specifications ([index](../specs/README.md)) and the [ADRs](adr/README.md) set out. When code exists and disagrees, the code wins and this file is fixed.
+Compact [arc42](https://arc42.org/): all twelve sections in this file, until one of them outgrows it. The service around the operations is built, the operations of master data, order to cash and procure to pay; this describes the design the requirement specifications ([index](../specs/README.md)) and the [ADRs](adr/README.md) set out. When code exists and disagrees, the code wins and this file is fixed.
 
 Diagrams are Mermaid, rendered by GitHub.
 
@@ -85,7 +85,7 @@ flowchart LR
 
 ## 5. Building block view
 
-*Built: `config`, `app`, `auth`, `log`, `erpnext`, `shapes`, and `tools/` with master data and order to cash. Not yet: the other areas.*
+*Built: `config`, `app`, `auth`, `log`, `erpnext`, `shapes`, and `tools/` with master data, order to cash and procure to pay. Not yet: the other areas.*
 
 ```mermaid
 flowchart TB

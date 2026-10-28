@@ -280,7 +280,7 @@ async def create_draft_sales_invoice(
     )
     warnings = [drafts.duplicate_warning(matches, DRAFT_MATCH)] if matches else []
     warnings += drafts.tax_warning(saved, inputs.taxes_and_charges)
-    warnings += drafts.rate_warnings(saved, doc["items"])
+    warnings += drafts.row_warnings(saved, doc["items"])
     return await drafts.result(context, "Sales Invoice", saved, DRAFT_FIELDS, warnings)
 
 
@@ -299,7 +299,7 @@ async def update_draft_sales_invoice(
         context, "Sales Invoice", inputs.name, {**doc, "modified": inputs.modified}
     )
     warnings = drafts.tax_warning(saved, inputs.taxes_and_charges)
-    warnings += drafts.rate_warnings(saved, doc.get("items"))
+    warnings += drafts.row_warnings(saved, doc.get("items"))
     return await drafts.result(context, "Sales Invoice", saved, DRAFT_FIELDS, warnings)
 
 
