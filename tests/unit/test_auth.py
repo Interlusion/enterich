@@ -55,6 +55,11 @@ class Rel(int):
     """A time claim relative to when the test runs."""
 
 
+# Time claims sit 10 s inside or outside this leeway, so a slow run (an
+# emulated arm64 image takes minutes) doesn't move them across it.
+LEEWAY = 30
+
+
 def at_runtime(overrides: dict[str, Any]) -> dict[str, Any]:
     now = int(time.time())
     return {k: now + v if isinstance(v, Rel) else v for k, v in overrides.items()}
@@ -97,9 +102,9 @@ async def test_expires_at_carries_the_leeway(jwks: FakeJwks, signer: Signer) -> 
         ({"typ": None}, "not an access token"),
         ({"azp": None}, "wrong client"),
         ({"azp": CLIENT_ID, "client_id": "another-client"}, "azp and client_id differ"),
-        ({"exp": Rel(-6)}, "expired"),
-        ({"nbf": Rel(6)}, "not yet valid"),
-        ({"iat": Rel(6)}, "not yet valid"),
+        ({"exp": Rel(-LEEWAY - 10)}, "expired"),
+        ({"nbf": Rel(LEEWAY + 10)}, "not yet valid"),
+        ({"iat": Rel(LEEWAY + 10)}, "not yet valid"),
         ({"sub": None}, "missing claim"),
         ({"iat": None}, "missing claim"),
         ({"exp": None}, "missing claim"),
@@ -108,7 +113,8 @@ async def test_expires_at_carries_the_leeway(jwks: FakeJwks, signer: Signer) -> 
 async def test_tokens_are_refused(
     jwks: FakeJwks, signer: Signer, overrides: dict[str, Any], reason: str
 ) -> None:
-    assert await refusal(verifier(jwks), token(signer, **at_runtime(overrides))) == reason
+    v = verifier(jwks, settings(clock_leeway=str(LEEWAY)))
+    assert await refusal(v, token(signer, **at_runtime(overrides))) == reason
 
 
 async def test_signature_valid_refusals_carry_subject_and_client(
@@ -133,15 +139,16 @@ async def test_signature_invalid_refusals_carry_nothing_unsigned(jwks: FakeJwks)
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"exp": Rel(-4)},
-        {"nbf": Rel(4)},
-        {"iat": Rel(4)},
+        {"exp": Rel(-LEEWAY + 10)},
+        {"nbf": Rel(LEEWAY - 10)},
+        {"iat": Rel(LEEWAY - 10)},
     ],
 )
 async def test_times_within_the_leeway_are_accepted(
     jwks: FakeJwks, signer: Signer, overrides: dict[str, Any]
 ) -> None:
-    assert await verifier(jwks).verify_token(token(signer, **at_runtime(overrides))) is not None
+    v = verifier(jwks, settings(clock_leeway=str(LEEWAY)))
+    assert await v.verify_token(token(signer, **at_runtime(overrides))) is not None
 
 
 @pytest.mark.parametrize("typ", ["at+jwt", "application/at+jwt", "AT+JWT"])
