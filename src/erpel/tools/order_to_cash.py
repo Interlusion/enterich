@@ -265,7 +265,7 @@ async def create_draft_sales_invoice(
     taxes = None
     if inputs.taxes_and_charges is not None:
         taxes = await drafts.tax_rows(context, SALES.template, inputs.taxes_and_charges)
-    doc = _invoice_body(inputs, taxes)
+    doc = drafts.due_dates(_invoice_body(inputs, taxes))
     posting_date = inputs.posting_date or today(context.settings.timezone)
     matches = await drafts.duplicates(
         context,
@@ -287,13 +287,14 @@ async def create_draft_sales_invoice(
 async def update_draft_sales_invoice(
     inputs: UpdateDraftSalesInvoice, context: Context
 ) -> dict[str, Any]:
-    await drafts.editable(
+    stored = await drafts.editable(
         context, "Sales Invoice", inputs.name, inputs.modified, "the sales invoice"
     )
     taxes = None
     if inputs.taxes_and_charges:
         taxes = await drafts.tax_rows(context, SALES.template, inputs.taxes_and_charges)
-    doc = _invoice_body(inputs, taxes)
+    day = today(context.settings.timezone)
+    doc = drafts.due_dates(_invoice_body(inputs, taxes), stored, day)
     saved = await drafts.save_update(
         context, "Sales Invoice", inputs.name, {**doc, "modified": inputs.modified}
     )

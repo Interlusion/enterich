@@ -4,7 +4,7 @@ duplicate check, the update checks, the warnings and their comment, the result."
 import html
 from collections import Counter
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -73,8 +73,10 @@ def duplicate_warning(names: Sequence[str], match: str) -> str:
     return f"Possible duplicate of {named(names)}: a draft with the same {match}."
 
 
-async def editable(context: Context, doctype: str, name: str, modified: str, what: str) -> None:
-    """Refuse an update of anything but the company's draft as last read (REQ-001-PRS-F003,
+async def editable(
+    context: Context, doctype: str, name: str, modified: str, what: str
+) -> dict[str, Any]:
+    """The company's draft as last read; refuse an update of anything else (REQ-001-PRS-F003,
     REQ-001-PRS-F004)."""
     stored = await get_named(context, doctype, name, field="name", what=what, company=True)
     state = DOCSTATUS.get(stored.get("docstatus", 0))
@@ -82,6 +84,7 @@ async def editable(context: Context, doctype: str, name: str, modified: str, wha
         raise Refusal(f"name: {name} is {state}; only drafts can be updated.")
     if _timestamp(stored.get("modified")) != _timestamp(modified):
         raise Refusal(STALE)
+    return stored
 
 
 def _timestamp(value: Any) -> datetime | None:
@@ -101,6 +104,25 @@ async def save_update(
         if refused.exc_type == "TimestampMismatchError":
             raise Refusal(STALE) from None
         raise
+
+
+def due_dates(
+    doc: dict[str, Any], stored: dict[str, Any] | None = None, day: date | None = None
+) -> dict[str, Any]:
+    """REQ-001-PRS-F017: an invoice body with what keeps its due date the given one, or the
+    one ERPNext counts from the payment terms and the current dates, as the form does.
+    `stored` is the draft an update changes, `day` today; on create both are None."""
+    if "due_date" in doc:
+        doc = {**doc, "payment_terms_template": ""}  # the given date is the only term
+    if stored is None:
+        return doc
+    # A draft without a fixed posting date gets today's at this save.
+    moves = not stored.get("set_posting_time") and stored.get("posting_date") != str(day)
+    if moves or {"due_date", "posting_date", "bill_date"} & doc.keys():
+        doc = {**doc, "payment_schedule": []}  # ERPNext builds it anew only when empty
+        if "due_date" not in doc:
+            doc["due_date"] = None  # counted again from the terms
+    return doc
 
 
 def _number(value: Decimal) -> str:
