@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-26 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: every variable is built; the operations so far are those of master data and the reads of order to cash |
+| **Status** | Draft: every variable is built; the operations so far are those of master data and order to cash |
 
 Erpel reads its whole configuration from environment variables at start and refuses to start if one is missing or invalid, naming the variable (spec REQ-002-PRS-NF005). There is no configuration file. Variables are part of the versioned interface ([ADR-004](../arc42/adr/ADR-004-releases-and-image.md)).
 
@@ -43,7 +43,7 @@ Erpel ignores proxy settings from the environment (`HTTP_PROXY`, `HTTPS_PROXY`) 
 | Variable | Required | Default | Meaning |
 | :- | :- | :- | :- |
 | `ERPEL_TOOLS` | no | all operations | Comma-separated operation names to offer; an unknown name stops Erpel. When set, operations added in later versions stay off until added here |
-| `ERPEL_TIMEZONE` | no | `UTC` | IANA time zone name, e.g. `Europe/Berlin`; defines "today" for defaults and the overdue state |
+| `ERPEL_TIMEZONE` | no | `UTC` | IANA time zone name, e.g. `Europe/Berlin`; defines "today" for defaults and the overdue state; set it to the site's time zone (System Settings), which ERPNext uses for a draft's posting date |
 | `ERPEL_HOST` | no | `0.0.0.0` | Listen address |
 | `ERPEL_PORT` | no | `8000` | Listen port |
 | `ERPEL_LOG_LEVEL` | no | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, for the lines of libraries and the HTTP server; Erpel's own events are always written. No level logs secrets or tokens |

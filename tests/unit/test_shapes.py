@@ -12,6 +12,7 @@ from erpel.erpnext import ErpnextError
 from erpel.shapes import (
     Amount,
     Day,
+    Modified,
     Name,
     Quantity,
     Rate,
@@ -78,19 +79,39 @@ def test_search_is_a_literal_substring(search: str, pattern: str) -> None:
     assert like_pattern(search) == pattern
 
 
-def test_quantities_allow_6_decimal_places_and_no_more() -> None:
+def test_quantities_allow_3_decimal_places_and_no_more() -> None:
     quantities = TypeAdapter(Quantity)
-    assert quantities.validate_python("1.123456") == Decimal("1.123456")
-    for bad in ("1.1234567", "0", "-1", "10000.000001"):
+    assert quantities.validate_python("1.123") == Decimal("1.123")
+    for bad in ("1.1234", "0", "-1", "10000.001"):
         with pytest.raises(ValidationError):
             quantities.validate_python(bad)
 
 
+@pytest.mark.parametrize("value", ["2026-10-28 11:00:00.123456", "2026-10-28 11:00:00"])
+def test_modified_is_taken_with_or_without_its_fraction(value: str) -> None:
+    assert TypeAdapter(Modified).validate_python(value) == value
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "2026-10-28T11:00:00",
+        "2026-10-28 11:00",
+        "2026-10-28 11:00:00.1234567",
+        "2026-13-45 11:00:00",
+    ],
+)
+def test_modified_has_erpnexts_format(value: str) -> None:
+    with pytest.raises(ValidationError):
+        TypeAdapter(Modified).validate_python(value)
+
+
 def test_rates_and_amounts_have_their_limits() -> None:
     rates, amounts = TypeAdapter(Rate), TypeAdapter(Amount)
-    assert rates.validate_python(0) == 0
+    assert rates.validate_python("0.000001") == Decimal("0.000001")
     assert amounts.validate_python("0.125") == Decimal("0.125")
-    for adapter, bad in ((rates, "1000000000.01"), (rates, "-0.01"), (amounts, "0.1234")):
+    # ERPNext takes a rate of 0 as none given
+    for adapter, bad in ((rates, "1000000000.01"), (rates, 0), (amounts, "0.1234")):
         with pytest.raises(ValidationError):
             adapter.validate_python(bad)
 

@@ -111,7 +111,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 **Description**: For REQ-001-PRS-F005, a purchase invoice create SHALL match:
 
 - when `bill_no` is given, a draft or submitted purchase invoice of the assigned company with the same supplier and `bill_no`;
-- otherwise, a draft with the same supplier, the same posting date (the given one, or today) and the same items (item codes and quantities, in any order).
+- otherwise, a draft with the same supplier, the same posting date (the given one, or today) and the same items (item codes and quantities, in any order, leaving out free-item rows a pricing rule added).
 
 **Related URS**: REQ-005-URS-F002, REQ-001-URS-F007
 
@@ -144,10 +144,12 @@ Supplier names are not in report rows; `get_supplier` gives them.
 | Operation | Inputs | Sent to ERPNext |
 | :- | :- | :- |
 | `create_draft_purchase_invoice` | **`supplier`**; `bill_no`, `bill_date`; `posting_date` (default today), `due_date` (default from payment terms); **`items`** (1–20) \[**`item_code`**, **`qty`**, **`rate`**, `uom`, `expense_account`, `cost_center`\]; `taxes_and_charges`; `remarks`; `allow_duplicate` | the given fields; `set_posting_time` 1 when `posting_date` is given; `taxes` from the template; `update_stock` 0; `company`; `docstatus` 0 |
-| `update_draft_purchase_invoice` | **`name`**, **`modified`**; at least one of `supplier`, `bill_no`, `bill_date`, `posting_date`, `due_date`, `items`, `taxes_and_charges`, `remarks` | the given fields; `set_posting_time` 1 when `posting_date` is given; `taxes` when `taxes_and_charges` is given (none when it is cleared); `modified` |
+| `update_draft_purchase_invoice` | **`name`**, **`modified`**; at least one of `bill_no`, `bill_date`, `posting_date`, `due_date`, `items`, `taxes_and_charges`, `remarks` | the given fields; `set_posting_time` 1 when `posting_date` is given; `taxes` when `taxes_and_charges` is given (none when it is cleared); `modified` |
 
 - Clearable on update: `remarks`, `bill_no`, `taxes_and_charges` (with its rows).
-- Results add: `supplier`, `posting_date`, `due_date`, `currency`, `net_total`, `total_taxes_and_charges`, `grand_total`, `taxes` \[`account_head`, `rate`, `tax_amount`\], the row count.
+- The supplier isn't changed by an update: ERPNext would keep the first supplier's address, payment terms, price list and payable account. A draft for another supplier is a new draft.
+- Rates come from the supplier's bill, so `rate` is required. Erpel never sends `ignore_pricing_rule`; REQ-001-PRS-F016 warns where a buying pricing rule replaced a given rate.
+- Results add: `supplier`, `posting_date`, `due_date`, `currency`, `net_total`, `total_taxes_and_charges`, `grand_total`, `taxes` \[`account_head`, `rate`, `tax_amount`\], `items` \[`item_code`, `qty`, `rate`, `amount`, `is_free_item`\].
 
 ### ERPNext calls
 
@@ -158,7 +160,7 @@ Supplier names are not in report rows; `get_supplier` gives them.
 | `list_purchase_tax_templates` | Purchase Taxes and Charges Template | `company` | `name` |
 | `report_accounts_payable` | Accounts Payable | `company`, `report_date`, `party_type` Supplier, `party` (a list holding `supplier`, when given), `ageing_based_on` (`Due Date` or `Posting Date`), `age_as_on` `Report Date`, `range` `30, 60, 90, 120` | ERPNext's |
 | duplicate check with `bill_no` | Purchase Invoice | `company`, `docstatus` 0 or 1, `supplier`, `bill_no` | — |
-| duplicate check without `bill_no` | Purchase Invoice | `company`, `docstatus` 0, `supplier`, `posting_date` | — |
+| duplicate check without `bill_no` | Purchase Invoice, with `name`, `items.item_code`, `items.qty` and `items.is_free_item` (one row per item) in one call | `company`, `docstatus` 0, `supplier`, `posting_date` | — |
 
 ### Rights
 
@@ -182,7 +184,9 @@ Warnings are added to a draft as a comment, which needs no further right (REQ-00
 
 Checked against ERPNext v16.52 source:
 
-- An invoice saved with `set_posting_time` 0 gets today as posting date.
+- An invoice saved with `set_posting_time` 0 gets today, in the site's time zone (System Settings), as posting date at every save.
+- A given rate is kept unless a price pricing rule for buying matches the row; then the rule sets the rate anew at every save and its name goes into the row's `pricing_rules`. Product pricing rules append free-item rows (`is_free_item`).
+- The supplier's address, contact, payment terms, price list and accounts are filled in on save only where the draft has none; a supplier address of another supplier is refused.
 
 Not checked yet:
 

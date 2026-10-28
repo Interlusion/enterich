@@ -1,9 +1,9 @@
 """Order to cash: customers, sales invoices, sales tax templates, receivables (REQ-004)."""
 
 from decimal import Decimal
-from typing import Any, Literal, Self, cast
+from typing import Annotated, Any, Literal, Self, cast
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from erpel.shapes import (
     Day,
@@ -11,8 +11,12 @@ from erpel.shapes import (
     Inputs,
     InvoiceState,
     Limit,
+    Modified,
     Name,
     Offset,
+    Quantity,
+    Rate,
+    Remarks,
     Search,
     cut_rows,
     cut_texts,
@@ -26,7 +30,7 @@ from erpel.shapes import (
     shape,
     today,
 )
-from erpel.tools import Context, Operation, Refusal, get_named
+from erpel.tools import Context, Operation, Refusal, drafts, get_named
 
 CUSTOMER_FIELDS = (
     "name",
@@ -100,6 +104,17 @@ RECEIVABLE_FIELDS = (
     "currency",
     "age",
 )
+SALES_TEMPLATE = "Sales Taxes and Charges Template"
+DRAFT_FIELDS = (
+    "customer",
+    "posting_date",
+    "due_date",
+    "currency",
+    "net_total",
+    "total_taxes_and_charges",
+    "grand_total",
+)
+DRAFT_MATCH = "customer, posting date and items"
 AGEING = tuple(f"range{i}" for i in range(6))  # range0: not yet due; then ERPNext's 30, 60, 90, 120
 AGEING_BASED_ON = {"due_date": "Due Date", "posting_date": "Posting Date"}
 MAX_ADDRESSES = 100
@@ -146,6 +161,47 @@ class ReportAccountsReceivable(Inputs):
     ageing_based_on: Literal["due_date", "posting_date"] = "due_date"
     limit: Limit = 20
     offset: Offset = 0
+
+
+class SalesInvoiceItem(Inputs):
+    item_code: Name
+    qty: Quantity
+    rate: Rate | None = None
+    uom: Name | None = None
+    income_account: Name | None = None
+    cost_center: Name | None = None
+
+
+SalesInvoiceItems = Annotated[list[SalesInvoiceItem], Field(min_length=1, max_length=20)]
+
+
+class CreateDraftSalesInvoice(Inputs):
+    customer: Name
+    posting_date: Day | None = None
+    due_date: Day | None = None
+    items: SalesInvoiceItems
+    taxes_and_charges: Name | None = None
+    remarks: Remarks | None = None
+    allow_duplicate: Flag = False
+
+
+class UpdateDraftSalesInvoice(Inputs):
+    name: Name
+    modified: Modified
+    posting_date: Day | None = None
+    due_date: Day | None = None
+    items: SalesInvoiceItems | None = None
+    taxes_and_charges: Name | Literal[""] | None = None
+    remarks: Remarks | None = None
+
+    @model_validator(mode="after")
+    def _changes(self) -> Self:
+        given = self.model_dump(exclude={"name", "modified"}, exclude_none=True)
+        if not given:
+            raise ValueError(
+                "give at least one of posting_date, due_date, items, taxes_and_charges, remarks"
+            )
+        return self
 
 
 def _customer(doc: dict[str, Any]) -> dict[str, Any]:
@@ -306,6 +362,70 @@ async def report_accounts_receivable(
     return {**page(records, inputs.offset, inputs.limit), "total_outstanding": total}
 
 
+def _invoice_body(
+    inputs: CreateDraftSalesInvoice | UpdateDraftSalesInvoice, taxes: list[dict[str, Any]] | None
+) -> dict[str, Any]:
+    """The catalogue's "Sent to ERPNext" for the given inputs; the customer only on create:
+    ERPNext would keep the first customer's address, terms and accounts."""
+    doc: dict[str, Any] = {}
+    if isinstance(inputs, CreateDraftSalesInvoice):
+        doc["customer"] = inputs.customer
+    if inputs.posting_date is not None:
+        doc |= {"posting_date": inputs.posting_date.isoformat(), "set_posting_time": 1}
+    if inputs.due_date is not None:
+        doc["due_date"] = inputs.due_date.isoformat()
+    if inputs.items is not None:
+        doc["items"] = [row.model_dump(exclude_none=True) for row in inputs.items]
+    if inputs.taxes_and_charges is not None:
+        doc |= {"taxes_and_charges": inputs.taxes_and_charges, "taxes": taxes or []}
+    if inputs.remarks is not None:
+        doc["remarks"] = inputs.remarks
+    return doc
+
+
+async def create_draft_sales_invoice(
+    inputs: CreateDraftSalesInvoice, context: Context
+) -> dict[str, Any]:
+    taxes = None
+    if inputs.taxes_and_charges is not None:
+        taxes = await drafts.tax_rows(context, SALES_TEMPLATE, inputs.taxes_and_charges)
+    doc = _invoice_body(inputs, taxes)
+    posting_date = inputs.posting_date or today(context.settings.timezone)
+    matches = await drafts.duplicates(
+        context,
+        "Sales Invoice",
+        [["customer", "=", inputs.customer], ["posting_date", "=", posting_date.isoformat()]],
+        doc["items"],
+    )
+    if matches and not inputs.allow_duplicate:
+        raise drafts.refuse_duplicates(matches, DRAFT_MATCH)
+    saved = await context.erpnext.insert(
+        "Sales Invoice", {**doc, "company": context.settings.company, "docstatus": 0}
+    )
+    warnings = [drafts.duplicate_warning(matches, DRAFT_MATCH)] if matches else []
+    warnings += drafts.tax_warning(saved, inputs.taxes_and_charges)
+    warnings += drafts.rate_warnings(saved, doc["items"])
+    return await drafts.result(context, "Sales Invoice", saved, DRAFT_FIELDS, warnings)
+
+
+async def update_draft_sales_invoice(
+    inputs: UpdateDraftSalesInvoice, context: Context
+) -> dict[str, Any]:
+    await drafts.editable(
+        context, "Sales Invoice", inputs.name, inputs.modified, "the sales invoice"
+    )
+    taxes = None
+    if inputs.taxes_and_charges:
+        taxes = await drafts.tax_rows(context, SALES_TEMPLATE, inputs.taxes_and_charges)
+    doc = _invoice_body(inputs, taxes)
+    saved = await drafts.save_update(
+        context, "Sales Invoice", inputs.name, {**doc, "modified": inputs.modified}
+    )
+    warnings = drafts.tax_warning(saved, inputs.taxes_and_charges)
+    warnings += drafts.rate_warnings(saved, doc.get("items"))
+    return await drafts.result(context, "Sales Invoice", saved, DRAFT_FIELDS, warnings)
+
+
 OPERATIONS: list[Operation[Any]] = [
     Operation(
         name="list_customers",
@@ -379,5 +499,36 @@ OPERATIONS: list[Operation[Any]] = [
         kind="read",
         inputs=ReportAccountsReceivable,
         run=report_accounts_receivable,
+    ),
+    Operation(
+        name="create_draft_sales_invoice",
+        title="Create draft sales invoice",
+        description=(
+            "Create a draft sales invoice of the assigned company; a person reviews and submits "
+            "it in ERPNext. Leave an item's `rate` out to let ERPNext price it from the price "
+            "list and its pricing rules; a given rate a pricing rule replaces, and a row left "
+            "at rate 0, are named in `warnings`. `posting_date` defaults to today, `due_date` "
+            "to the customer's payment terms. A draft with the same customer, posting date "
+            "and items is refused unless `allow_duplicate` is true. After an error or a "
+            "timeout, list the drafts (`list_sales_invoices` with `state` draft) before "
+            "creating again: the first may have been saved."
+        ),
+        kind="create",
+        inputs=CreateDraftSalesInvoice,
+        run=create_draft_sales_invoice,
+    ),
+    Operation(
+        name="update_draft_sales_invoice",
+        title="Update draft sales invoice",
+        description=(
+            "Change a draft sales invoice of the assigned company. Give its `name` and its "
+            "`modified` as last read; a draft changed since is refused. Give only what "
+            "changes: `items` replace all rows; an empty `remarks` or `taxes_and_charges` "
+            "clears it, and a cleared tax template takes its tax rows with it. The customer "
+            "stays; for another customer, create a new draft."
+        ),
+        kind="update",
+        inputs=UpdateDraftSalesInvoice,
+        run=update_draft_sales_invoice,
     ),
 ]

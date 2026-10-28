@@ -3,12 +3,11 @@ and through them REQ-001's states, dates, reports and the company check
 (REQ-001-PRS-F007, REQ-001-PRS-F014)."""
 
 from collections.abc import Iterator
-from datetime import UTC, datetime, tzinfo
 from typing import Any
 
 import pytest
 
-from erpel import shapes
+from tests.e2e.clock import TIMEZONE, TODAY, freeze
 from tests.e2e.mcp import Session, client
 from tests.fakes.erpnext import (
     COMPANY,
@@ -58,20 +57,11 @@ INVOICE_FIELDS = [
     "modified",
 ]
 TEMPLATE_FIELDS = ["name", "title", "is_default", "tax_category", "disabled"]
-TIMEZONE = "Pacific/Kiritimati"  # UTC+14
-NOW = datetime(2026, 10, 28, 12, 0, tzinfo=UTC)
-TODAY = "2026-10-29"  # in Kiritimati at NOW; UTC is still at 2026-10-28
-
-
-class Frozen(datetime):
-    @classmethod
-    def now(cls, tz: tzinfo | None = None) -> datetime:  # type: ignore[override]
-        return NOW.astimezone(tz) if tz else NOW.replace(tzinfo=None)
 
 
 @pytest.fixture(autouse=True)
 def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(shapes, "datetime", Frozen)
+    freeze(monkeypatch)
 
 
 @pytest.fixture

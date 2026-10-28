@@ -13,8 +13,10 @@ All notable changes to Erpel are recorded here. The format follows [Keep a Chang
 - REQ-001's conventions for every operation: strict input schemas, name inputs, literal search, outside text apart, child tables cut at 100 rows and texts in gets at 500 characters, results under 100,000 characters, the 60 s operation limit, the `operation` log line, `ERPEL_TOOLS`.
 - Master data: `list_items` and `get_item` (REQ-003).
 - Order to cash, the reads: `list_customers`, `get_customer`, `list_sales_invoices`, `get_sales_invoice`, `list_sales_tax_templates` and `report_accounts_receivable` (REQ-004); with them REQ-001's invoice states, dates, the company check on gets, and reports paged by Erpel without ERPNext's total row.
+- Order to cash, the drafts: `create_draft_sales_invoice` and `update_draft_sales_invoice` (REQ-004); with them REQ-001's draft rules: tax rows from the template, the duplicate check and `allow_duplicate`, stale updates refused, clearable fields, and warnings for a template without tax and for rates ERPNext set (REQ-001-PRS-F016), added to the draft as a comment. A row without `rate` is priced by ERPNext.
 
 ### Rights
 
 - `list_items`, `get_item`: Item read (REQ-003's Rights section).
 - The REQ-004 reads: Customer, Address, Sales Invoice, Sales Taxes and Charges Template read; Accounts Receivable needs Sales Invoice read and report, Journal Entry read, and the agent's role on the report (REQ-004's Rights section; the configuration guide says how to grant a report).
+- The REQ-004 drafts: Sales Invoice read, create and write, and the reads and selects ERPNext makes while saving (REQ-004's Rights section).
