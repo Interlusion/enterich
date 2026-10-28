@@ -8,7 +8,18 @@ from typing import Any
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from erpel.shapes import Amount, Name, Quantity, Rate, cut_rows, like_pattern, split_outside
+from erpel.erpnext import ErpnextError
+from erpel.shapes import (
+    Amount,
+    Day,
+    Name,
+    Quantity,
+    Rate,
+    cut_rows,
+    decimal,
+    like_pattern,
+    split_outside,
+)
 
 names = TypeAdapter(Name)
 
@@ -116,3 +127,36 @@ def test_child_tables_are_cut_to_100_rows() -> None:
     assert kept[-1] == {"n": 99}
     assert cut is True
     assert cut_rows(rows[:100]) == (rows[:100], False)
+
+
+days = TypeAdapter(Day)
+
+
+@pytest.mark.parametrize("value", ["2026-02-28", "2028-02-29", "1999-12-31"])
+def test_iso_dates_are_days(value: str) -> None:
+    assert days.validate_python(value).isoformat() == value
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["2026-02-30", "2026-13-01", "01.10.2026", "2026-1-1", "2026-10-01T00:00:00", "", 20261001],
+)
+def test_anything_else_is_no_day(value: Any) -> None:
+    with pytest.raises(ValidationError):
+        days.validate_python(value)
+
+
+def test_a_day_is_published_as_a_date() -> None:
+    assert days.json_schema() == {"type": "string", "format": "date"}
+
+
+def test_numbers_from_erpnext_become_decimals() -> None:
+    assert decimal(0.1) == Decimal("0.1")
+    assert decimal(3) == Decimal(3)
+    assert decimal(None) == Decimal(0)
+
+
+@pytest.mark.parametrize("value", [True, "1.0", [1], {"value": 1}])
+def test_anything_else_from_erpnext_is_a_faulty_answer(value: Any) -> None:
+    with pytest.raises(ErpnextError, match="isn't a number"):
+        decimal(value)
