@@ -1,7 +1,9 @@
-"""The README's tool list, generated from the tool-list snapshot. A test checks that the
-README holds it; `uv run python -m tests.readme` writes it."""
+"""The README's tool list, generated from the tool-list snapshot, each area under its
+name and scope from the specs index. A test checks that the README holds it;
+`uv run python -m tests.readme` writes it."""
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -16,15 +18,18 @@ from erpel.tools import (
 ROOT = Path(__file__).parent.parent
 README = ROOT / "README.md"
 SNAPSHOT = ROOT / "tests" / "snapshots" / "tools.json"
+SPECS = ROOT / "docs" / "specs" / "README.md"
 START, END = "<!-- tools:start -->", "<!-- tools:end -->"
-# Each area's operations and its spec, in the specs index's order
+# Each area's operations and its spec file, in the specs index's order
 AREAS = (
-    (master_data, "Master data", "REQ-003", "req-003-master-data.md"),
-    (order_to_cash, "Order to cash", "REQ-004", "req-004-order-to-cash.md"),
-    (procure_to_pay, "Procure to pay", "REQ-005", "req-005-procure-to-pay.md"),
-    (record_to_report, "Record to report", "REQ-006", "req-006-record-to-report.md"),
-    (bank_and_cash, "Bank and cash", "REQ-007", "req-007-bank-and-cash.md"),
+    (master_data, "req-003-master-data.md"),
+    (order_to_cash, "req-004-order-to-cash.md"),
+    (procure_to_pay, "req-005-procure-to-pay.md"),
+    (record_to_report, "req-006-record-to-report.md"),
+    (bank_and_cash, "req-007-bank-and-cash.md"),
 )
+# A specs index row: | [REQ-004](req-004-….md) | Order to cash: customers, … | Status |
+INDEX_ROW = re.compile(r"^\| \[(REQ-\d{3})\]\(([^)]+)\) \| ([^:|]+): ([^|]+?) \|", re.MULTILINE)
 # An operation's kind, as the README names it and as its annotations say it (REQ-001-PRS-NF002)
 KINDS = {
     "read": ("read", True, False),
@@ -36,7 +41,7 @@ KINDS = {
 def _tools() -> dict[str, dict[str, Any]]:
     """The snapshot's tools by name; they must be the areas' operations."""
     tools = {t["name"]: t for t in json.loads(SNAPSHOT.read_text())}
-    named = {op.name for module, *_ in AREAS for op in module.OPERATIONS}
+    named = {op.name for module, _ in AREAS for op in module.OPERATIONS}
     if named != tools.keys():
         raise ValueError(
             "The areas' operations and tests/snapshots/tools.json differ in "
@@ -46,10 +51,20 @@ def _tools() -> dict[str, dict[str, Any]]:
     return tools
 
 
+def _specs() -> dict[str, tuple[str, str, str]]:
+    """Per spec file in the specs index: its ID, its area's name and what the area covers."""
+    rows = INDEX_ROW.findall(SPECS.read_text())
+    specs = {path: (spec, area, covers) for spec, path, area, covers in rows}
+    missing = [path for _, path in AREAS if path not in specs]
+    if missing:
+        raise ValueError(f"docs/specs/README.md has no area row for {', '.join(missing)}.")
+    return specs
+
+
 def render() -> str:
     """The block between the markers: per area, its operations in their order, with the
     snapshot's title and the kind its annotations give."""
-    tools = _tools()
+    tools, specs = _tools(), _specs()
     lines = [
         START,
         "",
@@ -57,8 +72,10 @@ def render() -> str:
         "([`ERPEL_TOOLS`](docs/guides/configuration.md)); every tool works on one company, "
         "within the rights ERPNext gives the agent user.",
     ]
-    for module, area, spec, path in AREAS:
+    for module, path in AREAS:
+        spec, area, covers = specs[path]
         lines += ["", f"### {area} ([{spec}](docs/specs/{path}))", ""]
+        lines += [f"{covers[0].upper()}{covers[1:]}.", ""]
         lines += ["| Tool | Title | Kind |", "| :- | :- | :- |"]
         for op in module.OPERATIONS:
             tool = tools[op.name]

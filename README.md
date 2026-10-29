@@ -13,7 +13,8 @@ An MCP server for ERPNext with hard limits: a short, fixed list of tools, tokens
 
 ## What it is not
 
-- Not a general ERPNext API bridge: tools that take a DocType, method name or field list as input are out of scope.
+- Not a general ERPNext API bridge: tools that take a DocType, report name, method name, field list, filter expression or file path as input are out of scope.
+- Not a way to post: no tool submits, cancels, amends, deletes or discards a document. The agent prepares drafts; a person reviews and submits them in ERPNext ([reviewing drafts](docs/guides/reviewing-drafts.md)).
 - Not affiliated with or endorsed by Frappe Technologies. ERPNext and Frappe are their trademarks.
 
 ## Tools
@@ -24,12 +25,16 @@ Erpel offers 31 tools. A deployment may offer fewer ([`ERPEL_TOOLS`](docs/guides
 
 ### Master data ([REQ-003](docs/specs/req-003-master-data.md))
 
+Items.
+
 | Tool | Title | Kind |
 | :- | :- | :- |
 | `list_items` | List items | read |
 | `get_item` | Get item | read |
 
 ### Order to cash ([REQ-004](docs/specs/req-004-order-to-cash.md))
+
+Customers, sales invoices, receivables.
 
 | Tool | Title | Kind |
 | :- | :- | :- |
@@ -44,6 +49,8 @@ Erpel offers 31 tools. A deployment may offer fewer ([`ERPEL_TOOLS`](docs/guides
 
 ### Procure to pay ([REQ-005](docs/specs/req-005-procure-to-pay.md))
 
+Suppliers, purchase invoices, payables.
+
 | Tool | Title | Kind |
 | :- | :- | :- |
 | `list_suppliers` | List suppliers | read |
@@ -56,6 +63,8 @@ Erpel offers 31 tools. A deployment may offer fewer ([`ERPEL_TOOLS`](docs/guides
 | `update_draft_purchase_invoice` | Update draft purchase invoice | update draft |
 
 ### Record to report ([REQ-006](docs/specs/req-006-record-to-report.md))
+
+Accounts, cost centres, journal entries, ledger, trial balance.
 
 | Tool | Title | Kind |
 | :- | :- | :- |
@@ -70,6 +79,8 @@ Erpel offers 31 tools. A deployment may offer fewer ([`ERPEL_TOOLS`](docs/guides
 
 ### Bank and cash ([REQ-007](docs/specs/req-007-bank-and-cash.md))
 
+Bank accounts, bank transactions, payments.
+
 | Tool | Title | Kind |
 | :- | :- | :- |
 | `list_bank_accounts` | List bank accounts | read |
@@ -79,6 +90,10 @@ Erpel offers 31 tools. A deployment may offer fewer ([`ERPEL_TOOLS`](docs/guides
 | `get_payment_entry` | Get payment entry | read |
 
 <!-- tools:end -->
+
+## Scope
+
+Erpel is maintained for our own use. Contributions are welcome ([contributing](CONTRIBUTING.md)); support isn't promised. Report vulnerabilities privately, as the [security policy](SECURITY.md) describes.
 
 ## Documentation
 

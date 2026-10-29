@@ -29,7 +29,7 @@ tests/
                      module (test_order_to_cash_drafts.py)
   fakes/             the fakes, recording every request
   snapshots/         tools.json: the published tool list
-  readme.py          the README's tool list, generated from tools.json
+  readme.py          the README's tool list, from tools.json and the specs index
 docs/                specs, architecture, ADRs, guides, backlog
 scripts/             check-links.sh: the Markdown link check;
                      check-workflows.sh: actionlint and zizmor;

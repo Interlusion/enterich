@@ -42,3 +42,14 @@ def test_markers_out_of_place_change_nothing(
     with pytest.raises(ValueError, match="needs one"):
         readme.write()
     assert file.read_text() == text
+
+
+def test_an_area_missing_from_the_specs_index_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    index = tmp_path / "README.md"
+    rows = readme.SPECS.read_text().splitlines()
+    index.write_text("\n".join(r for r in rows if "req-007-bank-and-cash.md" not in r))
+    monkeypatch.setattr(readme, "SPECS", index)
+    with pytest.raises(ValueError, match=r"no area row for req-007-bank-and-cash\.md"):
+        readme.render()
