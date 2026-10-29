@@ -20,7 +20,7 @@ Before the move:
 - [ ] **History check:** search the whole Git history (all branches) for hostnames, realm and client names, user IDs, company names, keys and tokens of real deployments (`git log -p --all`, gitleaks over the history). If anything is found, rewrite or squash the history before the repository turns public.
 - [ ] `SECURITY.md`: report vulnerabilities privately through GitHub's private vulnerability reporting; what's in scope (token check, tool limits, secret handling); supported versions (the latest minor version only); no bounty; response on a best-effort basis.
 - [ ] README scope: maintained for our own use, contributions welcome, no support promised; status; link to the docs.
-- [ ] **Tool list in the README,** generated from the tool-list snapshot and checked against it in CI, so readers see every operation and the releasing guide's check has something to compare.
+- [x] **Tool list in the README,** generated from the tool-list snapshot and checked against it in CI, so readers see every operation and the releasing guide's check has something to compare.
 - [ ] **Product description (light spec):** a readable description of what Erpel does and doesn't do, derived from the specs, for the README, the website and user documentation. The specs stay authoritative; the light spec is updated whenever they change ([ADR-007](../arc42/adr/ADR-007-specs-by-accounting-area.md)).
 - [ ] `CONTRIBUTING.md`: spec first, tests first, Conventional Commits, no deployment facts, how to run the tests.
 - [ ] Issue and pull request templates; `CODEOWNERS`.
