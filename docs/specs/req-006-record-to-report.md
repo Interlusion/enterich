@@ -1,4 +1,4 @@
-# REQ-006: Erpel Record to Report — Requirement Specification
+# REQ-006: Enterich Record to Report — Requirement Specification
 
 | Meta | Value |
 | :- | :- |
@@ -46,7 +46,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-006-PRS-F001: Accounts and cost centres
 
-**Description**: Erpel SHALL offer `list_accounts` and `list_cost_centers` as the catalogue below defines them.
+**Description**: Enterich SHALL offer `list_accounts` and `list_cost_centers` as the catalogue below defines them.
 
 **Related URS**: REQ-006-URS-F001
 
@@ -54,11 +54,11 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - `root_type` sends exactly its filter; an account's number and name are both searchable.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-006-PRS-F002: Journal entry reads
 
-**Description**: Erpel SHALL offer `list_journal_entries` and `get_journal_entry` as the catalogue below defines them.
+**Description**: Enterich SHALL offer `list_journal_entries` and `get_journal_entry` as the catalogue below defines them.
 
 **Related URS**: REQ-006-URS-F001
 
@@ -66,11 +66,11 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - `voucher_type` accepts exactly ERPNext v16's voucher types (see the catalogue) and refuses any other value.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-006-PRS-F003: General Ledger
 
-**Description**: Erpel SHALL offer `report_general_ledger` as the catalogue below defines it, for at most 366 days per call, both dates included. It SHALL check a given `account` (of the assigned company) and `party` as name inputs (REQ-001-PRS-F009) before the report. It SHALL take ERPNext's opening, total and closing rows by their position, not their label; `opening` and `closing` come from ERPNext's rows, `totals` are Erpel's sums over all entries (REQ-001's ERPNext calls). It SHALL return each row's `balance` only when `account` or `party` is given, the only case in which ERPNext counts the balance before `from_date`, and SHALL name in `currency` the account's or party's currency when ERPNext shows the amounts in it.
+**Description**: Enterich SHALL offer `report_general_ledger` as the catalogue below defines it, for at most 366 days per call, both dates included. It SHALL check a given `account` (of the assigned company) and `party` as name inputs (REQ-001-PRS-F009) before the report. It SHALL take ERPNext's opening, total and closing rows by their position, not their label; `opening` and `closing` come from ERPNext's rows, `totals` are Enterich's sums over all entries (REQ-001's ERPNext calls). It SHALL return each row's `balance` only when `account` or `party` is given, the only case in which ERPNext counts the balance before `from_date`, and SHALL name in `currency` the account's or party's currency when ERPNext shows the amounts in it.
 
 **Related URS**: REQ-006-URS-F001
 
@@ -83,11 +83,11 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - An answer whose first row or last two rows aren't summary rows (with a posting date) is refused as a faulty answer.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
-- Evidence: Erpel's test suite; the integration test against a real ERPNext v16 site (backlog).
+- Evidence: Enterich's test suite; the integration test against a real ERPNext v16 site (backlog).
 
 #### REQ-006-PRS-F004: Trial Balance
 
-**Description**: Erpel SHALL offer `report_trial_balance` as the catalogue below defines it, finding the fiscal year from the dates itself as ERPNext does: among enabled fiscal years, those assigned to the assigned company first, then those assigned to no company.
+**Description**: Enterich SHALL offer `report_trial_balance` as the catalogue below defines it, finding the fiscal year from the dates itself as ERPNext does: among enabled fiscal years, those assigned to the assigned company first, then those assigned to no company.
 
 **Related URS**: REQ-006-URS-F001
 
@@ -95,14 +95,14 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - Dates in one fiscal year return its trial balance with `fiscal_year` named; dates in no fiscal year, or in two, are refused.
 - A fiscal year assigned only to other companies doesn't count; one assigned to the company comes before one assigned to none.
-- ERPNext's total row isn't among the rows; `totals` are Erpel's sums over the root accounts' rows, as decimals.
+- ERPNext's total row isn't among the rows; `totals` are Enterich's sums over the root accounts' rows, as decimals.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
-- Evidence: Erpel's test suite; the integration test against a real ERPNext v16 site (backlog).
+- Evidence: Enterich's test suite; the integration test against a real ERPNext v16 site (backlog).
 
 #### REQ-006-PRS-F005: Journal entry drafts
 
-**Description**: Erpel SHALL offer `create_draft_journal_entry` and `update_draft_journal_entry` as the catalogue below defines them, sending each row's `debit` and `credit` as `debit_in_account_currency` and `credit_in_account_currency`, sending `posting_date` on every create (ERPNext sets none itself), and refusing an update of a draft whose voucher type isn't Journal Entry as for another company's document, before its state and `modified` are checked. It SHALL refuse an update of a draft with `multi_currency` set: Erpel changes only journal entries in the company's currency.
+**Description**: Enterich SHALL offer `create_draft_journal_entry` and `update_draft_journal_entry` as the catalogue below defines them, sending each row's `debit` and `credit` as `debit_in_account_currency` and `credit_in_account_currency`, sending `posting_date` on every create (ERPNext sets none itself), and refusing an update of a draft whose voucher type isn't Journal Entry as for another company's document, before its state and `modified` are checked. It SHALL refuse an update of a draft with `multi_currency` set: Enterich changes only journal entries in the company's currency.
 
 **Related URS**: REQ-006-URS-F002
 
@@ -113,11 +113,11 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - An update of a Bank Entry or Opening Entry draft, or of another company's journal entry, is refused without a write, with the answer for a name that doesn't exist or isn't permitted (REQ-001-PRS-F009), also when it is submitted or its `modified` is stale.
 - An update of a draft with `multi_currency` set is refused naming `name`, without a write.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-006-PRS-F006: Journal entry rules
 
-**Description**: Before calling ERPNext, Erpel SHALL refuse a journal entry create or update whose resulting draft breaks a rule:
+**Description**: Before calling ERPNext, Enterich SHALL refuse a journal entry create or update whose resulting draft breaks a rule:
 
 - each row has exactly one of `debit` and `credit` above 0;
 - the rows' debits and credits are equal: given rows as exact decimals; when an update gives none, the draft's total debit and total credit as ERPNext saved them;
@@ -136,7 +136,7 @@ The rules on single rows apply to the given rows; ERPNext checks the saved ones 
 - An update without `accounts` of a draft whose saved totals differ is refused naming `accounts` and both totals.
 - An update of a draft with a `cheque_date` but no `cheque_no`, giving neither, is refused naming `cheque_no` and the saved date.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-006-PRS-F007: Duplicate match for journal entries
 
@@ -149,7 +149,7 @@ The rules on single rows apply to the given rows; ERPNext checks the saved ones 
 - A create matching an existing draft is refused naming it; one that differs in a row or the date goes through.
 - A create repeated with amounts of three decimal places, which ERPNext saved rounded to two, is refused naming the first draft.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-006-PRS-F008: Totals ERPNext rounded
 
@@ -162,7 +162,7 @@ The rules on single rows apply to the given rows; ERPNext checks the saved ones 
 - Rows of 10.004 and 5.004 against 15.008, balanced as exact decimals, saved by ERPNext as 15.00 against 15.01 (each row rounded to two places), return a warning naming both totals as 15 and 15.01.
 - A draft saved with equal totals returns no warning.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 ## Operation Catalogue
 
@@ -191,7 +191,7 @@ ERPNext v16's voucher types: Journal Entry, Inter Company Journal Entry, Bank En
 | `update_draft_journal_entry` | **`name`**, **`modified`**; at least one of `posting_date`, `cheque_no`, `cheque_date`, `user_remark`, `accounts` | the given fields, rows mapped as for create; `modified` |
 
 - Clearable on update: `user_remark`, `cheque_no` (with `cheque_date`).
-- Accounts are in the company's currency: Erpel sends `multi_currency` 0, and ERPNext refuses an account in another currency. A row with a receivable or payable account needs `party_type` and `party`; ERPNext saves a party on an account of another type but refuses it on submit, as the create's description says. A row with a reference carries the invoice's party and its receivable or payable account.
+- Accounts are in the company's currency: Enterich sends `multi_currency` 0, and ERPNext refuses an account in another currency. A row with a receivable or payable account needs `party_type` and `party`; ERPNext saves a party on an account of another type but refuses it on submit, as the create's description says. A row with a reference carries the invoice's party and its receivable or payable account.
 - Results add: `posting_date`, `total_debit`, `total_credit`, `row_count`; no `currency`, because a journal entry has none of its own, and no `status`, which ERPNext v16 doesn't give a journal entry (`docstatus` says it).
 - Further voucher types can be added later as a minor change ([ADR-004](../arc42/adr/ADR-004-releases-and-image.md)).
 

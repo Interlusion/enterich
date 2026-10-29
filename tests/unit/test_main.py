@@ -4,17 +4,17 @@ import json
 
 import pytest
 
-from erpel import __main__
+from enterich import __main__
 from tests.fakes.settings import API_SECRET, ENV
 
 
-def test_an_invalid_configuration_stops_erpel(
+def test_an_invalid_configuration_stops_enterich(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     for name, value in ENV.items():
         monkeypatch.setenv(name, value)
-    monkeypatch.delenv("ERPEL_ISSUER")
-    monkeypatch.setenv("ERPEL_CLOCK_LEEWAY", "120")
+    monkeypatch.delenv("ENTERICH_ISSUER")
+    monkeypatch.setenv("ENTERICH_CLOCK_LEEWAY", "120")
     with pytest.raises(SystemExit) as stopped:
         __main__.main()
     assert stopped.value.code == 2
@@ -22,8 +22,8 @@ def test_an_invalid_configuration_stops_erpel(
     line = json.loads(out)
     assert line["event"] == "error"
     assert line["problems"] == [
-        "ERPEL_ISSUER: required",
-        "ERPEL_CLOCK_LEEWAY: must be from 0 to 60",
+        "ENTERICH_ISSUER: required",
+        "ENTERICH_CLOCK_LEEWAY: must be from 0 to 60",
     ]
     assert API_SECRET not in out
 
@@ -38,7 +38,7 @@ def test_start_logs_the_settings_and_runs_uvicorn(
     __main__.main()
     line = json.loads(capsys.readouterr().out)
     assert line["event"] == "start"
-    assert line["subject"] == ENV["ERPEL_SUBJECT"]
+    assert line["subject"] == ENV["ENTERICH_SUBJECT"]
     assert line["leeway"] == 5
     assert API_SECRET not in json.dumps(line)
     assert ran["port"] == 8000
@@ -51,13 +51,13 @@ def test_start_carries_the_warnings(
 ) -> None:
     for name, value in ENV.items():
         monkeypatch.setenv(name, value)
-    monkeypatch.setenv("ERPEL_ERPNEXT_URL", "http://erp.internal")
-    monkeypatch.setenv("ERPEL_TOOL", "list_items")
+    monkeypatch.setenv("ENTERICH_ERPNEXT_URL", "http://erp.internal")
+    monkeypatch.setenv("ENTERICH_TOOL", "list_items")
     monkeypatch.setattr(__main__.uvicorn, "run", lambda app, **kw: None)  # pyright: ignore[reportUnknownLambdaType, reportUnknownArgumentType]
     __main__.main()
     line = json.loads(capsys.readouterr().out)
     assert line["level"] == "warning"
     assert line["warnings"] == [
-        "ERPEL_TOOL is not a known variable and is ignored",
-        "ERPEL_ERPNEXT_URL uses http: the API key travels unencrypted",
+        "ENTERICH_TOOL is not a known variable and is ignored",
+        "ENTERICH_ERPNEXT_URL uses http: the API key travels unencrypted",
     ]

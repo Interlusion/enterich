@@ -18,5 +18,5 @@ if [ -n "$wiki" ]; then
   echo "::error::Obsidian wiki-links above; use relative Markdown links: [text](path.md)"
   exit 1
 fi
-docker build -q -t erpel-lychee .github/lychee >/dev/null
-md docker run --rm -v "$PWD":/w:ro -w /w erpel-lychee --config lychee.toml --no-progress
+docker build -q -t enterich-lychee .github/lychee >/dev/null
+md docker run --rm -v "$PWD":/w:ro -w /w enterich-lychee --config lychee.toml --no-progress

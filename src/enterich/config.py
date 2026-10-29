@@ -1,4 +1,4 @@
-"""Configuration from `ERPEL_*` environment variables, validated once at start.
+"""Configuration from `ENTERICH_*` environment variables, validated once at start.
 
 REQ-002-PRS-NF005: every missing or invalid variable is reported by name and
 rule, never with the value of a secret.
@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from mcp.server.auth.settings import AuthSettings
 from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError
 
-PREFIX = "ERPEL_"
+PREFIX = "ENTERICH_"
 
 # Asymmetric JWS algorithms only (ADR-003); never HS* or none.
 ALLOWED_ALGORITHMS = frozenset(
@@ -90,7 +90,7 @@ class Settings(BaseModel):
 
 
 class ConfigError(Exception):
-    """Erpel can't start; `problems` names each variable and its rule."""
+    """Enterich can't start; `problems` names each variable and its rule."""
 
     def __init__(self, problems: list[str]) -> None:
         super().__init__("invalid configuration: " + "; ".join(problems))
@@ -98,7 +98,7 @@ class ConfigError(Exception):
 
 
 def load(env: Mapping[str, str], operations: Collection[str]) -> Settings:
-    """Build the settings from `env`; `operations` are the names `ERPEL_TOOLS` may use."""
+    """Build the settings from `env`; `operations` are the names `ENTERICH_TOOLS` may use."""
     reader = _Reader(env)
     resource = reader.url("RESOURCE_URL", canonical=True)
     issuer = reader.url("ISSUER")

@@ -470,7 +470,7 @@ def test_a_drafts_date_without_a_number_says_how_to_clear_it(
         {"company": "Other AG", "docstatus": 1},
     ],
 )
-def test_what_erpel_doesnt_change_answers_as_unknown(
+def test_what_enterich_doesnt_change_answers_as_unknown(
     mcp: Session, erp: FakeErpnext, overrides: dict[str, Any]
 ) -> None:
     other = journal_entry("ACC-JV-2026-00012", **{"docstatus": 0, **overrides})
@@ -489,7 +489,7 @@ def test_a_multi_currency_draft_isnt_changed(mcp: Session, erp: FakeErpnext) -> 
     result = update(mcp, user_remark="Changed")
     assert result.error
     assert result.text == (
-        f"name: {DRAFT} has accounts in several currencies; Erpel changes only journal "
+        f"name: {DRAFT} has accounts in several currencies; Enterich changes only journal "
         "entries in the company's currency."
     )
     assert writes(erp) == []

@@ -8,7 +8,7 @@
 
 ## Context
 
-An AI agent is to read an ERPNext company's books and prepare drafts, and must be unable to post, cancel or delete, whatever it is told ([REQ-001-URS-F003](../../specs/req-001-core.md#req-001-urs-f003-never-post-cancel-delete-or-discard), [REQ-001-URS-NF001](../../specs/req-001-core.md#req-001-urs-nf001-safe-without-client-side-approval)). Before Erpel, the options were surveyed (October 2026, ERPNext and Frappe v16):
+An AI agent is to read an ERPNext company's books and prepare drafts, and must be unable to post, cancel or delete, whatever it is told ([REQ-001-URS-F003](../../specs/req-001-core.md#req-001-urs-f003-never-post-cancel-delete-or-discard), [REQ-001-URS-NF001](../../specs/req-001-core.md#req-001-urs-nf001-safe-without-client-side-approval)). Before Enterich, the options were surveyed (October 2026, ERPNext and Frappe v16):
 
 - **MCP apps inside the Frappe bench.** Several exist. Most offer generic create, update and delete, method calls or document actions (submit, cancel), restricted by configuration; some add code or database query tools. In the bench they run with full database access, and they rely on Frappe's OAuth provider.
 - **Frappe's OAuth provider as the authorization server** doesn't fit remote MCP clients well: it has no resource indicators or audience binding, its protected resource metadata names the site's origin rather than an MCP URL with a path, and a request without a token to a whitelisted method gets 403, which clients don't take as a cue to sign in.
@@ -20,9 +20,9 @@ No published server combined a separate process, an external authorization serve
 
 ## Decision
 
-- **Erpel is its own service**, outside the bench, in its own image. It reaches ERPNext only over the REST API, with the API key of one agent user, and holds no other ERPNext credential.
+- **Enterich is its own service**, outside the bench, in its own image. It reaches ERPNext only over the REST API, with the API key of one agent user, and holds no other ERPNext credential.
 - **The tool list is fixed and short**, each tool with its own purpose and input schema; reads and writes are separate; writes only create and change drafts. No tool takes a DocType, method, field list or path.
-- **An external authorization server signs the agent in**; Erpel is a resource server only ([ADR-003](ADR-003-local-token-check.md)).
+- **An external authorization server signs the agent in**; Enterich is a resource server only ([ADR-003](ADR-003-local-token-check.md)).
 - **The protocol comes from the official MCP Python SDK** ([ADR-002](ADR-002-mcp-sdk-stateless-streamable-http.md)).
 
 Ideas taken from other projects: every update carries the document's `modified` timestamp as last read (from an ERPNext MCP tool collection); reads limited to allowlisted DocTypes and reports (from a read-only ERPNext MCP server).
@@ -35,11 +35,11 @@ Ideas taken from other projects: every update carries the document's `modified` 
 
 ### Alternative 2: An existing server, restricted by configuration
 
-**Rejected because**: a large generic tool set narrowed by exclusion fails open when a new tool or a configuration mistake slips through; Erpel's limits should be visible in its code and tool list.
+**Rejected because**: a large generic tool set narrowed by exclusion fails open when a new tool or a configuration mistake slips through; Enterich's limits should be visible in its code and tool list.
 
 ### Alternative 3: A generic MCP gateway in front of ERPNext's REST API
 
-**Rejected because**: it still needs a hand-written API description with tool descriptions and schemas, and the checks Erpel needs beyond allow or deny (amounts, balance, company, stale writes, error mapping) would need code anyway.
+**Rejected because**: it still needs a hand-written API description with tool descriptions and schemas, and the checks Enterich needs beyond allow or deny (amounts, balance, company, stale writes, error mapping) would need code anyway.
 
 ### Alternative 4: Frappe's built-in MCP server
 
@@ -49,26 +49,26 @@ Ideas taken from other projects: every update carries the document's `modified` 
 
 ### Positive
 
-- The agent user's ERPNext role is the hard limit, and Erpel holds nothing that could exceed it.
+- The agent user's ERPNext role is the hard limit, and Enterich holds nothing that could exceed it.
 - The whole interface can be reviewed in one tool list; a change to it is a versioned change ([ADR-004](ADR-004-releases-and-image.md)).
 - MCP changes don't touch the ERPNext image or its migrations.
 
 ### Negative
 
 - Every operation is code to write and maintain; a new need waits for a release.
-- Erpel follows ERPNext's REST API and report output between versions.
+- Enterich follows ERPNext's REST API and report output between versions.
 
 ## Reconsideration Triggers
 
 Revisit this decision when:
 
 1. Frappe ships an MCP server or OAuth provider that binds tokens to a resource and allows a fixed, reviewed tool list.
-2. A gateway can express Erpel's checks (amounts, company, stale writes) as configuration.
+2. A gateway can express Enterich's checks (amounts, company, stale writes) as configuration.
 
 ## Compliance
 
-- Erpel SHALL reach ERPNext only over its REST API with the agent user's key.
-- Erpel SHALL NOT offer generic document access, method calls or file access.
+- Enterich SHALL reach ERPNext only over its REST API with the agent user's key.
+- Enterich SHALL NOT offer generic document access, method calls or file access.
 
 ## References
 

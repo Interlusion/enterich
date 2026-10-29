@@ -8,8 +8,8 @@ from typing import Any
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from erpel.erpnext import ErpnextError
-from erpel.shapes import (
+from enterich.erpnext import ErpnextError
+from enterich.shapes import (
     Amount,
     Day,
     Modified,

@@ -18,16 +18,16 @@ def test_the_readme_lists_the_tools_of_the_snapshot() -> None:
 
 def test_writing_replaces_only_the_block(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     file = tmp_path / "README.md"
-    file.write_text(f"# Erpel\n\n{BLOCK}\n\n## Documentation\n")
+    file.write_text(f"# Enterich\n\n{BLOCK}\n\n## Documentation\n")
     monkeypatch.setattr(readme, "README", file)
     readme.write()
-    assert file.read_text() == f"# Erpel\n\n{readme.render()}\n\n## Documentation\n"
+    assert file.read_text() == f"# Enterich\n\n{readme.render()}\n\n## Documentation\n"
 
 
 @pytest.mark.parametrize(
     "text",
     [
-        "# Erpel\n",
+        "# Enterich\n",
         f"`{readme.END}` ends it.\n\n{BLOCK}\n",
         f"{BLOCK}\n\n{BLOCK}\n",
         f"{readme.END}\n{readme.START}\n",

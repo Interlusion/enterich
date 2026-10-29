@@ -8,9 +8,9 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from erpel.erpnext import ErpnextError, Refused
-from erpel.shapes import cut_rows, decimal, form_url, rows_of, shape
-from erpel.tools import Context, Refusal, get_named, unknown_name
+from enterich.erpnext import ErpnextError, Refused
+from enterich.shapes import cut_rows, decimal, form_url, rows_of, shape
+from enterich.tools import Context, Refusal, get_named, unknown_name
 
 MAX_DUPLICATE_ROWS = 1000
 MAX_NAMED = 5
@@ -198,7 +198,7 @@ async def comment(context: Context, doctype: str, name: str, warnings: list[str]
     if not warnings:
         return warnings
     # The content is HTML: each warning escaped, one per line
-    content = "Erpel: " + "<br>".join(html.escape(w, quote=False) for w in warnings)
+    content = "Enterich: " + "<br>".join(html.escape(w, quote=False) for w in warnings)
     try:
         await context.erpnext.add_comment(doctype, name, content)
     except ErpnextError as exc:

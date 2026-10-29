@@ -1,4 +1,4 @@
-# REQ-007: Erpel Bank and Cash — Requirement Specification
+# REQ-007: Enterich Bank and Cash — Requirement Specification
 
 | Meta | Value |
 | :- | :- |
@@ -44,7 +44,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-007-PRS-F001: Bank accounts
 
-**Description**: Erpel SHALL offer `list_bank_accounts` as the catalogue below defines it, returning only the company's own accounts.
+**Description**: Enterich SHALL offer `list_bank_accounts` as the catalogue below defines it, returning only the company's own accounts.
 
 **Related URS**: REQ-007-URS-F001
 
@@ -52,11 +52,11 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - A party's bank account of the same company isn't returned.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-007-PRS-F002: Bank transactions
 
-**Description**: Erpel SHALL offer `list_bank_transactions` and `get_bank_transaction` as the catalogue below defines them, with the bank transaction states below.
+**Description**: Enterich SHALL offer `list_bank_transactions` and `get_bank_transaction` as the catalogue below defines them, with the bank transaction states below.
 
 **Related URS**: REQ-007-URS-F001
 
@@ -65,11 +65,11 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - Each `state` sends exactly its ERPNext filter; without `state`, only unreconciled transactions are returned (this spec's default, see REQ-001's States).
 - A pending transaction is returned for `pending` and `all`, never for `unreconciled` or `reconciled`.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-007-PRS-F003: Payment entries
 
-**Description**: Erpel SHALL offer `list_payment_entries` and `get_payment_entry` as the catalogue below defines them.
+**Description**: Enterich SHALL offer `list_payment_entries` and `get_payment_entry` as the catalogue below defines them.
 
 **Related URS**: REQ-007-URS-F001
 
@@ -77,7 +77,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - `payment_type`, `party_type` and `state` each send exactly their ERPNext filter; `party` requires `party_type`.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 ## Operation Catalogue
 
@@ -128,7 +128,7 @@ Checked against ERPNext v16.52 source:
 - A bank transaction's `status` is Pending as a draft; on submit and every allocation ERPNext sets Unreconciled while `unallocated_amount` > 0, otherwise Reconciled; Cancelled on cancel (`set_status`). `unallocated_amount` is the difference of `withdrawal` and `deposit`, as a positive amount, less the allocations.
 - The Bank Statement Import based on Data Import submits its transactions only with "Submit After Import" and otherwise leaves drafts; the Bank Statement Import Log, the bank transaction upload and Plaid submit them. The bank reconciliation tool offers only submitted transactions.
 - On submit, and only with Accounts Settings' `enable_party_matching` (off by default), ERPNext matches a transaction's party from the counterparty's account number or IBAN, among parties' bank accounts and employees, and with `enable_fuzzy_matching` also from the name and description (`auto_set_party`); a party set by hand stays. A transaction's amount can be allocated to the DocTypes of the `bank_reconciliation_doctypes` hook (Payment Entry, Journal Entry, Sales Invoice, Purchase Invoice) and to another bank transaction.
-- Bank reconciliation sets the `clearance_date` of the voucher a transaction is allocated to, such as a payment entry; nothing sets the allocation row's own `clearance_date`, so Erpel doesn't return it.
+- Bank reconciliation sets the `clearance_date` of the voucher a transaction is allocated to, such as a payment entry; nothing sets the allocation row's own `clearance_date`, so Enterich doesn't return it.
 
 Not checked yet:
 

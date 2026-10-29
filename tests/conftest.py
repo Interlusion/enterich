@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from erpel import log
+from enterich import log
 from tests.fakes.settings import API_KEY, API_SECRET
 
 
@@ -18,9 +18,9 @@ def anyio_backend() -> str:
 
 @pytest.fixture(autouse=True)
 def isolated(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """No ERPEL_ variable from the shell, and the logging setup restored afterwards."""
+    """No ENTERICH_ variable from the shell, and the logging setup restored afterwards."""
     for name in list(os.environ):
-        if name.startswith("ERPEL_"):
+        if name.startswith("ENTERICH_"):
             monkeypatch.delenv(name)
     root = logging.getLogger()
     handlers, level = root.handlers[:], root.level

@@ -8,20 +8,20 @@
 
 ## Context
 
-Erpel holds an ERPNext API key and sits on the internet. Every dependency runs with that key in reach, so what goes into the image must be exactly what was reviewed and tested. The spike pinned every dependency with a hash, but only for amd64 wheels, which broke installs on arm64 development machines.
+Enterich holds an ERPNext API key and sits on the internet. Every dependency runs with that key in reach, so what goes into the image must be exactly what was reviewed and tested. The spike pinned every dependency with a hash, but only for amd64 wheels, which broke installs on arm64 development machines.
 
-The MCP SDK changes how Erpel talks to clients; an SDK update needs more care than a patch of a utility library.
+The MCP SDK changes how Enterich talks to clients; an SDK update needs more care than a patch of a utility library.
 
 ## Decision
 
 ### Toolchain
 
-- **One Python version.** Erpel is an application, not a library, so it runs on exactly one version. A new Python version is adopted once it has been released for a year and every dependency supports it; until then the previous one stays. `.python-version`, `requires-python` (`==3.N.*`) and the base image name the same version and change together in one pull request.
-- **uv** for the project: `pyproject.toml` declares the direct dependencies, `uv.lock` pins every package with hashes for all platforms. `uv_build` is the build backend; development tools are a dependency group (PEP 735), not an optional extra; `erpel` is a console script; the version is read at runtime from the package metadata.
+- **One Python version.** Enterich is an application, not a library, so it runs on exactly one version. A new Python version is adopted once it has been released for a year and every dependency supports it; until then the previous one stays. `.python-version`, `requires-python` (`==3.N.*`) and the base image name the same version and change together in one pull request.
+- **uv** for the project: `pyproject.toml` declares the direct dependencies, `uv.lock` pins every package with hashes for all platforms. `uv_build` is the build backend; development tools are a dependency group (PEP 735), not an optional extra; `enterich` is a console script; the version is read at runtime from the package metadata.
 - **ruff** for linting and formatting Python; **mdformat** with `mdformat-gfm` for Markdown, configured in `.mdformat.toml` (one line per paragraph, consecutive list numbers, tables without padding, so a change shows as one changed line); **basedpyright** in strict mode for types (it installs Node.js as a locked Python package, where `pyright` downloads it on first run); **pytest** with anyio's plugin for async tests (anyio already comes with the SDK), **coverage** with branch coverage, **syrupy** for the tool-list snapshot.
 - **Configuration with plain pydantic models**, no `pydantic-settings`; **logging with the standard library** and a small JSON formatter.
 - **HTTP client: `httpx2`,** the one the MCP SDK already depends on, so the image carries one HTTP stack; created with `trust_env=False`, so no proxy or certificate setting from the environment reaches the ERPNext calls.
-- **Layout:** `src/erpel/` (package), `tests/` (unit and end-to-end tests with a fake ERPNext and a fake JWKS), `Dockerfile`, `.github/`.
+- **Layout:** `src/enterich/` (package), `tests/` (unit and end-to-end tests with a fake ERPNext and a fake JWKS), `Dockerfile`, `.github/`.
 
 ### Pins
 

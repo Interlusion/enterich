@@ -20,8 +20,8 @@ import jwt
 from jwt import PyJWK
 from mcp.server.auth.provider import AccessToken
 
-from erpel import log
-from erpel.config import Settings
+from enterich import log
+from enterich.config import Settings
 
 MAX_TOKEN_LENGTH = 8 * 1024
 MAX_JWKS_BYTES = 1024 * 1024

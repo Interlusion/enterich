@@ -1,4 +1,4 @@
-"""Talking to Erpel as an MCP client would."""
+"""Talking to Enterich as an MCP client would."""
 
 import json
 from dataclasses import dataclass
@@ -6,8 +6,8 @@ from typing import Any
 
 from starlette.testclient import TestClient
 
-from erpel.app import create_app
-from erpel.config import Settings
+from enterich.app import create_app
+from enterich.config import Settings
 from tests.fakes.erpnext import FakeErpnext
 from tests.fakes.jwks import FakeJwks
 from tests.fakes.settings import settings

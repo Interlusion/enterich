@@ -8,8 +8,8 @@ from decimal import Decimal
 import anyio
 import pytest
 
-from erpel import erpnext
-from erpel.erpnext import Erpnext, ErpnextError
+from enterich import erpnext
+from enterich.erpnext import Erpnext, ErpnextError
 from tests.fakes.erpnext import FakeErpnext, customer, error, item, sales_invoice
 from tests.fakes.settings import API_KEY, API_SECRET, settings
 

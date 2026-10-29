@@ -2,7 +2,7 @@
 
 import pytest
 
-from erpel.config import KNOWN, ConfigError, load
+from enterich.config import KNOWN, ConfigError, load
 from tests.fakes.settings import API_KEY, API_SECRET, ENV
 
 REQUIRED = [
@@ -23,9 +23,9 @@ def problems(**overrides: str | None) -> list[str]:
     env = dict(ENV)
     for name, value in overrides.items():
         if value is None:
-            env.pop(f"ERPEL_{name}", None)
+            env.pop(f"ENTERICH_{name}", None)
         else:
-            env[f"ERPEL_{name}"] = value
+            env[f"ENTERICH_{name}"] = value
     with pytest.raises(ConfigError) as caught:
         load(env, ("list_items",))
     return caught.value.problems
@@ -45,28 +45,28 @@ def test_example_configuration_loads_with_defaults() -> None:
 
 
 @pytest.mark.parametrize("value", ["", "  ", "erp example.com", "erp.example.com/x", "user@erp"])
-def test_an_empty_or_invalid_erpnext_host_stops_erpel(value: str) -> None:
-    assert [p.split(":")[0] for p in problems(ERPNEXT_HOST=value)] == ["ERPEL_ERPNEXT_HOST"]
+def test_an_empty_or_invalid_erpnext_host_stops_enterich(value: str) -> None:
+    assert [p.split(":")[0] for p in problems(ERPNEXT_HOST=value)] == ["ENTERICH_ERPNEXT_HOST"]
 
 
 @pytest.mark.parametrize(
     "value", ["erp.example.com", "erp.internal:8000", "10.0.0.5", "[::1]:8080"]
 )
 def test_an_erpnext_host_may_carry_a_port(value: str) -> None:
-    assert load({**ENV, "ERPEL_ERPNEXT_HOST": value}, ("list_items",)).erpnext_host == value
+    assert load({**ENV, "ENTERICH_ERPNEXT_HOST": value}, ("list_items",)).erpnext_host == value
 
 
 @pytest.mark.parametrize("name", REQUIRED)
 def test_each_required_variable_is_named_when_missing(name: str) -> None:
-    assert problems(**{name: None}) == [f"ERPEL_{name}: required"]
+    assert problems(**{name: None}) == [f"ENTERICH_{name}: required"]
 
 
 def test_all_problems_are_reported_at_once() -> None:
     found = problems(ISSUER=None, CLOCK_LEEWAY="61", TIMEZONE="Mars/Base")
     assert [p.split(":")[0] for p in found] == [
-        "ERPEL_ISSUER",
-        "ERPEL_CLOCK_LEEWAY",
-        "ERPEL_TIMEZONE",
+        "ENTERICH_ISSUER",
+        "ENTERICH_CLOCK_LEEWAY",
+        "ENTERICH_TIMEZONE",
     ]
 
 
@@ -110,19 +110,19 @@ def test_all_problems_are_reported_at_once() -> None:
         ("TIMEZONE", "a" * 300),
     ],
 )
-def test_invalid_values_stop_erpel_with_name_and_rule(name: str, value: str) -> None:
+def test_invalid_values_stop_enterich_with_name_and_rule(name: str, value: str) -> None:
     found = problems(**{name: value})
     assert len(found) == 1
-    assert found[0].startswith(f"ERPEL_{name}: ")
+    assert found[0].startswith(f"ENTERICH_{name}: ")
 
 
 def test_http_urls_are_allowed_for_loopback_hosts() -> None:
     s = load(
         {
             **ENV,
-            "ERPEL_RESOURCE_URL": "http://127.0.0.1:8000/mcp",
-            "ERPEL_ISSUER": "http://localhost:8180/realms/example",
-            "ERPEL_JWKS_URL": "http://[::1]:8180/certs",
+            "ENTERICH_RESOURCE_URL": "http://127.0.0.1:8000/mcp",
+            "ENTERICH_ISSUER": "http://localhost:8180/realms/example",
+            "ENTERICH_JWKS_URL": "http://[::1]:8180/certs",
         },
         (),
     )
@@ -141,18 +141,18 @@ def test_messages_never_contain_secrets() -> None:
 
 
 def test_http_erpnext_url_to_another_host_warns() -> None:
-    s = load({**ENV, "ERPEL_ERPNEXT_URL": "http://erp.internal:8080"}, ())
-    assert s.warnings == ("ERPEL_ERPNEXT_URL uses http: the API key travels unencrypted",)
+    s = load({**ENV, "ENTERICH_ERPNEXT_URL": "http://erp.internal:8080"}, ())
+    assert s.warnings == ("ENTERICH_ERPNEXT_URL uses http: the API key travels unencrypted",)
 
 
-def test_unknown_erpel_variables_are_reported_as_warnings() -> None:
-    s = load({**ENV, "ERPEL_TOOL": "list_items"}, ("list_items",))
-    assert s.warnings == ("ERPEL_TOOL is not a known variable and is ignored",)
+def test_unknown_enterich_variables_are_reported_as_warnings() -> None:
+    s = load({**ENV, "ENTERICH_TOOL": "list_items"}, ("list_items",))
+    assert s.warnings == ("ENTERICH_TOOL is not a known variable and is ignored",)
     assert s.tools == ("list_items",)
 
 
 def test_tools_set_limits_the_operations() -> None:
-    s = load({**ENV, "ERPEL_TOOLS": " list_items , "}, ("list_items", "get_item"))
+    s = load({**ENV, "ENTERICH_TOOLS": " list_items , "}, ("list_items", "get_item"))
     assert s.tools == ("list_items",)
 
 
@@ -160,4 +160,4 @@ def test_the_configuration_guide_lists_every_variable() -> None:
     with open("docs/guides/configuration.md", encoding="utf-8") as guide:
         text = guide.read()
     for name in KNOWN:
-        assert f"`ERPEL_{name}`" in text
+        assert f"`ENTERICH_{name}`" in text

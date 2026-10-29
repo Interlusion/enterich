@@ -4,7 +4,7 @@
 
 | I want to … | Read |
 | :- | :- |
-| Know what Erpel must do, and its tools | [Specs](specs/README.md): REQ-001 core, REQ-002 service, REQ-003 to REQ-007 the operations by area |
+| Know what Enterich must do, and its tools | [Specs](specs/README.md): REQ-001 core, REQ-002 service, REQ-003 to REQ-007 the operations by area |
 | Understand how it fits together | [Architecture](arc42/README.md) |
 | Know why it is built this way | [ADRs](arc42/adr/README.md) |
 | Configure and run it | [Configuration](guides/configuration.md), [Keycloak](guides/keycloak.md) |
@@ -32,9 +32,9 @@
 
 ## Conventions
 
-- **Generic only.** Docs describe Erpel, never a deployment: placeholders such as `erp.example.com`, `id.example.com`, `Example GmbH`.
+- **Generic only.** Docs describe Enterich, never a deployment: placeholders such as `erp.example.com`, `id.example.com`, `Example GmbH`.
 - **Plain Markdown links**, so they work on GitHub.
 - **Requirement IDs in full:** `REQ-001-PRS-F005`, never `PRS-F005`.
-- **The name:** Erpel in prose, like Git; `erpel` where it is an identifier (package, command, repository, image); `ERPEL_` for variables.
-- **Source of truth:** the specs for what Erpel must do; the code for what it does. When docs and code disagree, fix one of them in the same change.
+- **The name:** Enterich in prose, like Git; `enterich` where it is an identifier (package, command, repository, image); `ENTERICH_` for variables.
+- **Source of truth:** the specs for what Enterich must do; the code for what it does. When docs and code disagree, fix one of them in the same change.
 - Agent-drafted documents say so under Author.

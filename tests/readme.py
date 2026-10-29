@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from erpel.tools import (
+from enterich.tools import (
     bank_and_cash,
     master_data,
     order_to_cash,
@@ -68,8 +68,8 @@ def render() -> str:
     lines = [
         START,
         "",
-        f"Erpel offers {len(tools)} tools. A deployment may offer fewer "
-        "([`ERPEL_TOOLS`](docs/guides/configuration.md)); every tool works on one company, "
+        f"Enterich offers {len(tools)} tools. A deployment may offer fewer "
+        "([`ENTERICH_TOOLS`](docs/guides/configuration.md)); every tool works on one company, "
         "within the rights ERPNext gives the agent user.",
     ]
     for module, path in AREAS:

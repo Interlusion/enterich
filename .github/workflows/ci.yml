@@ -92,9 +92,9 @@ jobs:
           target: test
           platforms: ${{ matrix.platform }}
           load: true
-          tags: erpel:test
+          tags: enterich:test
           push: false
       - name: Tests in the image
         env:
           PLATFORM: ${{ matrix.platform }}
-        run: docker run --rm --platform "$PLATFORM" erpel:test
+        run: docker run --rm --platform "$PLATFORM" enterich:test

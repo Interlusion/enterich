@@ -873,7 +873,7 @@ def tax_template(name: str = "VAT 19% - EX", **overrides: Any) -> dict[str, Any]
 
 
 def receivable(voucher_no: str, outstanding: float, **overrides: Any) -> dict[str, Any]:
-    """A row of Accounts Receivable as its execute() returns it, with columns Erpel drops."""
+    """A row of Accounts Receivable as its execute() returns it, with columns Enterich drops."""
     row: dict[str, Any] = {
         "party_type": "Customer",
         "party": "CUST-0001",
@@ -1010,7 +1010,7 @@ def purchase_tax_template(name: str = "Input VAT 19% - EX", **overrides: Any) ->
 
 
 def payable(voucher_no: str, outstanding: float, **overrides: Any) -> dict[str, Any]:
-    """A row of Accounts Payable as its execute() returns it, with columns Erpel drops."""
+    """A row of Accounts Payable as its execute() returns it, with columns Enterich drops."""
     row: dict[str, Any] = {
         "party_type": "Supplier",
         "party": "SUPP-0001",
@@ -1147,7 +1147,7 @@ def fiscal_year(
 
 
 def ledger_entry(voucher_no: str, debit: float, credit: float, **overrides: Any) -> dict[str, Any]:
-    """An entry row of General Ledger as its execute() returns it, with columns Erpel drops."""
+    """An entry row of General Ledger as its execute() returns it, with columns Enterich drops."""
     row: dict[str, Any] = {
         "gl_entry": f"GLE-{voucher_no}",
         "posting_date": "2026-10-01",

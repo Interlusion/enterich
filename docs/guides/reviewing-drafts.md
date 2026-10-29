@@ -6,7 +6,7 @@
 | **Author** | loxy (drafted with Claude) |
 | **Status** | Draft: describes the planned behaviour; nothing is built yet |
 
-For the people who check and submit what the agent prepares (the bookkeeper of [REQ-001](../specs/req-001-core.md#personas)). Everything happens in ERPNext; Erpel adds nothing to its interface.
+For the people who check and submit what the agent prepares (the bookkeeper of [REQ-001](../specs/req-001-core.md#personas)). Everything happens in ERPNext; Enterich adds nothing to its interface.
 
 ## Finding the agent's drafts
 
@@ -17,7 +17,7 @@ The agent works as its own ERPNext user, so its drafts carry that user as owner.
 
 ## Warnings
 
-When something about a draft looks wrong, Erpel adds a comment to it, in the draft's timeline, starting with "Erpel:". Two cases today:
+When something about a draft looks wrong, Enterich adds a comment to it, in the draft's timeline, starting with "Enterich:". Two cases today:
 
 - **Possible duplicate:** a matching document existed, and the agent created the draft anyway. The comment names the match.
 - **Tax template without tax:** a tax template was given, but the draft's tax is zero.

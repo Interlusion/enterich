@@ -37,6 +37,6 @@ The project code is **ERPL**. Outside this repository, IDs carry it: `ERPL-REQ-0
 
 ## Changes
 
-A spec is Draft until the maintainer baselines it, and edited in place until then. After baseline, a substantive change (a requirement added, removed or changed) is folded into the body and a sibling `req-NNN-name.history.md` records the dated reason, most recent first. Until the first release, details found while building Erpel are folded into the body without a history entry.
+A spec is Draft until the maintainer baselines it, and edited in place until then. After baseline, a substantive change (a requirement added, removed or changed) is folded into the body and a sibling `req-NNN-name.history.md` records the dated reason, most recent first. Until the first release, details found while building Enterich are folded into the body without a history entry.
 
 Deployments keep their own requirements elsewhere and trace them to these IDs. A change a deployment needs arrives here as a change to these specs, never as a deployment fact.

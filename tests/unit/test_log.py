@@ -4,7 +4,7 @@ import io
 import json
 import logging
 
-from erpel import log
+from enterich import log
 
 
 def capture() -> io.StringIO:

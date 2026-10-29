@@ -21,7 +21,7 @@ on:
 # job in release.yml grants exactly what its run needs.
 
 env:
-  IMAGE: ghcr.io/interlusion/erpel
+  IMAGE: ghcr.io/interlusion/enterich
   VERSION: ${{ inputs.version }}
   # The build records stay out of the run's artefacts; the job summary remains.
   DOCKER_BUILD_RECORD_UPLOAD: false
@@ -68,10 +68,10 @@ jobs:
           target: test
           platforms: linux/amd64
           load: true
-          tags: erpel:test-amd64
+          tags: enterich:test-amd64
           push: false
       - name: Tests in the image, amd64
-        run: docker run --rm --platform linux/amd64 erpel:test-amd64
+        run: docker run --rm --platform linux/amd64 enterich:test-amd64
       - name: Test stage, arm64
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -79,10 +79,10 @@ jobs:
           target: test
           platforms: linux/arm64
           load: true
-          tags: erpel:test-arm64
+          tags: enterich:test-arm64
           push: false
       - name: Tests in the image, arm64
-        run: docker run --rm --platform linux/arm64 erpel:test-arm64
+        run: docker run --rm --platform linux/arm64 enterich:test-arm64
       - name: Where the image goes
         id: output
         env:
@@ -116,7 +116,7 @@ jobs:
           python3 scripts/image_index.py "$RUNNER_TEMP/oci" "$out" "$IMAGE:$VERSION" \
             linux/amd64 linux/arm64
           python3 scripts/changelog.py "$VERSION" --draft > "$out/notes.md"
-          cp tests/snapshots/tools.json "$out/erpel-$VERSION-tools.json"
+          cp tests/snapshots/tools.json "$out/enterich-$VERSION-tools.json"
       - name: Dry-run artefact
         if: ${{ !inputs.publish }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -160,6 +160,6 @@ jobs:
           # The backticks are Markdown for the release notes, not command substitution.
           # shellcheck disable=SC2016
           printf '\n## Image\n\n`%s:%s`, digest `%s`\n' "$IMAGE" "$VERSION" "$DIGEST" >> "$notes"
-          cp tests/snapshots/tools.json "$RUNNER_TEMP/erpel-$VERSION-tools.json"
-          gh release create "v$VERSION" --verify-tag --title "Erpel $VERSION" \
-            --notes-file "$notes" "$RUNNER_TEMP/erpel-$VERSION-tools.json"
+          cp tests/snapshots/tools.json "$RUNNER_TEMP/enterich-$VERSION-tools.json"
+          gh release create "v$VERSION" --verify-tag --title "Enterich $VERSION" \
+            --notes-file "$notes" "$RUNNER_TEMP/enterich-$VERSION-tools.json"

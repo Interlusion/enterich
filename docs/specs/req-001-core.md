@@ -1,4 +1,4 @@
-# REQ-001: Erpel Core — Requirement Specification
+# REQ-001: Enterich Core — Requirement Specification
 
 | Meta | Value |
 | :- | :- |
@@ -9,11 +9,11 @@
 
 ## Intended Use
 
-Erpel is an MCP server for ERPNext. It lets one AI agent read an ERPNext company's books and prepare drafts, which a person reviews and submits in ERPNext. It serves MCP over Streamable HTTP as an OAuth resource server: tokens come from an external authorization server (for example Keycloak), and Erpel accepts only those of one configured client and agent identity. It calls ERPNext's REST API with the API key of one ERPNext agent user and holds no other ERPNext credential.
+Enterich is an MCP server for ERPNext. It lets one AI agent read an ERPNext company's books and prepare drafts, which a person reviews and submits in ERPNext. It serves MCP over Streamable HTTP as an OAuth resource server: tokens come from an external authorization server (for example Keycloak), and Enterich accepts only those of one configured client and agent identity. It calls ERPNext's REST API with the API key of one ERPNext agent user and holds no other ERPNext credential.
 
-Out of scope: submitting, cancelling, amending or deleting anything; any operation not catalogued in an area spec; issuing tokens or signing users in, including second factors; several agent identities in one instance; browser-based clients calling Erpel directly (no CORS); network access control (source ranges, rate limits per client), which belongs to the deployment.
+Out of scope: submitting, cancelling, amending or deleting anything; any operation not catalogued in an area spec; issuing tokens or signing users in, including second factors; several agent identities in one instance; browser-based clients calling Enterich directly (no CORS); network access control (source ranges, rate limits per client), which belongs to the deployment.
 
-Key constraints: the ERPNext agent user's permissions are the hard limit, whatever Erpel, the model or the client do; the agent's interface is a fixed list of operations; nothing about one deployment is in Erpel's code, and everything a deployment differs in comes from configuration. Decisions: [ADR-001](../arc42/adr/ADR-001-separate-service-fixed-tools.md), [ADR-007](../arc42/adr/ADR-007-specs-by-accounting-area.md).
+Key constraints: the ERPNext agent user's permissions are the hard limit, whatever Enterich, the model or the client do; the agent's interface is a fixed list of operations; nothing about one deployment is in Enterich's code, and everything a deployment differs in comes from configuration. Decisions: [ADR-001](../arc42/adr/ADR-001-separate-service-fixed-tools.md), [ADR-007](../arc42/adr/ADR-007-specs-by-accounting-area.md).
 
 This spec holds the product's personas, user stories and terms, and the rules every operation shares. The service around the operations (access, protocol, configuration, logging, limits) is [REQ-002](req-002-service.md); the operations themselves are specified by accounting area, in the area specs listed in the [index](README.md). A deployment's own requirements trace to the IDs of these specs.
 
@@ -22,7 +22,7 @@ This spec holds the product's personas, user stories and terms, and the rules ev
 ### REQ-001-P1. The operator
 
 - **Role**: Owns the company's books in ERPNext and decides what the agent may do there: which operations, for which company; connects the agent.
-- **Expectations**: Asks the agent about the books and gets drafts that need only a check; can see from Erpel's configuration and tool list what the agent can do.
+- **Expectations**: Asks the agent about the books and gets drafts that need only a check; can see from Enterich's configuration and tool list what the agent can do.
 - **Pain points**: Invoices and journal entries typed by hand; open items looked up across several lists.
 - **Underlying fear**: An agent that posts, cancels or deletes something, manipulated by text from outside or by its own mistake; access that can't be stopped quickly; a person's sign-in that hands the agent's tools to someone else.
 
@@ -41,17 +41,17 @@ This spec holds the product's personas, user stories and terms, and the rules ev
 
 ### REQ-001-P4. The agent
 
-- **Role**: The AI model that calls Erpel's operations for the operator, through any MCP client.
+- **Role**: The AI model that calls Enterich's operations for the operator, through any MCP client.
 - **Expectations**: Stable tool names, exact input schemas, results it can rely on, refusals that say what to change.
 - **Pain points**: Vague errors that leave it guessing; results the client cuts off without saying so; names that must be exactly right.
 - **Underlying fear**: (operator's) The agent taking a remittance text or an incoming invoice as an instruction.
 
 ### REQ-001-P5. The deployer
 
-- **Role**: Installs and runs Erpel for a site: the image, its configuration and secrets, the agent user's rights, the authorization server's client. The operator, or an IT provider working for them.
-- **Expectations**: One pinned image, configuration from the environment, an exact list of the rights and settings Erpel needs, a health check and logs like any other service.
+- **Role**: Installs and runs Enterich for a site: the image, its configuration and secrets, the agent user's rights, the authorization server's client. The operator, or an IT provider working for them.
+- **Expectations**: One pinned image, configuration from the environment, an exact list of the rights and settings Enterich needs, a health check and logs like any other service.
 - **Pain points**: Settings that fail silently; rights lists that drift from what the software needs.
-- **Underlying fear**: An Erpel that holds more rights than it needs, or leaks its key.
+- **Underlying fear**: An Enterich that holds more rights than it needs, or leaks its key.
 
 ## User Stories
 
@@ -59,18 +59,18 @@ This spec holds the product's personas, user stories and terms, and the rules ev
 - REQ-001-P1-2. As the operator, I need the agent to prepare and correct drafts of the documents people would otherwise type, so that nobody types them by hand.
 - REQ-001-P1-3. As the operator, I need the agent to be unable to post, cancel, delete or discard anything, whatever it is told and whatever the client allows, so that only people post to the books.
 - REQ-001-P1-4. As the operator, I need the agent's access to end as soon as I disable its user in ERPNext or in the authorization server.
-- REQ-001-P1-5. As the operator, I need to choose which operations my site offers, without changing Erpel's code.
+- REQ-001-P1-5. As the operator, I need to choose which operations my site offers, without changing Enterich's code.
 - REQ-001-P1-6. As the operator, I need to trace each change back to the connection and session that caused it.
-- REQ-001-P2-1. As the auditor, I need every change made through Erpel recorded under the agent user, distinguishable from people's changes.
+- REQ-001-P2-1. As the auditor, I need every change made through Enterich recorded under the agent user, distinguishable from people's changes.
 - REQ-001-P3-1. As the bookkeeper, I need each draft the agent prepares to come with a link and to be recognisable as the agent's, so that I find and check it quickly.
 - REQ-001-P3-2. As the bookkeeper, I need to be warned of likely mistakes in a draft, such as a possible duplicate or a tax template without tax, so that I don't submit them unnoticed.
 - REQ-001-P3-3. As the bookkeeper, I need my corrections to a draft to survive the agent's later changes, so that no work is lost.
 - REQ-001-P4-1. As the agent, I need exact names, schemas and results, so that I call each operation correctly the first time.
 - REQ-001-P4-2. As the agent, I need refusals that name the input and the rule, and a way to narrow a request whose result is too large, so that I can correct myself.
 - REQ-001-P4-3. As the agent, I need text written by outsiders marked as such, so that I don't take it for instructions.
-- REQ-001-P5-1. As the deployer, I need to configure Erpel from environment variables only, with every mistake named at start, so that one image serves every site.
-- REQ-001-P5-2. As the deployer, I need to know exactly which ERPNext rights and authorization-server settings Erpel needs, so that I grant no more.
-- REQ-001-P5-3. As the deployer, I need a health endpoint and logs my platform can collect, so that I run and watch Erpel like any other service.
+- REQ-001-P5-1. As the deployer, I need to configure Enterich from environment variables only, with every mistake named at start, so that one image serves every site.
+- REQ-001-P5-2. As the deployer, I need to know exactly which ERPNext rights and authorization-server settings Enterich needs, so that I grant no more.
+- REQ-001-P5-3. As the deployer, I need a health endpoint and logs my platform can collect, so that I run and watch Enterich like any other service.
 
 ## Requirement Rules
 
@@ -85,10 +85,10 @@ This spec holds the product's personas, user stories and terms, and the rules ev
 ## Terms
 
 - **Agent**: the MCP client acting on behalf of the agent identity, in any client application.
-- **Agent identity**: the pair of OAuth client (`azp` or `client_id`) and subject (`sub`) that Erpel is configured to accept.
-- **Agent user**: the ERPNext user whose API key Erpel holds.
+- **Agent identity**: the pair of OAuth client (`azp` or `client_id`) and subject (`sub`) that Enterich is configured to accept.
+- **Agent user**: the ERPNext user whose API key Enterich holds.
 - **Assigned company**: the one ERPNext company configured for the instance.
-- **Operation**: an MCP tool Erpel offers, with a fixed purpose and a fixed input schema; each area spec catalogues its operations, and this spec's [Operation Conventions](#operation-conventions) apply to all of them.
+- **Operation**: an MCP tool Enterich offers, with a fixed purpose and a fixed input schema; each area spec catalogues its operations, and this spec's [Operation Conventions](#operation-conventions) apply to all of them.
 - **Area spec**: a spec listed in the [index](README.md) that holds the operations of one accounting area.
 - **Draft**: an ERPNext document with `docstatus` 0.
 - **Outside-text field**: a field whose content may have been written by someone outside the company: party names, tax IDs and addresses, item names and descriptions, remarks and terms, supplier references, bank transaction texts, ledger counter-parties. The area catalogues mark each such field.
@@ -124,7 +124,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-URS-F004: A fixed list of operations
 
-**Description**: Erpel SHALL offer only the operations catalogued in the area specs; it SHALL NOT offer generic document access, generic method calls or file access.
+**Description**: Enterich SHALL offer only the operations catalogued in the area specs; it SHALL NOT offer generic document access, generic method calls or file access.
 
 **Related User Stories**: REQ-001-P1-3, REQ-001-P4-1 | **Rationale**: Generic calls reach the side doors of REQ-001-URS-F003; a fixed list can be reviewed.
 
@@ -136,7 +136,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-URS-F006: Refusals the agent can act on
 
-**Description**: When ERPNext or Erpel refuses an operation, the agent SHALL receive the reason.
+**Description**: When ERPNext or Enterich refuses an operation, the agent SHALL receive the reason.
 
 **Related User Stories**: REQ-001-P4-2 | **Rationale**: With the reason the agent corrects a wrong name or a missing field at once; without it, it guesses.
 
@@ -148,7 +148,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-URS-F008: Operations chosen by configuration
 
-**Description**: The operator SHALL be able to limit an instance to a chosen set of operations through configuration, and an operation added in a later Erpel version SHALL NOT appear in such a set by itself.
+**Description**: The operator SHALL be able to limit an instance to a chosen set of operations through configuration, and an operation added in a later Enterich version SHALL NOT appear in such a set by itself.
 
 **Related User Stories**: REQ-001-P1-5 | **Rationale**: A site that wants only reads, or no journal entries, runs a smaller set without a fork, and an update doesn't widen it unnoticed.
 
@@ -168,7 +168,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-URS-NF002: Outside text is data
 
-**Description**: Erpel SHALL return outside-text fields as data, marked as such.
+**Description**: Enterich SHALL return outside-text fields as data, marked as such.
 
 **Related User Stories**: REQ-001-P1-3, REQ-001-P4-3 | **Rationale**: Remittance texts and incoming e-invoices are written by strangers. Draft-only rights contain what a manipulated agent can do; marking lowers the chance.
 
@@ -182,7 +182,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-F001: Read operations
 
-**Description**: Erpel SHALL offer the read operations of the area specs, each calling ERPNext only as its area spec's ERPNext calls table says, and returning at most 100 records per call, with the limit enforced in Erpel.
+**Description**: Enterich SHALL offer the read operations of the area specs, each calling ERPNext only as its area spec's ERPNext calls table says, and returning at most 100 records per call, with the limit enforced in Enterich.
 
 **Related URS**: REQ-001-URS-F001, REQ-001-URS-F004
 
@@ -191,7 +191,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - Each read operation of the area specs works against a fake ERPNext and sends ERPNext only its DocType or report, fields, fixed filters and order as catalogued.
 - A `limit` of 101 is refused before any ERPNext call; list results carry `has_more`.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-001-PRS-F002: Draft create operations
 
@@ -206,7 +206,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - A draft created with a tax template carries the template's rows as ERPNext returned them.
 - The result carries number, `modified`, totals, tax rows where the document has them, and URL.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-001-PRS-F003: Draft update operations
 
@@ -220,7 +220,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - The body ERPNext receives equals the "Sent to ERPNext" column for the given inputs.
 - Rows given in an update replace all existing rows: a draft with three rows updated with one row has exactly that row.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-001-PRS-F004: Stale updates refused
 
@@ -231,13 +231,13 @@ Only a fixed list of operations, without generic method calls, closes these door
 **Definition of Done**:
 
 - An update with an old timestamp is refused with a message saying the draft changed, and the draft is unchanged.
-- An update whose draft changes between Erpel's check and its write is refused by ERPNext (`TimestampMismatchError`) and reported the same way.
+- An update whose draft changes between Enterich's check and its write is refused by ERPNext (`TimestampMismatchError`) and reported the same way.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-001-PRS-F005: Possible duplicates refused
 
-**Description**: Before a create, Erpel SHALL look in ERPNext for a document of the assigned company, whoever made it, that matches as the operation's area spec defines. When one matches, Erpel SHALL refuse the create, naming the matching documents and the `allow_duplicate` input. With `allow_duplicate` true, Erpel SHALL create the document and name the matches in `warnings`.
+**Description**: Before a create, Enterich SHALL look in ERPNext for a document of the assigned company, whoever made it, that matches as the operation's area spec defines. When one matches, Enterich SHALL refuse the create, naming the matching documents and the `allow_duplicate` input. With `allow_duplicate` true, Enterich SHALL create the document and name the matches in `warnings`.
 
 **Related URS**: REQ-001-URS-F007
 
@@ -247,7 +247,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - A create that differs from every existing document in a field of its match goes through without a warning.
 - With `allow_duplicate: true`, a matching create goes through and its result names the match in `warnings`.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-001-PRS-F006: No generic operations
 
@@ -258,13 +258,13 @@ Only a fixed list of operations, without generic method calls, closes these door
 **Definition of Done**:
 
 - The published tool list equals the operations of the area specs, held as a snapshot that changes only with a reviewed change to those specs.
-- No input schema has a property that accepts a DocType, report, method, field list, filter or path; no ERPNext call Erpel makes uses `docstatus` other than 0 in a body, `run_method` or `run_doc_method`, the submit, cancel, delete or discard routes, or the purchase invoice block and release-date methods.
+- No input schema has a property that accepts a DocType, report, method, field list, filter or path; no ERPNext call Enterich makes uses `docstatus` other than 0 in a body, `run_method` or `run_doc_method`, the submit, cancel, delete or discard routes, or the purchase invoice block and release-date methods.
 - Verification: inspection and test.
-- Evidence: the tool-list snapshot in Erpel's test suite.
+- Evidence: the tool-list snapshot in Enterich's test suite.
 
 #### REQ-001-PRS-F007: The assigned company from configuration
 
-**Description**: Erpel SHALL set the assigned company on every draft it creates, filter every list of a company's records (transactions, accounts, cost centres, bank accounts, tax templates) and every report by it, and refuse to return or change a transaction of another company.
+**Description**: Enterich SHALL set the assigned company on every draft it creates, filter every list of a company's records (transactions, accounts, cost centres, bank accounts, tax templates) and every report by it, and refuse to return or change a transaction of another company.
 
 **Related URS**: REQ-001-URS-F005
 
@@ -273,11 +273,11 @@ Only a fixed list of operations, without generic method calls, closes these door
 - Every create body carries the configured company; every such list and report call filters by it.
 - A get or update of a document whose company differs answers as for a name that doesn't exist (REQ-001-PRS-F009).
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-001-PRS-F008: Refusals reported
 
-**Description**: Erpel SHALL return an ERPNext refusal as a tool error carrying the HTTP status, ERPNext's `exc_type` and the first message of `_server_messages`, labelled as ERPNext's message; it SHALL forward no other part of ERPNext's error body (`exc`, `exception`, `_debug_messages`, tracebacks). Erpel's own refusals SHALL be tool errors naming the input and the rule it broke. Every tool error SHALL reach the agent as plain text of at most 300 characters.
+**Description**: Enterich SHALL return an ERPNext refusal as a tool error carrying the HTTP status, ERPNext's `exc_type` and the first message of `_server_messages`, labelled as ERPNext's message; it SHALL forward no other part of ERPNext's error body (`exc`, `exception`, `_debug_messages`, tracebacks). Enterich's own refusals SHALL be tool errors naming the input and the rule it broke. Every tool error SHALL reach the agent as plain text of at most 300 characters.
 
 **Related URS**: REQ-001-URS-F006, REQ-001-URS-NF002
 
@@ -289,11 +289,11 @@ Only a fixed list of operations, without generic method calls, closes these door
 - An input that breaks the schema is refused with the property and rule.
 - A message of 2,000 characters from ERPNext, and an input with 50 unknown properties, each reach the agent as at most 300 characters.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-001-PRS-F009: Unknown or unpermitted names
 
-**Description**: When ERPNext answers a name input with "not found" or "not permitted", Erpel SHALL say that the name doesn't exist or isn't permitted for the agent user, and name the input.
+**Description**: When ERPNext answers a name input with "not found" or "not permitted", Enterich SHALL say that the name doesn't exist or isn't permitted for the agent user, and name the input.
 
 **Related URS**: REQ-001-URS-F006
 
@@ -301,7 +301,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 - A 404 and a 403 for a tax template name each produce a tool error naming `taxes_and_charges` and both possible causes.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-001-PRS-F010: Name inputs stay names
 
@@ -314,20 +314,20 @@ Only a fixed list of operations, without generic method calls, closes these door
 - `../User/Administrator`, `a/./b`, a name with a newline, U+2028 or U+202E, and a 141-character name are refused before any ERPNext call.
 - A name with `/`, `%`, `&`, `?`, `#` or spaces, such as `X?run_method=discard` or `a#b`, reaches ERPNext unchanged as one parameter or one encoded segment.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-001-PRS-F011: Operations chosen
 
-**Description**: When its configuration lists operations, Erpel SHALL offer and run only those; when it lists none, all operations of the area specs. Erpel SHALL refuse to start when the list names an unknown operation.
+**Description**: When its configuration lists operations, Enterich SHALL offer and run only those; when it lists none, all operations of the area specs. Enterich SHALL refuse to start when the list names an unknown operation.
 
 **Related URS**: REQ-001-URS-F008
 
 **Definition of Done**:
 
 - With a list of three operations, `tools/list` shows exactly those, and calling another gives an unknown-tool error.
-- A misspelt operation name stops Erpel at start with a message naming it.
+- A misspelt operation name stops Enterich at start with a message naming it.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-001-PRS-F012: Tax template without tax
 
@@ -339,11 +339,11 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 - A draft with a template whose rows have rate 0 and items without an item tax template returns the warning.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-001-PRS-F013: No approval in the loop
 
-**Description**: No operation SHALL ask the client for anything (approval, elicitation, sampling) or wait for it; every limit SHALL be enforced in Erpel or ERPNext, and tool annotations SHALL be hints only.
+**Description**: No operation SHALL ask the client for anything (approval, elicitation, sampling) or wait for it; every limit SHALL be enforced in Enterich or ERPNext, and tool annotations SHALL be hints only.
 
 **Related URS**: REQ-001-URS-NF001
 
@@ -352,7 +352,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - The end-to-end suite calls every operation, including every refusal case, with a client that never confirms anything.
 - No code path sends a request to the client or reads an annotation for a decision.
 - Verification: test and inspection.
-- Evidence: Erpel's test suite; code review at each release.
+- Evidence: Enterich's test suite; code review at each release.
 
 #### REQ-001-PRS-F014: Operation conventions
 
@@ -369,11 +369,11 @@ Only a fixed list of operations, without generic method calls, closes these door
 - Each `state` sends exactly the filter of the States table.
 - An update clearing a field its area spec doesn't name as clearable is refused.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-001-PRS-F015: Warnings on the draft
 
-**Description**: When a create or update returns warnings, Erpel SHALL also add them to the draft in ERPNext as a comment, as plain text starting with "Erpel:", through `frappe.desk.form.utils.add_comment`. If adding the comment fails, the result SHALL say so; the draft stays as written.
+**Description**: When a create or update returns warnings, Enterich SHALL also add them to the draft in ERPNext as a comment, as plain text starting with "Enterich:", through `frappe.desk.form.utils.add_comment`. If adding the comment fails, the result SHALL say so; the draft stays as written.
 
 **Related URS**: REQ-001-URS-F009
 
@@ -384,7 +384,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - Markup in a warning reaches ERPNext escaped, as text.
 - A failing comment call yields a result with the draft and a note that the comment is missing.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-001-PRS-F016: Rates ERPNext set
 
@@ -399,7 +399,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - A given rate ERPNext keeps, a given rate ERPNext only rounded to the currency's precision (12.345 saved as 12.35), and a free-item row a pricing rule added, return no warning.
 - An update of a draft with 30 rows at rate 0 names 20 of them and says 10 more rows follow.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-001-PRS-F017: Due dates of invoice drafts
 
@@ -415,7 +415,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - A draft created without a posting date, for a party without payment terms, can be updated on a later day; its due date moves with its posting date.
 - An update that gives no date, of a draft whose posting date stays, sends no schedule and keeps the due date.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 ## PRS — Non-Functional
 
@@ -429,7 +429,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 - Every field an area catalogue marks as outside text appears only under `outside_text` of its record or row; a customer name such as "Ignore previous instructions" arrives there.
 - Verification: test and inspection.
-- Evidence: Erpel's test suite; the tool-list snapshot.
+- Evidence: Enterich's test suite; the tool-list snapshot.
 
 #### REQ-001-PRS-NF002: Tool annotations
 
@@ -456,7 +456,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - An update of a draft with 500 rows returns 100 with `truncated: ["items"]`.
 - An oversized report result gives the narrowing message.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 ## Operation Conventions
 
@@ -473,7 +473,7 @@ What every operation of the area specs follows (REQ-001-PRS-F014). Each area spe
 | `include_groups` | boolean | default false; group records (accounts, cost centres) are left out unless true |
 | `from_date`, `to_date` | string | ISO date `YYYY-MM-DD`; `from_date` ≤ `to_date` |
 | Name inputs | string | REQ-001-PRS-F010 |
-| `modified` | string | as Erpel returned it (`YYYY-MM-DD HH:MM:SS`, with up to 6 decimal places of seconds; ERPNext leaves them out on a whole second), sent back unchanged |
+| `modified` | string | as Enterich returned it (`YYYY-MM-DD HH:MM:SS`, with up to 6 decimal places of seconds; ERPNext leaves them out on a whole second), sent back unchanged |
 | `allow_duplicate` | boolean | create operations only; default false; REQ-001-PRS-F005 |
 | Quantities | number | > 0 and ≤ 10,000, at most 3 decimal places (ERPNext rounds quantities to 3 by default) |
 | Rates | number | > 0 and ≤ 1,000,000,000, at most 6 decimal places (ERPNext takes a rate of 0 as none given) |
@@ -485,7 +485,7 @@ Numbers are read as decimals, never as binary floating point. Every operation re
 ### Results
 
 - **Lists:** `{count, offset, has_more, records}`, where `records` holds the records in the fixed order of the area spec's ERPNext calls table and `count` is their number.
-- **Reports:** as lists, with the report's rows in `records`, paged by Erpel over all rows, and beside them the totals the area spec names.
+- **Reports:** as lists, with the report's rows in `records`, paged by Enterich over all rows, and beside them the totals the area spec names.
 - **Gets:** the record with `modified`, `url`, its child tables of at most 100 rows each, and `truncated` (usually empty): the names of cut tables, and of cut text fields as `<field>` or `<table>.<field>`.
 - **Every record and child row** carries an `outside_text` object, empty when it has no such field.
 - **Yes/no fields** (ERPNext's Check fields, stored as 0 and 1) are returned as `true` and `false`.
@@ -507,7 +507,7 @@ Document `state` inputs map to ERPNext as follows. No `state` means all, unless 
 
 ### ERPNext calls
 
-Lists use `/api/resource/<DocType>` with the fields of their area catalogue; gets use `frappe.client.get`; reports use `frappe.desk.query_report.run` with `are_default_filters` false, so a site's saved report filters never replace Erpel's. Each area spec's ERPNext calls table names, for its reads and duplicate checks, the DocType or report, the fixed filters and the order. Creates and updates make these further calls: `get_taxes_and_charges` for a given tax template's rows, `frappe.client.get` for the draft before an update, `/api/resource` to write (POST for a create, PUT for an update), and `frappe.desk.form.utils.add_comment` (POST) for warnings (REQ-001-PRS-F015), which needs only read on the draft. Every list of a company's records and every report filters by the assigned company (REQ-001-PRS-F007). Erpel leaves out the total row ERPNext appends to a report's rows and computes the totals its area spec names itself. A site that runs a report as a prepared report, or as a snapshot report on synced data, gets a refusal saying so; Erpel doesn't wait for prepared reports and doesn't take snapshots for current data. ERPNext turns a report into a prepared report for good after one run longer than 15 seconds; the configuration guide says how a site prevents that.
+Lists use `/api/resource/<DocType>` with the fields of their area catalogue; gets use `frappe.client.get`; reports use `frappe.desk.query_report.run` with `are_default_filters` false, so a site's saved report filters never replace Enterich's. Each area spec's ERPNext calls table names, for its reads and duplicate checks, the DocType or report, the fixed filters and the order. Creates and updates make these further calls: `get_taxes_and_charges` for a given tax template's rows, `frappe.client.get` for the draft before an update, `/api/resource` to write (POST for a create, PUT for an update), and `frappe.desk.form.utils.add_comment` (POST) for warnings (REQ-001-PRS-F015), which needs only read on the draft. Every list of a company's records and every report filters by the assigned company (REQ-001-PRS-F007). Enterich leaves out the total row ERPNext appends to a report's rows and computes the totals its area spec names itself. A site that runs a report as a prepared report, or as a snapshot report on synced data, gets a refusal saying so; Enterich doesn't wait for prepared reports and doesn't take snapshots for current data. ERPNext turns a report into a prepared report for good after one run longer than 15 seconds; the configuration guide says how a site prevents that.
 
 ### Drafts
 
@@ -533,13 +533,13 @@ Checked against Frappe and ERPNext v16.52 source:
 - ERPNext rounds every number it saves to its field's precision: quantities to the site's float precision (3 unless System Settings say otherwise), rates and amounts to the currency's.
 - Saving a submitted document needs the submit right (`check_docstatus_transition`).
 - A standard report set as a snapshot report runs on the last DuckDB sync of its data, and `frappe.desk.query_report.run` then answers with `snapshot_report` set.
-- ERPNext fills tax rows from a template on insert only when a site setting says so (`add_taxes_from_taxes_and_charges_template`); Erpel therefore fills them itself.
+- ERPNext fills tax rows from a template on insert only when a site setting says so (`add_taxes_from_taxes_and_charges_template`); Enterich therefore fills them itself.
 - With only the select right on a DocType, lists return only its search fields; the operations need read (configuration guide).
 
 Not checked yet:
 
-- ERPNext v16's REST API: `/api/resource` for lists, inserts and updates; `frappe.client.get` for a document with its rows; `frappe.desk.query_report.run` for reports; ERPNext's `get_taxes_and_charges` for a template's rows. Erpel calls these only with fixed DocTypes, reports and methods. Report filters and columns are checked against ERPNext v16 when each report operation is built (area specs).
-- The deployment gives the agent user a role without submit, cancel, amend, delete, share, import or export, and a User Permission on the assigned company. Erpel neither creates nor checks the role.
+- ERPNext v16's REST API: `/api/resource` for lists, inserts and updates; `frappe.client.get` for a document with its rows; `frappe.desk.query_report.run` for reports; ERPNext's `get_taxes_and_charges` for a template's rows. Enterich calls these only with fixed DocTypes, reports and methods. Report filters and columns are checked against ERPNext v16 when each report operation is built (area specs).
+- The deployment gives the agent user a role without submit, cancel, amend, delete, share, import or export, and a User Permission on the assigned company. Enterich neither creates nor checks the role.
 - A draft takes the next number of its naming series when created, and an abandoned draft keeps it. Whether that's acceptable is the deployment's decision.
 - Two identical creates at the same instant can both pass the duplicate check. One agent works through one conversation in sequence, and a person reviews every draft, so this is accepted.
 - Document IDs can contain text a person typed (a customer named after itself); they are returned outside `outside_text` because the agent needs them as inputs.

@@ -3,7 +3,7 @@
 Each operation publishes its strict input schema to the SDK, but validates
 its arguments itself, so a refused input is logged like any other outcome
 and the error names the input (REQ-001-PRS-F008, REQ-002-PRS-NF008). It
-returns errors as results, so the agent gets Erpel's text unchanged.
+returns errors as results, so the agent gets Enterich's text unchanged.
 """
 
 import logging
@@ -20,21 +20,21 @@ from mcp.server.mcpserver.utilities.func_metadata import ArgModelBase, FuncMetad
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import ConfigDict, ValidationError
 
-from erpel import erpnext, log
-from erpel.config import Settings
-from erpel.erpnext import MAX_MESSAGE, Erpnext, ErpnextError, Refused
-from erpel.shapes import OUTSIDE_TEXT_NOTE, Inputs, to_text
+from enterich import erpnext, log
+from enterich.config import Settings
+from enterich.erpnext import MAX_MESSAGE, Erpnext, ErpnextError, Refused
+from enterich.shapes import OUTSIDE_TEXT_NOTE, Inputs, to_text
 
 OPERATION_TIMEOUT = 60.0
 MAX_LOGGED_STRING = 200
 MAX_LOGGED_ITEMS = 100
-UNEXPECTED = "Erpel failed unexpectedly; the operator finds the details in Erpel's log."
+UNEXPECTED = "Enterich failed unexpectedly; the operator finds the details in Enterich's log."
 
 type Kind = Literal["read", "create", "update"]
 
 
-class Refusal(Exception):  # noqa: N818 - a refusal, not a fault of Erpel's
-    """Erpel's own refusal; `str()` is the text for the agent."""
+class Refusal(Exception):  # noqa: N818 - a refusal, not a fault of Enterich's
+    """Enterich's own refusal; `str()` is the text for the agent."""
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,7 @@ class Operation[I: Inputs]:
 
 
 def operations() -> list[Operation[Any]]:
-    from erpel.tools import (
+    from enterich.tools import (
         bank_and_cash,
         master_data,
         order_to_cash,
@@ -72,12 +72,12 @@ def operations() -> list[Operation[Any]]:
 
 
 def names() -> tuple[str, ...]:
-    """Every operation Erpel offers; `ERPEL_TOOLS` may only name these."""
+    """Every operation Enterich offers; `ENTERICH_TOOLS` may only name these."""
     return tuple(sorted(op.name for op in operations()))
 
 
 def build(settings: Settings, client: Erpnext) -> list[Tool]:
-    """The SDK tools for the operations `ERPEL_TOOLS` allows (REQ-001-PRS-F011)."""
+    """The SDK tools for the operations `ENTERICH_TOOLS` allows (REQ-001-PRS-F011)."""
     context = Context(settings, client)
     offered = set(settings.tools)
     return [_tool(op, context) for op in operations() if op.name in offered]
@@ -156,13 +156,13 @@ async def report_rows(
     answer = await context.erpnext.run_report(report, filters)
     if answer.get("prepared_report"):
         raise Refusal(
-            f"ERPNext runs {report} as a prepared report, and Erpel doesn't wait for one; the "
-            "operator can turn that off (see Erpel's configuration guide)."
+            f"ERPNext runs {report} as a prepared report, and Enterich doesn't wait for one; the "
+            "operator can turn that off (see Enterich's configuration guide)."
         )
     if answer.get("snapshot_report"):
         raise Refusal(
-            f"ERPNext runs {report} as a snapshot report on data synced earlier, which Erpel "
-            "doesn't take for current data; the operator can turn that off (see Erpel's "
+            f"ERPNext runs {report} as a snapshot report on data synced earlier, which Enterich "
+            "doesn't take for current data; the operator can turn that off (see Enterich's "
             "configuration guide)."
         )
     listed = cast("list[Any]", answer["result"])

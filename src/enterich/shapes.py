@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, PlainValidator, WithJsonSchema
 
-from erpel.erpnext import ErpnextError
+from enterich.erpnext import ErpnextError
 
 MAX_ROWS = 100
 MAX_TEXT = 500
@@ -63,11 +63,11 @@ def _modified(value: str) -> str:
     try:
         datetime.fromisoformat(value)  # refuses 2026-13-45
     except ValueError:
-        raise ValueError("must be `modified` as Erpel returned it") from None
+        raise ValueError("must be `modified` as Enterich returned it") from None
     return value
 
 
-# ERPNext's `modified` as Erpel returned it; on a whole second it comes without fraction
+# ERPNext's `modified` as Enterich returned it; on a whole second it comes without fraction
 Modified = Annotated[
     str,
     Field(pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$"),
@@ -92,7 +92,7 @@ def in_order(from_date: date | None, to_date: date | None) -> None:
 
 
 def today(timezone: ZoneInfo) -> date:
-    """Today in the configured time zone (ERPEL_TIMEZONE)."""
+    """Today in the configured time zone (ENTERICH_TIMEZONE)."""
     return datetime.now(timezone).date()
 
 

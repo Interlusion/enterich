@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, Literal
 
-from erpel.shapes import (
+from enterich.shapes import (
     InvoiceState,
     cut_rows,
     cut_texts,
@@ -20,7 +20,7 @@ from erpel.shapes import (
     split_outside,
     today,
 )
-from erpel.tools import Context, get_named, report_rows
+from enterich.tools import Context, get_named, report_rows
 
 ADDRESS_FIELDS = (
     "name",

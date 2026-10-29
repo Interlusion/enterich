@@ -1,5 +1,5 @@
 [project]
-name = "erpel"
+name = "enterich"
 version = "0.1.0"
 description = "An MCP server for ERPNext with a fixed tool list and the rights of one agent user"
 readme = "README.md"
@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-erpel = "erpel.__main__:main"
+enterich = "enterich.__main__:main"
 
 [dependency-groups]
 # What the image's test stage installs.
@@ -62,4 +62,4 @@ addopts = ["--strict-markers"]
 
 [tool.coverage.run]
 branch = true
-source = ["erpel"]
+source = ["enterich"]

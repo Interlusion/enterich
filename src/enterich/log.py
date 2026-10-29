@@ -1,6 +1,6 @@
 """JSON-lines logging to standard output (REQ-002-PRS-NF008).
 
-Erpel's own lines carry an `event` and its fields. Lines from libraries and
+Enterich's own lines carry an `event` and its fields. Lines from libraries and
 the HTTP server go through the same formatter, as event `library`.
 """
 
@@ -12,9 +12,9 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Any, TextIO
 
-from erpel.config import LogLevel
+from enterich.config import LogLevel
 
-LOGGER = "erpel"
+LOGGER = "enterich"
 LIBRARY_EVENT = "library"
 MAX_MESSAGE = 300
 
@@ -38,13 +38,13 @@ class JsonFormatter(logging.Formatter):
 
 
 def configure(level: LogLevel, stream: TextIO | None = None) -> None:
-    """Route every logger, Erpel's and the libraries', through one JSON handler."""
+    """Route every logger, Enterich's and the libraries', through one JSON handler."""
     handler = logging.StreamHandler(stream or sys.stdout)
     handler.setFormatter(JsonFormatter())
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(level)  # filters the libraries' lines only
-    # Erpel's events always reach the handler: a record propagates to the root's
+    # Enterich's events always reach the handler: a record propagates to the root's
     # handlers whatever the root's level.
     logging.getLogger(LOGGER).setLevel(logging.DEBUG)
     for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
@@ -54,7 +54,7 @@ def configure(level: LogLevel, stream: TextIO | None = None) -> None:
 
 
 def event(name: str, level: int = logging.INFO, **fields: Any) -> None:
-    """Write one line for an Erpel event."""
+    """Write one line for an Enterich event."""
     logging.getLogger(LOGGER).log(level, name, extra={"event": name, "fields": fields})
 
 
