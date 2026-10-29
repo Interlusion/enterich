@@ -42,7 +42,7 @@ The move:
 After the move:
 
 - [ ] Organisation: two-factor authentication required for members; only owners may change repository visibility or create public packages; members' base permission read.
-- [ ] Settings: Dependabot alerts and security updates on.
+- [x] Settings: Dependabot alerts and security updates on.
 - [x] Rulesets: `main` protected (pull request, green CI, no force push); tags `v*` immutable (no update, no deletion).
 - [x] About box: a description following the README's first sentence; topics (`mcp`, `mcp-server`, `model-context-protocol`, `erpnext`, `oauth2`, `python`); the website field empty until there is one to link.
 - [x] Social preview image uploaded in the repository settings.

@@ -1,10 +1,11 @@
 name: Release image
 
-# Called by release.yml for the dry run and the tag run. Both build the image once for
-# both architectures, test its test stage on each, and write the runtime image with the
-# same build step; the runtime image reuses the layers the tests ran on. The dry run
-# writes it as an OCI image layout and checks the index, the tag run pushes it. Only
-# the tag run signs in to GHCR, attests and creates the release (releasing guide).
+# Called by release.yml for the dry run and the tag run. Both build and test the test
+# stage for each architecture on a runner of that architecture, then write the runtime
+# image for both with the same build step, from the layers the tests ran on: the test
+# jobs hand over their build cache, so the image job builds nothing anew. The dry run
+# writes the image as an OCI image layout and checks the index, the tag run pushes it.
+# Only the tag run signs in to GHCR, attests and creates the release (releasing guide).
 on:
   workflow_call:
     inputs:
@@ -29,9 +30,54 @@ env:
   SBOM_SCANNER: docker/buildkit-syft-scanner:1.12.0@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
 
 jobs:
+  test:
+    name: test (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    # Read only, whatever the caller grants: the tests need no write rights.
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Test stage
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: test
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: enterich:test
+          push: false
+          # Every layer, the build stage's too, for the image job.
+          cache-to: type=local,dest=${{ runner.temp }}/cache,mode=max
+      - name: Tests in the image
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: docker run --rm --platform "$PLATFORM" enterich:test
+      - name: Build cache for the image job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: build-cache-${{ matrix.arch }}
+          path: ${{ runner.temp }}/cache
+          if-no-files-found: error
+          retention-days: 7
+
   image:
+    needs: test
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 60
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
@@ -53,7 +99,13 @@ jobs:
             echo "::error::$IMAGE:$VERSION exists already"
             exit 1
           fi
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - name: The test jobs' build caches
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: build-cache-*
+          path: ${{ runner.temp }}/cache
+      # No setup-qemu-action: the arm64 layers come from the arm64 test job's cache.
+      # Were one missing, BuildKit would build it with its own emulator, only slower.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
           # Without it, BuildKit's provenance carries GitHub's whole event payload,
@@ -61,28 +113,6 @@ jobs:
           # email addresses, published with the image. GitHub's own attestation
           # identifies the workflow run.
           driver-opts: provenance-add-gha=false
-      - name: Test stage, amd64
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          target: test
-          platforms: linux/amd64
-          load: true
-          tags: enterich:test-amd64
-          push: false
-      - name: Tests in the image, amd64
-        run: docker run --rm --platform linux/amd64 enterich:test-amd64
-      - name: Test stage, arm64
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          target: test
-          platforms: linux/arm64
-          load: true
-          tags: enterich:test-arm64
-          push: false
-      - name: Tests in the image, arm64
-        run: docker run --rm --platform linux/arm64 enterich:test-arm64
       - name: Where the image goes
         id: output
         env:
@@ -99,6 +129,9 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64
+          cache-from: |
+            type=local,src=${{ runner.temp }}/cache/build-cache-amd64
+            type=local,src=${{ runner.temp }}/cache/build-cache-arm64
           labels: |
             org.opencontainers.image.version=${{ inputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}

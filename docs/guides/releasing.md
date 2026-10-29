@@ -31,7 +31,7 @@ The version lives in one place: `version` in `pyproject.toml`, set with `uv vers
    git tag -a vX.Y.Z -m "Enterich vX.Y.Z"
    git push origin vX.Y.Z
    ```
-3. **CI** (`release.yml`, triggered by the tag) checks that the tag equals the version in `pyproject.toml`, is annotated, is on `main` and was pushed to `interlusion/enterich`, and that `CHANGELOG.md` has the version's section. Then `image.yml` builds the image for amd64 and arm64 once, runs the tests in its `test` stage for both, pushes the runtime image `ghcr.io/interlusion/enterich:X.Y.Z` with its SBOM and provenance, adds a build provenance attestation, and creates the GitHub release with the changelog section and the digest, attaching `tests/snapshots/tools.json` as `enterich-X.Y.Z-tools.json`.
+3. **CI** (`release.yml`, triggered by the tag) checks that the tag equals the version in `pyproject.toml`, is annotated, is on `main` and was pushed to `interlusion/enterich`, and that `CHANGELOG.md` has the version's section. Then `image.yml` builds the `test` stage for amd64 and arm64, each on a runner of its own architecture, and runs the tests in it; builds the runtime image for both once, from the layers the tests ran on; pushes the runtime image `ghcr.io/interlusion/enterich:X.Y.Z` with its SBOM and provenance, adds a build provenance attestation, and creates the GitHub release with the changelog section and the digest, attaching `tests/snapshots/tools.json` as `enterich-X.Y.Z-tools.json`.
 4. **Check** the release page: notes, digest, both architectures, the tools asset.
 
 ## Dry run
@@ -44,7 +44,7 @@ Only a tag run signs in to GHCR, pushes, attests and creates the release; those 
 
 A release run that failed for a passing reason (a registry or runner outage) is re-run with **Re-run failed jobs**:
 
-- If the `image` job failed, nothing was pushed, and it runs again. It refuses to start when the version's image exists already, so a published image tag is never overwritten.
+- If a `test` job or the `image` job failed, nothing was pushed, and they run again. The `image` job refuses to start when the version's image exists already, so a published image tag is never overwritten. It takes the layers from the `test` jobs' build caches, which are kept for 7 days; after that, re-run all jobs.
 - If the `release` job failed (attestation or GitHub release), only it runs again, for the image already pushed.
 
 Anything that needs a commit, including a fix to the workflows, needs a new patch version: the tag can't move to the fixed commit.
