@@ -115,6 +115,13 @@ def _tool(op: Operation[Any], context: Context) -> Tool:
     )
 
 
+def unknown_name(field: str, what: str, name: str) -> Refusal:
+    """The answer for a name that doesn't exist or isn't permitted (REQ-001-PRS-F009)."""
+    return Refusal(
+        f"{field}: {what} {name!r} doesn't exist, or the agent user isn't permitted to read it."
+    )
+
+
 async def get_named(
     context: Context, doctype: str, name: str, *, field: str, what: str, company: bool = False
 ) -> dict[str, Any]:
@@ -122,9 +129,7 @@ async def get_named(
 
     With `company`, another company's document answers the same (REQ-001-PRS-F007).
     """
-    unknown = Refusal(
-        f"{field}: {what} {name!r} doesn't exist, or the agent user isn't permitted to read it."
-    )
+    unknown = unknown_name(field, what, name)
     try:
         doc = await context.erpnext.get_doc(doctype, name)
     except Refused as refused:

@@ -1,20 +1,24 @@
 """Record to report: accounts, cost centres, journal entries, the General Ledger and the
 Trial Balance (REQ-006)."""
 
+from collections.abc import Sequence
 from datetime import date
 from decimal import Decimal
-from typing import Any, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
-from pydantic import model_validator
+from pydantic import AfterValidator, Field, model_validator
 
 from erpel.erpnext import ErpnextError
 from erpel.shapes import (
+    Amount,
     Day,
     Flag,
     Inputs,
     Limit,
+    Modified,
     Name,
     Offset,
+    Remarks,
     Search,
     cut_rows,
     cut_texts,
@@ -26,8 +30,16 @@ from erpel.shapes import (
     rows_of,
     shape,
     split_outside,
+    today,
 )
-from erpel.tools import Context, Operation, Refusal, get_named, report_rows
+from erpel.tools import (
+    Context,
+    Operation,
+    Refusal,
+    drafts,
+    get_named,
+    report_rows,
+)
 
 ACCOUNT_FIELDS = (
     "name",
@@ -98,6 +110,12 @@ BALANCE_VALUES = (
     "closing_credit",
 )
 MAX_FISCAL_YEAR_ROWS = 1000  # one per company a year is assigned to
+JOURNAL_DRAFT_FIELDS = ("posting_date", "total_debit", "total_credit")
+JOURNAL_MATCH = "posting date and rows"
+# The most rounding to a currency's precision (2 or 3 places) moves an amount.
+ROUNDING = Decimal("0.005")
+# The bank's reference: free text, not a name (ERPNext's Data field)
+ChequeNo = Annotated[str, Field(min_length=1, max_length=140)]
 
 # ERPNext v16's voucher types (Journal Entry's voucher_type options)
 type VoucherType = Literal[
@@ -177,6 +195,85 @@ class ReportGeneralLedger(Inputs):
         if self.party is not None and self.party_type is None:
             raise ValueError("party needs party_type")
         return self
+
+
+class JournalEntryRow(Inputs):
+    account: Name
+    debit: Amount | None = None
+    credit: Amount | None = None
+    party_type: Literal["Customer", "Supplier"] | None = None
+    party: Name | None = None
+    cost_center: Name | None = None
+    reference_type: Literal["Sales Invoice", "Purchase Invoice"] | None = None
+    reference_name: Name | None = None
+    user_remark: Remarks | None = None
+
+    @model_validator(mode="after")
+    def _rules(self) -> Self:
+        """REQ-006-PRS-F006, per row."""
+        if bool(self.debit) == bool(self.credit):
+            raise ValueError("give exactly one of debit and credit, above 0")
+        if (self.party_type is None) != (self.party is None):
+            raise ValueError("party_type and party come together")
+        if (self.reference_type is None) != (self.reference_name is None):
+            raise ValueError("reference_type and reference_name come together")
+        return self
+
+
+def _balanced(rows: list[JournalEntryRow]) -> list[JournalEntryRow]:
+    """REQ-006-PRS-F006: debits and credits equal as exact decimals."""
+    debit = sum((r.debit or Decimal(0) for r in rows), Decimal(0))
+    credit = sum((r.credit or Decimal(0) for r in rows), Decimal(0))
+    if debit != credit:
+        raise ValueError(f"the debits ({debit}) and the credits ({credit}) must be equal")
+    return rows
+
+
+JournalEntryRows = Annotated[
+    list[JournalEntryRow], Field(min_length=2, max_length=20), AfterValidator(_balanced)
+]
+
+
+class CreateDraftJournalEntry(Inputs):
+    posting_date: Day | None = None
+    cheque_no: ChequeNo | None = None
+    cheque_date: Day | None = None
+    user_remark: Remarks | None = None
+    accounts: JournalEntryRows
+    allow_duplicate: Flag = False
+
+    @model_validator(mode="after")
+    def _reference(self) -> Self:
+        _reference_rule(self.cheque_no, self.cheque_date)
+        return self
+
+
+class UpdateDraftJournalEntry(Inputs):
+    name: Name
+    modified: Modified
+    posting_date: Day | None = None
+    cheque_no: ChequeNo | Literal[""] | None = None
+    cheque_date: Day | None = None
+    user_remark: Remarks | None = None
+    accounts: JournalEntryRows | None = None
+
+    @model_validator(mode="after")
+    def _changes(self) -> Self:
+        given = self.model_dump(exclude={"name", "modified"}, exclude_none=True)
+        if not given:
+            raise ValueError(
+                "give at least one of posting_date, cheque_no, cheque_date, user_remark, accounts"
+            )
+        return self
+
+
+def _reference_rule(number: Any, day: Any) -> None:
+    """REQ-006-PRS-F006: ERPNext refuses a reference number without its date at every save,
+    a date without its number on submit."""
+    if number and not day:
+        raise ValueError("cheque_date: a reference number (cheque_no) needs its date")
+    if day and not number:
+        raise ValueError("cheque_no: a reference date (cheque_date) needs its number")
 
 
 class ReportTrialBalance(Inputs):
@@ -410,6 +507,174 @@ async def report_trial_balance(inputs: ReportTrialBalance, context: Context) -> 
     return {**page(records, inputs.offset, inputs.limit), "fiscal_year": year, "totals": totals}
 
 
+def _journal_body(inputs: CreateDraftJournalEntry | UpdateDraftJournalEntry) -> dict[str, Any]:
+    """The catalogue's "Sent to ERPNext" for the given inputs: rows with the account-currency
+    fields, the only ones ERPNext writes; a cleared reference clears its date."""
+    doc: dict[str, Any] = {}
+    if inputs.posting_date is not None:
+        doc["posting_date"] = inputs.posting_date.isoformat()
+    if inputs.cheque_no is not None:
+        doc["cheque_no"] = inputs.cheque_no
+        if inputs.cheque_no == "":
+            doc["cheque_date"] = None
+    if inputs.cheque_date is not None:
+        doc["cheque_date"] = inputs.cheque_date.isoformat()
+    if inputs.user_remark is not None:
+        doc["user_remark"] = inputs.user_remark
+    if inputs.accounts is not None:
+        doc["accounts"] = [_journal_row(row) for row in inputs.accounts]
+    return doc
+
+
+def _journal_row(row: JournalEntryRow) -> dict[str, Any]:
+    names = {"debit": "debit_in_account_currency", "credit": "credit_in_account_currency"}
+    return {names.get(k, k): v for k, v in row.model_dump(exclude_none=True).items()}
+
+
+async def _journal_duplicates(
+    context: Context, posting_date: date, rows: Sequence[JournalEntryRow]
+) -> list[str]:
+    """REQ-006-PRS-F007: drafts of the assigned company on the posting date with the same
+    rows (account, debit, credit), in any order."""
+    found = await context.erpnext.get_list(
+        "Journal Entry",
+        fields=(
+            "name",
+            "accounts.account",
+            "accounts.debit_in_account_currency",
+            "accounts.credit_in_account_currency",
+        ),
+        filters=[
+            ["company", "=", context.settings.company],
+            ["docstatus", "=", 0],
+            ["posting_date", "=", posting_date.isoformat()],
+        ],
+        order_by="name asc",
+        start=0,
+        page_length=drafts.MAX_DUPLICATE_ROWS,
+    )
+    entries: dict[str, list[tuple[str, Decimal, Decimal]]] = {}
+    for row in found:
+        stored = entries.setdefault(str(row.get("name")), [])
+        if row.get("account") is not None:
+            debit = decimal(row.get("debit_in_account_currency"))
+            credit = decimal(row.get("credit_in_account_currency"))
+            stored.append((str(row["account"]), debit, credit))
+    wanted = [(r.account, r.debit or Decimal(0), r.credit or Decimal(0)) for r in rows]
+    return sorted(name for name, stored in entries.items() if _same_rows(wanted, stored))
+
+
+def _same_rows(
+    wanted: list[tuple[str, Decimal, Decimal]], stored: list[tuple[str, Decimal, Decimal]]
+) -> bool:
+    """The given rows as ERPNext stores them: each amount rounded to the currency's
+    precision, which moves it by at most ROUNDING. Rounding keeps the order, so the rows
+    pair up sorted."""
+    return len(wanted) == len(stored) and all(
+        w[0] == s[0] and abs(w[1] - s[1]) <= ROUNDING and abs(w[2] - s[2]) <= ROUNDING
+        for w, s in zip(sorted(wanted), sorted(stored), strict=True)
+    )
+
+
+def _rounding_warning(saved: dict[str, Any]) -> list[str]:
+    """REQ-006-PRS-F008: ERPNext rounds each row to the currency's precision and checks the
+    balance only on submit."""
+    debit, credit = decimal(saved.get("total_debit")), decimal(saved.get("total_credit"))
+    if debit == credit:
+        return []
+    return [
+        f"ERPNext rounded the rows to the currency's precision and saved a total debit of "
+        f"{drafts.plain(debit)} against a total credit of {drafts.plain(credit)}; adjust the "
+        "rows so that they balance, or ERPNext refuses to submit the entry."
+    ]
+
+
+async def _journal_result(
+    context: Context, saved: dict[str, Any], warnings: list[str]
+) -> dict[str, Any]:
+    name = str(saved.get("name"))
+    record = shape(saved, ("name", "modified", "docstatus", "company", *JOURNAL_DRAFT_FIELDS))
+    return {
+        **record,
+        "row_count": len(rows_of(saved, "accounts")),
+        "url": form_url(context.settings.erpnext_public_url, "Journal Entry", name),
+        "warnings": await drafts.comment(context, "Journal Entry", name, warnings),
+        "truncated": [],
+    }
+
+
+async def create_draft_journal_entry(
+    inputs: CreateDraftJournalEntry, context: Context
+) -> dict[str, Any]:
+    posting_date = inputs.posting_date or today(context.settings.timezone)
+    # ERPNext sets no posting date itself; only the form does.
+    doc = {**_journal_body(inputs), "posting_date": posting_date.isoformat()}
+    matches = await _journal_duplicates(context, posting_date, inputs.accounts)
+    if matches and not inputs.allow_duplicate:
+        raise drafts.refuse_duplicates(matches, JOURNAL_MATCH)
+    saved = await context.erpnext.insert(
+        "Journal Entry",
+        {
+            **doc,
+            "voucher_type": "Journal Entry",
+            "multi_currency": 0,
+            "company": context.settings.company,
+            "docstatus": 0,
+        },
+    )
+    warnings = [drafts.duplicate_warning(matches, JOURNAL_MATCH)] if matches else []
+    warnings += _rounding_warning(saved)
+    return await _journal_result(context, saved, warnings)
+
+
+async def update_draft_journal_entry(
+    inputs: UpdateDraftJournalEntry, context: Context
+) -> dict[str, Any]:
+    # Erpel changes only entries of the voucher type it creates.
+    stored = await drafts.editable(
+        context,
+        "Journal Entry",
+        inputs.name,
+        inputs.modified,
+        "the journal entry",
+        only={"voucher_type": "Journal Entry"},
+    )
+    if stored.get("multi_currency"):
+        raise Refusal(
+            f"name: {inputs.name} has accounts in several currencies; Erpel changes only "
+            "journal entries in the company's currency."
+        )
+    # The rules on the draft as it will be saved: stored values where none are given.
+    if inputs.accounts is None:
+        debit, credit = decimal(stored.get("total_debit")), decimal(stored.get("total_credit"))
+        if debit != credit:
+            raise Refusal(
+                f"accounts: the draft's rows don't balance (total debit {drafts.plain(debit)} "
+                f"against total credit {drafts.plain(credit)}); give the rows."
+            )
+    number = stored.get("cheque_no") if inputs.cheque_no is None else inputs.cheque_no
+    if inputs.cheque_date is not None:
+        day: Any = inputs.cheque_date
+    else:
+        day = None if inputs.cheque_no == "" else stored.get("cheque_date")
+    if day and not number and inputs.cheque_date is None:
+        raise Refusal(
+            f"cheque_no: the draft has a reference date ({day}) without a reference number; "
+            "give cheque_no, or an empty cheque_no to clear the date."
+        )
+    try:
+        _reference_rule(number, day)
+    except ValueError as exc:
+        raise Refusal(str(exc)) from None
+    saved = await drafts.save_update(
+        context,
+        "Journal Entry",
+        inputs.name,
+        {**_journal_body(inputs), "modified": inputs.modified},
+    )
+    return await _journal_result(context, saved, _rounding_warning(saved))
+
+
 OPERATIONS: list[Operation[Any]] = [
     Operation(
         name="list_accounts",
@@ -492,5 +757,41 @@ OPERATIONS: list[Operation[Any]] = [
         kind="read",
         inputs=ReportTrialBalance,
         run=report_trial_balance,
+    ),
+    Operation(
+        name="create_draft_journal_entry",
+        title="Create draft journal entry",
+        description=(
+            "Create a draft journal entry (voucher type Journal Entry) of the assigned "
+            "company; a person reviews and submits it in ERPNext. Give 2 to 20 `accounts` "
+            "rows, each with exactly one of `debit` and `credit`; debits and credits must be "
+            "equal. Accounts are in the company's currency. A receivable or payable account "
+            "needs `party_type` and `party`; ERPNext saves a party on another account but "
+            "refuses it on submit. A row referencing an invoice carries its party and its "
+            "receivable or payable account; `reference_type` and `reference_name` come "
+            "together. `cheque_no` and `cheque_date` (the bank's reference and its date) come "
+            "together. `posting_date` defaults to today. A draft "
+            "with the same posting date and rows is refused unless `allow_duplicate` is true. "
+            "After an error or a timeout, list the drafts (`list_journal_entries` with `state` "
+            "draft) before creating again: the first may have been saved."
+        ),
+        kind="create",
+        inputs=CreateDraftJournalEntry,
+        run=create_draft_journal_entry,
+    ),
+    Operation(
+        name="update_draft_journal_entry",
+        title="Update draft journal entry",
+        description=(
+            "Change a draft journal entry (voucher type Journal Entry) of the assigned company. "
+            "Give its `name` and its `modified` as last read; a draft changed since is "
+            "refused. Give only what changes: `accounts` replace all rows, under the same "
+            "rules as on create; without them, the draft's rows must balance. A draft with "
+            "accounts in several currencies can't be changed. An empty `user_remark` clears "
+            "it, and an empty `cheque_no` clears it with `cheque_date`."
+        ),
+        kind="update",
+        inputs=UpdateDraftJournalEntry,
+        run=update_draft_journal_entry,
     ),
 ]
