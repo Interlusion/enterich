@@ -36,14 +36,21 @@ def blob(layout: Path, content: Any) -> str:
     return f"sha256:{digest}"
 
 
+def statement(predicate: str, platform: str, internal: dict[str, Any]) -> dict[str, Any]:
+    body = {"buildDefinition": {"internalParameters": internal}} if predicate == PROVENANCE else {}
+    return {"predicateType": predicate, "platform": platform, "predicate": body}
+
+
 def write_layout(
     layout: Path,
     name: str = NAME,
     platforms: list[str] = PLATFORMS,
     predicates: tuple[str, ...] = (SBOM, PROVENANCE),
+    internal: dict[str, Any] | None = None,
 ) -> None:
     """An OCI image layout as buildx writes it: a named index of the platforms' manifests,
-    each with an attestation manifest of in-toto statements."""
+    each with an attestation manifest of in-toto statements; `internal` goes into the
+    provenance's internal parameters."""
     entries: list[dict[str, Any]] = []
     for platform in platforms:
         os, arch = platform.split("/")
@@ -51,7 +58,7 @@ def write_layout(
         layers = [
             {
                 "mediaType": "application/vnd.in-toto+json",
-                "digest": blob(layout, {"predicateType": p, "platform": platform}),
+                "digest": blob(layout, statement(p, platform, internal or {})),
                 "annotations": {"in-toto.io/predicate-type": p},
             }
             for p in predicates
@@ -97,6 +104,7 @@ def test_a_release_image_gives_its_attestations_per_platform(tmp_path: Path) -> 
     assert statements["linux_arm64-sbom.spdx.json"] == {
         "predicateType": SBOM,
         "platform": "linux/arm64",
+        "predicate": {},
     }
 
 
@@ -123,6 +131,19 @@ def test_an_image_unlike_a_release_is_refused(
     with pytest.raises(image_index.LayoutError) as info:
         image_index.check(tmp_path, NAME, PLATFORMS)
     assert says in str(info.value)
+
+
+def test_provenance_with_githubs_event_payload_is_refused(tmp_path: Path) -> None:
+    # A tag push's payload names the pusher and the commit's authors with their emails.
+    payload = {"pusher": {"name": "someone", "email": "someone@example.com"}}
+    write_layout(tmp_path, internal={"github_event_payload": payload})
+    with pytest.raises(image_index.LayoutError, match="carries GitHub's event payload"):
+        image_index.check(tmp_path, NAME, PLATFORMS)
+
+
+def test_provenance_with_other_github_parameters_passes(tmp_path: Path) -> None:
+    write_layout(tmp_path, internal={"github_repository": "interlusion/erpel"})
+    assert len(image_index.check(tmp_path, NAME, PLATFORMS)) == 4
 
 
 def test_a_platform_without_attestations_is_refused(tmp_path: Path) -> None:

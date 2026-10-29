@@ -65,6 +65,9 @@ jobs:
 
   image:
     runs-on: ubuntu-24.04
+    env:
+      # The build records stay out of the run's artefacts; the job summary remains.
+      DOCKER_BUILD_RECORD_UPLOAD: false
     strategy:
       matrix:
         platform: [linux/amd64, linux/arm64]

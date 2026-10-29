@@ -3,7 +3,8 @@
     python3 scripts/image_index.py LAYOUT OUT NAME PLATFORM...
 
 It checks that the layout holds one image named NAME (image:tag) for exactly the given
-platforms (os/arch), each with an SBOM and a provenance attestation, and writes those
+platforms (os/arch), each with an SBOM and a provenance attestation without GitHub's
+event payload (which names people and their email addresses), and writes those
 in-toto statements to OUT as <os>_<arch>-sbom.spdx.json and <os>_<arch>-provenance.json.
 Standard library only: the release workflow runs it with the runner's Python (3.12).
 """
@@ -66,6 +67,9 @@ def check(layout: Path, name: str, platforms: list[str]) -> dict[str, Any]:
         missing = [file for file in FILES if file not in found]
         if missing:
             raise LayoutError(f"{platform} lacks {', '.join(missing)}")
+        build = found["provenance.json"].get("predicate", {}).get("buildDefinition", {})
+        if "github_event_payload" in build.get("internalParameters", {}):
+            raise LayoutError(f"{platform}'s provenance carries GitHub's event payload")
         prefix = platform.replace("/", "_")
         statements |= {f"{prefix}-{file}": statement for file, statement in found.items()}
     return statements
