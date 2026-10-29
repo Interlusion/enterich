@@ -1,0 +1,103 @@
+name: Release
+
+# A version tag publishes; started by hand with a version, it is the dry run, which
+# publishes nothing (releasing guide, ADR-004).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to dry-run (X.Y.Z); nothing is published
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# The image job is called as ./ rather than GitHub's newer $/ form: actionlint 1.7.12
+# doesn't know $/ yet, and a reusable workflow is loaded from this commit either way.
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.13.6"
+          enable-cache: false
+      - name: The version equals pyproject.toml's
+        id: version
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT: ${{ inputs.version }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT" = push ]; then version="${TAG#v}"; else version="$INPUT"; fi
+          if ! [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::$version isn't a version X.Y.Z"
+            exit 1
+          fi
+          project=$(uv version --short)
+          if [ "$project" != "$version" ]; then
+            echo "::error::$version doesn't equal the version in pyproject.toml ($project)"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: The tag is annotated, on main, in the organisation's repository
+        if: github.event_name == 'push'
+        env:
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Images are published only after the move (ADR-004).
+          if [ "$REPOSITORY" != interlusion/erpel ]; then
+            echo "::error::Erpel is released only from interlusion/erpel, not $REPOSITORY"
+            exit 1
+          fi
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          if [ "$(git cat-file -t "refs/tags/$TAG")" != tag ]; then
+            echo "::error::$TAG isn't an annotated tag"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$TAG isn't on main"
+            exit 1
+          fi
+      - name: The changelog has the version's section
+        if: github.event_name == 'push'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: python3 scripts/changelog.py "$VERSION" > /dev/null
+
+  dry-run:
+    needs: check
+    if: github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/image.yml # zizmor: ignore[self-repository]
+    with:
+      version: ${{ needs.check.outputs.version }}
+      publish: false
+
+  publish:
+    needs: check
+    if: github.event_name == 'push'
+    # After the move, this job alone gets packages: write, id-token: write,
+    # attestations: write and contents: write (ITEM-001); until then it can't publish.
+    permissions:
+      contents: read
+    uses: ./.github/workflows/image.yml # zizmor: ignore[self-repository]
+    with:
+      version: ${{ needs.check.outputs.version }}
+      publish: true

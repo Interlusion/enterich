@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # Build, runtime and test stages (ADR-005). The runtime image is the last
 # stage, so a plain `docker build` produces it.
 
@@ -47,6 +46,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --group test --no-editable
 COPY tests ./tests
 COPY docs/guides/configuration.md ./docs/guides/configuration.md
+COPY CHANGELOG.md ./
+COPY scripts/changelog.py scripts/image_index.py ./scripts/
 USER 10001:10001
 ENTRYPOINT []
 CMD ["python", "-m", "pytest", "-q", "-p", "no:cacheprovider"]

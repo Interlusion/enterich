@@ -55,7 +55,7 @@ ignore = ["TRY003"]
 [tool.basedpyright]
 typeCheckingMode = "strict"
 pythonVersion = "3.14"
-include = ["src", "tests"]
+include = ["src", "tests", "scripts"]
 
 [tool.pytest]
 testpaths = ["tests"]

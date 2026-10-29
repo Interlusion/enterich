@@ -25,9 +25,9 @@ Before the move:
 - [ ] `CONTRIBUTING.md`: spec first, tests first, Conventional Commits, no deployment facts, how to run the tests.
 - [ ] Issue and pull request templates; `CODEOWNERS`.
 - [ ] **Logo:** SVG in a light and a dark variant (`docs/assets/`); a drake fits the name; nothing that uses or resembles ERPNext's or Frappe's marks ([ADR-006](../arc42/adr/ADR-006-licence-and-name.md)). The README header shows it, switching with the reader's colour scheme (`<picture>`). A 1280×640 PNG made from it for the social preview.
-- [ ] **Version source:** the version in `pyproject.toml`, which the release workflow compares with the tag.
-- [ ] **Release workflow** (`release.yml`) as the [releasing guide](../guides/releasing.md) describes it, including the dry run; the dry run passes on the default branch. It can't publish before the move, because it lacks the permissions.
-- [ ] **Verifying an image:** a section in the [configuration guide](../guides/configuration.md) showing deployers how to check an image's provenance before deploying it (`gh attestation verify`), written against the final workflow.
+- [x] **Version source:** the version in `pyproject.toml`, which the release workflow compares with the tag.
+- [ ] **Release workflow** (`release.yml`) as the [releasing guide](../guides/releasing.md) describes it, including the dry run; the dry run passes on the default branch. It can't publish before the move: it lacks the permissions, and refuses a tag outside `interlusion/erpel`.
+- [x] **Verifying an image:** a section in the [configuration guide](../guides/configuration.md) showing deployers how to check an image's provenance before deploying it (`gh attestation verify`), written against the final workflow.
 
 The move:
 
@@ -41,7 +41,7 @@ After the move:
 - [ ] Settings: private vulnerability reporting on; secret scanning and push protection on; Dependabot alerts and security updates on.
 - [ ] Rulesets: `main` protected (pull request, green CI, no force push); tags `v*` immutable (no update, no deletion).
 - [ ] Social preview image uploaded in the repository settings.
-- [ ] `release.yml` given `packages: write`, `id-token: write` and `attestations: write`, for the tag-triggered job only; the dry run repeated in the organisation.
+- [ ] `release.yml`'s `publish` job given `packages: write`, `id-token: write`, `attestations: write`, `artifact-metadata: write` (the attestation's storage record, which the action creates in an organisation) and `contents: write` (for the GitHub release), that job only; the dry run repeated in the organisation.
 - [ ] Confirm the image name (`ghcr.io/interlusion/erpel`).
 - [ ] First tag (`v0.1.0`) following the [releasing guide](../guides/releasing.md); the package linked to the repository and made public.
 - [ ] Check the published image pulls on amd64 and arm64 and its attestation verifies (`gh attestation verify`).
