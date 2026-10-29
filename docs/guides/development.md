@@ -35,12 +35,14 @@ scripts/             check-links.sh: the Markdown link check;
                      changelog.py: a version's release notes;
                      image_index.py: the dry run's check of the image
 AGENTS.md            rules for coding agents; CLAUDE.md imports it
+CONTRIBUTING.md, SECURITY.md
 Dockerfile           build, runtime and test stages
 pyproject.toml, uv.lock, .python-version
 .github/workflows/   ci.yml; release.yml with image.yml (releasing guide)
 .github/gitleaks/, .github/lychee/
                      the images CI runs, pinned in a Dockerfile each
 .github/dependabot.yml
+.github/ISSUE_TEMPLATE/, pull_request_template.md, CODEOWNERS
 lychee.toml          the link check's settings
 ```
 

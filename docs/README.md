@@ -9,7 +9,8 @@
 | Know why it is built this way | [ADRs](arc42/adr/README.md) |
 | Configure and run it | [Configuration](guides/configuration.md), [Keycloak](guides/keycloak.md) |
 | Review the agent's drafts | [Reviewing drafts](guides/reviewing-drafts.md) |
-| Work on it | [Development](guides/development.md) |
+| Contribute or work on it | [Contributing](../CONTRIBUTING.md), [Development](guides/development.md) |
+| Report a vulnerability | [Security policy](../SECURITY.md) |
 | Release it | [Releasing](guides/releasing.md) |
 | See open work | [Backlog](backlog/backlog.md), [ITEM-001 Going public](backlog/item-001-going-public.md), [ITEM-002 OpenTelemetry](backlog/item-002-opentelemetry.md) |
 

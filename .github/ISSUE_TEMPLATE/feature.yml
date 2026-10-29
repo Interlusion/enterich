@@ -1,0 +1,37 @@
+name: Feature
+description: A new tool, input or behaviour. Changes start in a spec, so this asks what it would add there.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Erpel's tools have a fixed purpose and input schema. Generic operations, such as
+        a tool that takes a DocType, report name, method name, field list, filter
+        expression or file path as input, are out of scope (REQ-001-PRS-F006).
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which spec it belongs to (docs/specs/README.md).
+      options:
+        - Master data (REQ-003)
+        - Order to cash (REQ-004)
+        - Procure to pay (REQ-005)
+        - Record to report (REQ-006)
+        - Bank and cash (REQ-007)
+        - Service, configuration or rules for all tools (REQ-001, REQ-002)
+        - A new area, or not sure
+    validations:
+      required: true
+  - type: textarea
+    id: need
+    attributes:
+      label: What the agent or the operator should be able to do
+      description: The task, as a user story if you like, and why the existing tools don't cover it.
+    validations:
+      required: true
+  - type: textarea
+    id: erpnext
+    attributes:
+      label: In ERPNext
+      description: The DocTypes, reports or methods involved, and the rights the agent user would need.
