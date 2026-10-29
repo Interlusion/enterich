@@ -171,6 +171,67 @@ FIELDS: dict[str, set[str]] = {
         "user_remark",
     },
     "Fiscal Year": {"year", "disabled", "year_start_date", "year_end_date"},
+    "Bank Account": {
+        "account_name",
+        "bank",
+        "account",
+        "iban",
+        "bank_account_no",
+        "is_default",
+        "is_company_account",
+        "company",
+        "party_type",
+        "party",
+        "disabled",
+    },
+    "Bank Transaction": {
+        "date",
+        "status",
+        "bank_account",
+        "company",
+        "currency",
+        "deposit",
+        "withdrawal",
+        "included_fee",
+        "allocated_amount",
+        "unallocated_amount",
+        "party_type",
+        "party",
+        "description",
+        "reference_number",
+        "transaction_type",
+        "bank_party_name",
+        "bank_party_iban",
+        "bank_party_account_number",
+    },
+    "Bank Transaction Payments": {
+        "payment_document",
+        "payment_entry",
+        "allocated_amount",
+        "clearance_date",
+    },
+    "Payment Entry": {
+        "payment_type",
+        "posting_date",
+        "company",
+        "mode_of_payment",
+        "party_type",
+        "party",
+        "party_name",
+        "paid_from",
+        "paid_from_account_currency",
+        "paid_to",
+        "paid_to_account_currency",
+        "paid_amount",
+        "received_amount",
+        "unallocated_amount",
+        "reference_no",
+        "reference_date",
+        "clearance_date",
+        "bank_account",
+        "remarks",
+    },
+    "Payment Entry Reference": {"reference_doctype", "reference_name", "allocated_amount"},
     "Fiscal Year Company": {"company"},
     "Dynamic Link": {"link_doctype", "link_name"},
 }
@@ -184,6 +245,8 @@ TABLES: dict[str, dict[str, str]] = {
     "Purchase Taxes and Charges Template": {"taxes": "Purchase Taxes and Charges"},
     "Journal Entry": {"accounts": "Journal Entry Account"},
     "Fiscal Year": {"companies": "Fiscal Year Company"},
+    "Bank Transaction": {"payment_entries": "Bank Transaction Payments"},
+    "Payment Entry": {"references": "Payment Entry Reference"},
 }
 # Reports whose JSON sets add_total_row: Frappe appends a total row as a list
 TOTAL_ROW_REPORTS = {"Accounts Receivable", "Accounts Payable"}
@@ -1195,3 +1258,108 @@ def balance_total(rows: list[dict[str, Any]], label: str = "Total") -> dict[str,
         "has_value": True,
         "currency": "EUR",
     }
+
+
+def bank_account(name: str = "Main - Example Bank", **overrides: Any) -> dict[str, Any]:
+    """A company Bank Account; its name is the account name and the bank."""
+    account_name, _, bank = name.partition(" - ")
+    doc: dict[str, Any] = {
+        "doctype": "Bank Account",
+        "name": name,
+        "account_name": account_name,
+        "bank": bank,
+        "account": "1200 - Bank - EX",
+        "iban": "DE02120300000000202051",
+        "bank_account_no": None,
+        "is_default": 1,
+        "is_company_account": 1,
+        "company": COMPANY,
+        "party_type": None,
+        "party": None,
+        "disabled": 0,
+    }
+    doc.update(overrides)
+    return doc
+
+
+def bank_transaction(name: str = "ACC-BTN-2026-00001", **overrides: Any) -> dict[str, Any]:
+    """A submitted, unreconciled Bank Transaction as frappe.client.get returns it."""
+    doc: dict[str, Any] = {
+        "doctype": "Bank Transaction",
+        "name": name,
+        "date": "2026-10-20",
+        "status": "Unreconciled",
+        "bank_account": "Main - Example Bank",
+        "company": COMPANY,
+        "currency": "EUR",
+        "deposit": 119.0,
+        "withdrawal": 0.0,
+        "included_fee": 0.0,
+        "allocated_amount": 19.0,
+        "unallocated_amount": 100.0,
+        "party_type": "Customer",
+        "party": "CUST-0001",
+        "description": "Invoice ACC-SINV-2026-00001, thank you",
+        "reference_number": "NOTPROVIDED",
+        "transaction_type": "SEPA credit transfer",
+        "bank_party_name": "Customer CUST-0001",
+        "bank_party_iban": "DE89370400440532013000",
+        "bank_party_account_number": None,
+        "docstatus": 1,
+        "owner": "bookkeeper@example.com",
+        "modified": "2026-10-20 09:00:00.000000",
+        "payment_entries": [
+            {
+                "doctype": "Bank Transaction Payments",
+                "payment_document": "Payment Entry",
+                "payment_entry": "ACC-PAY-2026-00001",
+                "allocated_amount": 19.0,
+                "clearance_date": None,  # v16 sets the voucher's, never this one
+                "reconciliation_type": "Matched",
+            }
+        ],
+    }
+    doc.update(overrides)
+    return doc
+
+
+def payment_entry(name: str = "ACC-PAY-2026-00001", **overrides: Any) -> dict[str, Any]:
+    """A submitted Payment Entry receiving a customer's payment."""
+    doc: dict[str, Any] = {
+        "doctype": "Payment Entry",
+        "name": name,
+        "payment_type": "Receive",
+        "posting_date": "2026-10-20",
+        "company": COMPANY,
+        "mode_of_payment": "Wire Transfer",
+        "party_type": "Customer",
+        "party": "CUST-0001",
+        "party_name": "Customer CUST-0001",
+        "paid_from": "1400 - Debtors - EX",
+        "paid_from_account_currency": "EUR",
+        "paid_to": "1200 - Bank - EX",
+        "paid_to_account_currency": "EUR",
+        "paid_amount": 19.0,
+        "received_amount": 19.0,
+        "unallocated_amount": 0.0,
+        "reference_no": "TX-4711",
+        "reference_date": "2026-10-20",
+        "clearance_date": None,
+        "bank_account": "Main - Example Bank",
+        "remarks": "Amount EUR 19 received from CUST-0001",
+        "status": "Submitted",
+        "docstatus": 1,
+        "owner": "bookkeeper@example.com",
+        "modified": "2026-10-20 09:30:00.000000",
+        "references": [
+            {
+                "doctype": "Payment Entry Reference",
+                "reference_doctype": "Sales Invoice",
+                "reference_name": "ACC-SINV-2026-00001",
+                "allocated_amount": 19.0,
+                "outstanding_amount": 19.0,
+            }
+        ],
+    }
+    doc.update(overrides)
+    return doc
