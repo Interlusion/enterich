@@ -8,8 +8,8 @@ import httpx2
 import pytest
 from starlette.testclient import TestClient
 
-from erpel.app import create_app
-from erpel.tools import names
+from enterich.app import create_app
+from enterich.tools import names
 from tests.conftest import Logs
 from tests.e2e.mcp import ACCEPT, BASE, METADATA, bearer, client
 from tests.fakes.jwks import FakeJwks, Signer, rsa_signer, token
@@ -156,15 +156,15 @@ def test_metadata_is_served_during_a_jwks_outage(
 
 
 def test_a_missing_scope_gets_403(jwks: FakeJwks, signer: Signer, logs: Logs) -> None:
-    s = settings(required_scopes="openid erpel")
+    s = settings(required_scopes="openid enterich")
     with client(jwks, s) as c:
         response = c.post("/mcp", headers=bearer(token(signer)), json={})
-        assert c.get(METADATA).json()["scopes_supported"] == ["openid", "erpel"]
+        assert c.get(METADATA).json()["scopes_supported"] == ["openid", "enterich"]
     assert response.status_code == 403
     assert 'error="insufficient_scope"' in response.headers["www-authenticate"]
     assert [
         (r["status"], r["reason"], r["sub"], r["client"]) for r in logs.events("rejection")
-    ] == [(403, "missing scope", "00000000-0000-0000-0000-000000000001", "erpel-agent")]
+    ] == [(403, "missing scope", "00000000-0000-0000-0000-000000000001", "enterich-agent")]
 
 
 def test_a_refused_token_gets_401_and_one_short_line_each(
@@ -180,7 +180,7 @@ def test_a_refused_token_gets_401_and_one_short_line_each(
     first = logs.events("rejection")[0]
     assert first["reason"] == "wrong subject"
     assert first["sub"] == "11111111-1111-1111-1111-111111111111"
-    assert first["client"] == "erpel-agent"
+    assert first["client"] == "enterich-agent"
 
 
 def test_rejection_lines_stay_short_whatever_the_claims(

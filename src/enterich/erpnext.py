@@ -21,7 +21,7 @@ from urllib.parse import quote
 import anyio
 import httpx2
 
-from erpel.config import Settings
+from enterich.config import Settings
 
 CALL_TIMEOUT = 30.0
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
@@ -36,7 +36,7 @@ class ErpnextError(Exception):
     """A call that ended without a usable answer; `str()` is the text for the agent."""
 
 
-class Refused(ErpnextError):  # noqa: N818 - ERPNext's answer, not a fault of Erpel's
+class Refused(ErpnextError):  # noqa: N818 - ERPNext's answer, not a fault of Enterich's
     """ERPNext answered with an error status."""
 
     def __init__(self, text: str, status: int, exc_type: str | None) -> None:
@@ -117,7 +117,7 @@ class Erpnext:
         params = {
             "report_name": report,
             "filters": json.dumps(filters),
-            # A site's saved filters never replace Erpel's.
+            # A site's saved filters never replace Enterich's.
             "are_default_filters": "false",
         }
         answer = await self._call("GET", "/api/method/frappe.desk.query_report.run", params)
@@ -178,8 +178,8 @@ class Erpnext:
                 meter.seconds += time.monotonic() - started
         if 300 <= status < 400:
             raise ErpnextError(
-                f"ERPNext answered with a redirect ({status}); Erpel doesn't follow redirects. "
-                "Check ERPEL_ERPNEXT_URL."
+                f"ERPNext answered with a redirect ({status}); Enterich doesn't follow redirects. "
+                "Check ENTERICH_ERPNEXT_URL."
             )
         try:
             answer = json.loads(raw) if raw else None

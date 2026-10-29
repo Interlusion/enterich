@@ -1,4 +1,4 @@
-# REQ-003: Erpel Master Data — Requirement Specification
+# REQ-003: Enterich Master Data — Requirement Specification
 
 | Meta | Value |
 | :- | :- |
@@ -39,7 +39,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-003-PRS-F001: Item operations
 
-**Description**: Erpel SHALL offer `list_items` and `get_item` as the catalogue below defines them, and `get_item` SHALL return only the assigned company's Item Default row.
+**Description**: Enterich SHALL offer `list_items` and `get_item` as the catalogue below defines them, and `get_item` SHALL return only the assigned company's Item Default row.
 
 **Related URS**: REQ-003-URS-F001
 
@@ -47,7 +47,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - An item with Item Default rows for two companies returns only the assigned company's accounts and cost centres.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 ## Operation Catalogue
 

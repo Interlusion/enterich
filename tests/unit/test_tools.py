@@ -7,10 +7,10 @@ import pytest
 from mcp.types import CallToolResult, TextContent
 from pydantic import BaseModel
 
-from erpel import tools
-from erpel.erpnext import Erpnext
-from erpel.shapes import Inputs
-from erpel.tools import Context, Kind, Operation
+from enterich import tools
+from enterich.erpnext import Erpnext
+from enterich.shapes import Inputs
+from enterich.tools import Context, Kind, Operation
 from tests.conftest import Logs
 from tests.fakes.erpnext import FakeErpnext
 from tests.fakes.settings import API_SECRET, settings
@@ -77,7 +77,7 @@ async def test_a_validation_error_inside_an_operation_is_a_crash_not_invalid_inp
     assert len(logs.events("error")) == 1
 
 
-async def test_the_agent_gets_erpels_text_without_a_prefix(
+async def test_the_agent_gets_enterichs_text_without_a_prefix(
     monkeypatch: pytest.MonkeyPatch, logs: Logs
 ) -> None:
     async def refuse(inputs: Nothing, context: Context) -> dict[str, Any]:

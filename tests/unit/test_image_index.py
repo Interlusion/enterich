@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 SCRIPT = Path(__file__).parent.parent.parent / "scripts" / "image_index.py"
-NAME = "ghcr.io/interlusion/erpel:0.1.0"
+NAME = "ghcr.io/interlusion/enterich:0.1.0"
 PLATFORMS = ["linux/amd64", "linux/arm64"]
 SBOM = "https://spdx.dev/Document"
 PROVENANCE = "https://slsa.dev/provenance/v1"
@@ -116,7 +116,10 @@ def test_slsa_provenance_v02_counts_too(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("layout", "says"),
     [
-        ({"name": "ghcr.io/interlusion/erpel:0.2.0"}, "named ghcr.io/interlusion/erpel:0.1.0"),
+        (
+            {"name": "ghcr.io/interlusion/enterich:0.2.0"},
+            "named ghcr.io/interlusion/enterich:0.1.0",
+        ),
         ({"platforms": ["linux/arm64"]}, "platforms ['linux/arm64']"),
         ({"platforms": [*PLATFORMS, "linux/s390x"]}, "not ['linux/amd64', 'linux/arm64']"),
         ({"predicates": (PROVENANCE,)}, "linux/amd64 lacks sbom.spdx.json"),
@@ -142,7 +145,7 @@ def test_provenance_with_githubs_event_payload_is_refused(tmp_path: Path) -> Non
 
 
 def test_provenance_with_other_github_parameters_passes(tmp_path: Path) -> None:
-    write_layout(tmp_path, internal={"github_repository": "interlusion/erpel"})
+    write_layout(tmp_path, internal={"github_repository": "interlusion/enterich"})
     assert len(image_index.check(tmp_path, NAME, PLATFORMS)) == 4
 
 

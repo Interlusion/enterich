@@ -379,7 +379,7 @@ def test_allow_duplicate_creates_and_leaves_the_warning_on_the_draft(
     assert comment == {
         "reference_doctype": "Sales Invoice",
         "reference_name": second["name"],
-        "content": f"Erpel: {warning}",
+        "content": f"Enterich: {warning}",
         "comment_email": "",
         "comment_by": "",
     }
@@ -395,7 +395,7 @@ def test_a_template_without_tax_warns_on_the_draft(mcp: Session, erp: FakeErpnex
     [warning] = result["warnings"]
     assert "VAT 0% - EX" in warning
     [comment] = comments(erp)
-    assert comment["content"] == f"Erpel: {warning}"
+    assert comment["content"] == f"Enterich: {warning}"
 
 
 def test_a_rate_a_pricing_rule_replaced_warns(mcp: Session, erp: FakeErpnext) -> None:
@@ -441,7 +441,7 @@ def test_the_warnings_go_on_the_draft_as_one_comment(mcp: Session, erp: FakeErpn
     result = create(mcp, items=items, taxes_and_charges="VAT 0% - EX").data
     tax, rate = result["warnings"]
     [comment] = comments(erp)
-    assert comment["content"] == f"Erpel: {tax}<br>{rate}"
+    assert comment["content"] == f"Enterich: {tax}<br>{rate}"
 
 
 def test_markup_in_a_warning_reaches_erpnext_as_text(mcp: Session, erp: FakeErpnext) -> None:

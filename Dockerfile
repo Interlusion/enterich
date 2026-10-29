@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-editable
 
 FROM python:3.14-slim@sha256:82abc9f53600280b0757126f83c5a7d47088592d2acb6b4c0b9e97f76865508c AS runtime
-LABEL org.opencontainers.image.title="erpel" \
+LABEL org.opencontainers.image.title="enterich" \
       org.opencontainers.image.licenses="Apache-2.0"
 COPY --from=build /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" \
@@ -30,7 +30,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
 WORKDIR /app
 USER 10001:10001
 EXPOSE 8000
-ENTRYPOINT ["erpel"]
+ENTRYPOINT ["enterich"]
 
 # The runtime stage plus dev dependencies and tests, all from the lock.
 FROM runtime AS test

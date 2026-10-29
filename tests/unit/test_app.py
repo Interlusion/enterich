@@ -12,8 +12,8 @@ from starlette.testclient import TestClient
 from starlette.types import Receive, Scope, Send
 from starlette.websockets import WebSocketDisconnect
 
-from erpel import log
-from erpel.app import Wrapper
+from enterich import log
+from enterich.app import Wrapper
 
 
 async def boom(request: Request) -> Response:

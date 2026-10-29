@@ -61,8 +61,9 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           # Images are published only after the move (ADR-004).
-          if [ "$REPOSITORY" != interlusion/erpel ]; then
-            echo "::error::Erpel is released only from interlusion/erpel, not $REPOSITORY"
+          # GitHub reports the owner in its own case (Interlusion).
+          if [ "${REPOSITORY,,}" != interlusion/enterich ]; then
+            echo "::error::Enterich is released only from interlusion/enterich, not $REPOSITORY"
             exit 1
           fi
           git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"

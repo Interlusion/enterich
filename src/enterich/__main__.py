@@ -1,4 +1,4 @@
-"""Entry point: `erpel` or `python -m erpel`."""
+"""Entry point: `enterich` or `python -m enterich`."""
 
 import logging
 import os
@@ -7,9 +7,9 @@ from importlib.metadata import version
 
 import uvicorn
 
-from erpel import log, tools
-from erpel.app import create_app
-from erpel.config import ConfigError, load
+from enterich import log, tools
+from enterich.app import create_app
+from enterich.config import ConfigError, load
 
 
 def main() -> None:
@@ -24,7 +24,7 @@ def main() -> None:
     log.event(
         "start",
         logging.WARNING if settings.warnings else logging.INFO,
-        version=version("erpel"),
+        version=version("enterich"),
         resource_url=settings.resource_url,
         issuer=settings.issuer,
         client=settings.client_id,

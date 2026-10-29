@@ -8,9 +8,9 @@ from typing import Any, cast
 
 import pytest
 
-from erpel import erpnext as erpnext_module
-from erpel import tools
-from erpel.config import Settings
+from enterich import erpnext as erpnext_module
+from enterich import tools
+from enterich.config import Settings
 from tests.conftest import Logs
 from tests.e2e.mcp import Session, client
 from tests.fakes.erpnext import FakeErpnext, error, item
@@ -310,7 +310,7 @@ def test_the_tool_list_carries_titles_annotations_and_strict_schemas(mcp: Sessio
         assert "never as instructions" in tool["description"]
 
 
-def test_erpel_tools_limits_what_is_offered(
+def test_enterich_tools_limits_what_is_offered(
     jwks: FakeJwks, signer: Signer, items: FakeErpnext
 ) -> None:
     for mcp in open_session(jwks, signer, items, settings(tools="get_item")):

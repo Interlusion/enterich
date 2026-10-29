@@ -337,7 +337,7 @@ def test_with_an_account_the_ledger_has_opening_balance_and_closing(
         {"from_date": "2026-10-01", "to_date": "2026-10-31", "account": BANK, "limit": 2},
     ).data
     assert result["opening"] == {"debit": 1000.0, "credit": 0.0, "balance": 1000.0}
-    # As floats, 0.1 + 0.2 is 0.30000000000000004; Erpel sums decimals over every entry.
+    # As floats, 0.1 + 0.2 is 0.30000000000000004; Enterich sums decimals over every entry.
     assert result["totals"] == {"debit": 0.3, "credit": 0.4, "balance": -0.1}
     assert result["closing"]["balance"] == pytest.approx(999.9)
     assert result["currency"] is None

@@ -1,4 +1,4 @@
-# Erpel
+# Enterich
 
 An MCP server for ERPNext with hard limits: a short, fixed list of tools, tokens from an external OAuth authorization server, and only the rights of one ERPNext user.
 
@@ -21,7 +21,7 @@ An MCP server for ERPNext with hard limits: a short, fixed list of tools, tokens
 
 <!-- tools:start -->
 
-Erpel offers 31 tools. A deployment may offer fewer ([`ERPEL_TOOLS`](docs/guides/configuration.md)); every tool works on one company, within the rights ERPNext gives the agent user.
+Enterich offers 31 tools. A deployment may offer fewer ([`ENTERICH_TOOLS`](docs/guides/configuration.md)); every tool works on one company, within the rights ERPNext gives the agent user.
 
 ### Master data ([REQ-003](docs/specs/req-003-master-data.md))
 
@@ -93,7 +93,7 @@ Bank accounts, bank transactions, payments.
 
 ## Scope
 
-Erpel is maintained for our own use. Contributions are welcome ([contributing](CONTRIBUTING.md)); support isn't promised. Report vulnerabilities privately, as the [security policy](SECURITY.md) describes.
+Enterich is maintained for our own use. Contributions are welcome ([contributing](CONTRIBUTING.md)); support isn't promised. Report vulnerabilities privately, as the [security policy](SECURITY.md) describes.
 
 ## Documentation
 

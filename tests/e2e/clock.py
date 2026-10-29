@@ -1,10 +1,10 @@
-"""A frozen clock where Erpel's today, in ERPEL_TIMEZONE, is already tomorrow in UTC."""
+"""A frozen clock where Enterich's today, in ENTERICH_TIMEZONE, is already tomorrow in UTC."""
 
 from datetime import UTC, datetime, tzinfo
 
 import pytest
 
-from erpel import shapes
+from enterich import shapes
 
 TIMEZONE = "Pacific/Kiritimati"  # UTC+14
 NOW = datetime(2026, 10, 28, 12, 0, tzinfo=UTC)

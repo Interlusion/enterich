@@ -8,7 +8,7 @@
 
 ## Context
 
-Erpel's requirements started as one specification: the service, the rules for every operation and the full catalogue of 31 operations, about 1,000 lines. More operations will come, area by area, and the agent is meant to take on more work on its own over time. Whether it may post, for example, may then differ between areas, each with its own limits.
+Enterich's requirements started as one specification: the service, the rules for every operation and the full catalogue of 31 operations, about 1,000 lines. More operations will come, area by area, and the agent is meant to take on more work on its own over time. Whether it may post, for example, may then differ between areas, each with its own limits.
 
 Specs show only the current state; the reasons for a change go into a history file next to the spec. One spec for everything would collect the history of the token check, of banking and of posting rules in one file.
 
@@ -45,7 +45,7 @@ The first cut kept the service in REQ-001.
 
 ### Alternative 5: A separate product specification next to the technical one
 
-A product-level document (what Erpel does, for whom) as a second source of truth.
+A product-level document (what Enterich does, for whom) as a second source of truth.
 
 **Rejected because**: two authoritative documents that change together drift. Product-facing descriptions are derived from the specs instead, when they're needed (README, website, user documentation), and the specs win.
 

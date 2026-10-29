@@ -1,4 +1,4 @@
-# REQ-005: Erpel Procure to Pay — Requirement Specification
+# REQ-005: Enterich Procure to Pay — Requirement Specification
 
 | Meta | Value |
 | :- | :- |
@@ -46,7 +46,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-005-PRS-F001: Supplier operations
 
-**Description**: Erpel SHALL offer `list_suppliers` and `get_supplier` as the catalogue below defines them; `get_supplier` SHALL return the supplier's addresses.
+**Description**: Enterich SHALL offer `list_suppliers` and `get_supplier` as the catalogue below defines them; `get_supplier` SHALL return the supplier's addresses.
 
 **Related URS**: REQ-005-URS-F001
 
@@ -54,11 +54,11 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - `get_supplier` returns the addresses linked to the supplier, and no other party's addresses.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-005-PRS-F002: Purchase invoice reads
 
-**Description**: Erpel SHALL offer `list_purchase_invoices` and `get_purchase_invoice` as the catalogue below defines them, with the invoice states of REQ-001's Operation Conventions.
+**Description**: Enterich SHALL offer `list_purchase_invoices` and `get_purchase_invoice` as the catalogue below defines them, with the invoice states of REQ-001's Operation Conventions.
 
 **Related URS**: REQ-005-URS-F001
 
@@ -66,11 +66,11 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - `state` accepts exactly draft, unpaid, overdue, paid, return and cancelled; `overdue` uses today in the configured time zone.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-005-PRS-F003: Purchase tax templates
 
-**Description**: Erpel SHALL offer `list_purchase_tax_templates` as the catalogue below defines it.
+**Description**: Enterich SHALL offer `list_purchase_tax_templates` as the catalogue below defines it.
 
 **Related URS**: REQ-005-URS-F001
 
@@ -78,11 +78,11 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - Only purchase templates are returned, never sales templates.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-005-PRS-F004: Payables
 
-**Description**: Erpel SHALL offer `report_accounts_payable` as the catalogue below defines it, with `total_outstanding` over all rows, not only the returned page.
+**Description**: Enterich SHALL offer `report_accounts_payable` as the catalogue below defines it, with `total_outstanding` over all rows, not only the returned page.
 
 **Related URS**: REQ-005-URS-F001
 
@@ -91,11 +91,11 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - The report call carries exactly the fixed filters of the ERPNext calls table; `total_outstanding` equals the sum over all rows when `limit` returns fewer.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
-- Evidence: Erpel's test suite; the integration test against a real ERPNext v16 site (backlog).
+- Evidence: Enterich's test suite; the integration test against a real ERPNext v16 site (backlog).
 
 #### REQ-005-PRS-F005: Purchase invoice drafts
 
-**Description**: Erpel SHALL offer `create_draft_purchase_invoice` and `update_draft_purchase_invoice` as the catalogue below defines them; it SHALL send `set_posting_time` 1 whenever it sends a `posting_date`, and `update_stock` 0 on every create.
+**Description**: Enterich SHALL offer `create_draft_purchase_invoice` and `update_draft_purchase_invoice` as the catalogue below defines them; it SHALL send `set_posting_time` 1 whenever it sends a `posting_date`, and `update_stock` 0 on every create.
 
 **Related URS**: REQ-005-URS-F002
 
@@ -104,7 +104,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - An update that sets `posting_date` on a draft created without one keeps it.
 - Every create body carries `update_stock` 0.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-005-PRS-F006: Duplicate match for purchase invoices
 
@@ -123,7 +123,7 @@ An update that gives a `bill_no` SHOULD carry a warning, added to the draft, whe
 - Without `bill_no`, a create matching a draft is refused naming it; one that differs in a quantity, an item or the date goes through.
 - An update giving a `bill_no` already on a submitted invoice of the supplier warns naming it; the draft's own `bill_no` doesn't count.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-005-PRS-F007: Expense accounts ERPNext set
 
@@ -136,7 +136,7 @@ An update that gives a `bill_no` SHOULD carry a warning, added to the draft, whe
 - A row given an expense account that ERPNext replaces returns a warning naming the row, the item and both accounts, and the warning is added to the draft.
 - A row without an expense account, and one whose account ERPNext keeps, also in another case, return no warning.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 ## Operation Catalogue
 
@@ -164,7 +164,7 @@ Supplier names are not in report rows; `get_supplier` gives them. `bill_no` and 
 
 - `bill_no` is the supplier's invoice number as printed: a string of 1–140 characters without leading or trailing whitespace, not a name. Clearable on update: `remarks`, `bill_no`, `taxes_and_charges` (with its rows).
 - The supplier isn't changed by an update: ERPNext would keep the first supplier's address, payment terms, price list and payable account. A draft for another supplier is a new draft.
-- Rates come from the supplier's bill, so `rate` is required. Erpel never sends `ignore_pricing_rule`; REQ-001-PRS-F016 warns where a buying pricing rule replaced a given rate.
+- Rates come from the supplier's bill, so `rate` is required. Enterich never sends `ignore_pricing_rule`; REQ-001-PRS-F016 warns where a buying pricing rule replaced a given rate.
 - Results add: `supplier`, `posting_date`, `due_date`, `currency`, `net_total`, `total_taxes_and_charges`, `grand_total`, `taxes` \[`account_head`, `rate`, `tax_amount`\], `items` \[`item_code`, `qty`, `rate`, `amount`, `expense_account`, `is_free_item`\].
 
 ### ERPNext calls
@@ -207,8 +207,8 @@ Checked against ERPNext v16.52 source:
 - Without a due date, ERPNext counts one from `bill_date` when given, else from the posting date, by the supplier's payment terms template, else its supplier group's, else the company's; it never sets one before the posting date. A due date before `bill_date` is refused, and so is one later than the payment terms counted from `bill_date` allow; for a bill older than its terms, the due date ERPNext counts itself (never before the posting date) is such a date, so the agent gives the due date from the bill (`validate_due_date_with_template`).
 - Under perpetual inventory, a stock item's `expense_account` is replaced on save by the company's Stock Received But Not Billed account unless the invoice updates stock (`set_expense_account`); the desk only shows a message.
 - Buying Settings can require a purchase order for every row (`po_required`), or a purchase receipt for every row with a stock or asset item (`pr_required`, for invoices that don't update stock); ERPNext then refuses drafts without one, unless the supplier is allowed them (configuration guide).
-- ERPNext refuses a `bill_no` already on a draft or submitted invoice of the same supplier in the same fiscal year only when Accounts Settings say so (`check_supplier_invoice_uniqueness`, off by default); Erpel's duplicate check therefore stays, over every year. Where the setting is on, ERPNext refuses even with `allow_duplicate`. Both compare `bill_no` in the database, so case follows its collation.
-- ERPNext computes tax withholding only for an invoice with `apply_tds` set. A REST save leaves it at 0, and the form sets it only for a new invoice or a changed supplier, from the supplier's tax withholding category or group (`purchase_invoice.js`, `TaxWithholdingController`); Erpel therefore sends it on create. The withholding rows are among the result's `taxes`.
+- ERPNext refuses a `bill_no` already on a draft or submitted invoice of the same supplier in the same fiscal year only when Accounts Settings say so (`check_supplier_invoice_uniqueness`, off by default); Enterich's duplicate check therefore stays, over every year. Where the setting is on, ERPNext refuses even with `allow_duplicate`. Both compare `bill_no` in the database, so case follows its collation.
+- ERPNext computes tax withholding only for an invoice with `apply_tds` set. A REST save leaves it at 0, and the form sets it only for a new invoice or a changed supplier, from the supplier's tax withholding category or group (`purchase_invoice.js`, `TaxWithholdingController`); Enterich therefore sends it on create. The withholding rows are among the result's `taxes`.
 - Accounts Payable runs Accounts Receivable's code with the account type Payable: the same filters and columns, plus `bill_no` and `bill_date`, and debit notes in the `credit_note` column. Its rows are read through permission-checked lists of Purchase Invoice and Journal Entry.
 
 Not checked yet:

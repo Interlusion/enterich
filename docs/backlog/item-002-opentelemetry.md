@@ -10,22 +10,22 @@
 
 ## Summary
 
-Let a deployment send Erpel's traces to an OpenTelemetry collector, so that a request can be followed from the ingress through Erpel to ERPNext. Off unless configured.
+Let a deployment send Enterich's traces to an OpenTelemetry collector, so that a request can be followed from the ingress through Enterich to ERPNext. Off unless configured.
 
 ## Context
 
-Erpel's first versions report through their JSON log ([REQ-002-PRS-NF008](../specs/req-002-service.md#req-002-prs-nf008-log)) and `/healthz`. Each `operation` line carries the total duration and the number and duration of its ERPNext calls, so a log store can derive rates, error ratios and latencies, and alert on them.
+Enterich's first versions report through their JSON log ([REQ-002-PRS-NF008](../specs/req-002-service.md#req-002-prs-nf008-log)) and `/healthz`. Each `operation` line carries the total duration and the number and duration of its ERPNext calls, so a log store can derive rates, error ratios and latencies, and alert on them.
 
-The MCP SDK depends on `opentelemetry-api`, which does nothing without an OpenTelemetry SDK and exporter; Erpel installs neither.
+The MCP SDK depends on `opentelemetry-api`, which does nothing without an OpenTelemetry SDK and exporter; Enterich installs neither.
 
-What traces would add: one request followed across the ingress, Erpel and its ERPNext calls, next to other services' traces. ERPNext itself likely emits no traces, so a trace ends at Erpel's ERPNext calls.
+What traces would add: one request followed across the ingress, Enterich and its ERPNext calls, next to other services' traces. ERPNext itself likely emits no traces, so a trace ends at Enterich's ERPNext calls.
 
 ## Triggers
 
 Take this up when:
 
-- a deployment runs an OpenTelemetry collector and wants Erpel's requests in its traces, or
-- alerting from log lines becomes awkward, or several Erpel instances need comparing.
+- a deployment runs an OpenTelemetry collector and wants Enterich's requests in its traces, or
+- alerting from log lines becomes awkward, or several Enterich instances need comparing.
 
 ## Conditions
 

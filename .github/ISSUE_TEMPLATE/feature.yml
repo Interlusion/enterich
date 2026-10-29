@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: >-
-        Erpel's tools have a fixed purpose and input schema. Generic operations, such as
+        Enterich's tools have a fixed purpose and input schema. Generic operations, such as
         a tool that takes a DocType, report name, method name, field list, filter
         expression or file path as input, are out of scope (REQ-001-PRS-F006).
   - type: dropdown

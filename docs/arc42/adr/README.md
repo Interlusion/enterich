@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-Decisions about Erpel. The architecture they shape is in the [arc42 overview](../README.md).
+Decisions about Enterich. The architecture they shape is in the [arc42 overview](../README.md).
 
 | ADR | Title | Status |
 | :- | :- | :- |

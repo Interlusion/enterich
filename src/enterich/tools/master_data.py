@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from erpel.shapes import (
+from enterich.shapes import (
     Flag,
     Inputs,
     Limit,
@@ -17,7 +17,7 @@ from erpel.shapes import (
     rows_of,
     shape,
 )
-from erpel.tools import Context, Operation, get_named
+from enterich.tools import Context, Operation, get_named
 
 LIST_FIELDS = ["item_code", "item_name", "item_group", "stock_uom", "is_stock_item", "disabled"]
 OUTSIDE = {"item_name", "description"}

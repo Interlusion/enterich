@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-docker build -q -t erpel-actionlint .github/actionlint >/dev/null
+docker build -q -t enterich-actionlint .github/actionlint >/dev/null
 # As the caller, so files only their owner may read are readable; the image runs as guest.
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/repo:ro -w /repo erpel-actionlint -color
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/repo:ro -w /repo enterich-actionlint -color
 uv run zizmor --offline .github/workflows

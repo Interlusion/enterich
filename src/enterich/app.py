@@ -1,4 +1,4 @@
-"""ASGI assembly: the SDK's MCP app inside Erpel's outer wrapper (ADR-002).
+"""ASGI assembly: the SDK's MCP app inside Enterich's outer wrapper (ADR-002).
 
 The wrapper serves only three paths: the MCP endpoint (POST only, at most
 1 MiB), the protected resource metadata, and `/healthz`. It writes the
@@ -20,10 +20,10 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from erpel import log, tools
-from erpel.auth import JWKS_RETRY_INTERVAL, JwksCache, KeysUnavailable, Verifier, last_refusal
-from erpel.config import Settings
-from erpel.erpnext import Erpnext
+from enterich import log, tools
+from enterich.auth import JWKS_RETRY_INTERVAL, JwksCache, KeysUnavailable, Verifier, last_refusal
+from enterich.config import Settings
+from enterich.erpnext import Erpnext
 
 MAX_BODY = 1024 * 1024
 RETRY_AFTER = str(int(JWKS_RETRY_INTERVAL))  # a retry before that finds no new keys
@@ -43,8 +43,8 @@ def create_app(
     erpnext = Erpnext(settings, erpnext_transport)
     verifier = Verifier(settings, JwksCache(settings.jwks_url, client))
     server = MCPServer(
-        name="erpel",
-        version=version("erpel"),
+        name="enterich",
+        version=version("enterich"),
         token_verifier=verifier,
         tools=tools.build(settings, erpnext),
         auth=AuthSettings(

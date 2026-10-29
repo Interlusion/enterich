@@ -13,8 +13,8 @@ import httpx2
 import pytest
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
-from erpel.auth import JwksCache, KeysUnavailable, Verifier, last_refusal
-from erpel.config import Settings
+from enterich.auth import JwksCache, KeysUnavailable, Verifier, last_refusal
+from enterich.config import Settings
 from tests.fakes.jwks import FakeJwks, Signer, claims, ec_signer, rsa_signer, token
 from tests.fakes.settings import CLIENT_ID, JWKS_URL, RESOURCE_URL, SUBJECT, settings
 

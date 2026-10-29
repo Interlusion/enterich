@@ -5,7 +5,7 @@ from typing import Any, Literal, Self
 
 from pydantic import model_validator
 
-from erpel.shapes import (
+from enterich.shapes import (
     Day,
     Flag,
     Inputs,
@@ -20,7 +20,7 @@ from erpel.shapes import (
     rows_of,
     shape,
 )
-from erpel.tools import Context, Operation, get_named
+from enterich.tools import Context, Operation, get_named
 
 BANK_ACCOUNT_FIELDS = (
     "name",

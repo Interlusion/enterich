@@ -4,7 +4,7 @@ from typing import Annotated, Any, Literal, Self
 
 from pydantic import Field, model_validator
 
-from erpel.shapes import (
+from enterich.shapes import (
     Day,
     Flag,
     Inputs,
@@ -20,8 +20,8 @@ from erpel.shapes import (
     in_order,
     today,
 )
-from erpel.tools import Context, Operation, drafts, get_named, invoicing
-from erpel.tools.invoicing import AgeingBasedOn
+from enterich.tools import Context, Operation, drafts, get_named, invoicing
+from enterich.tools.invoicing import AgeingBasedOn
 
 PURCHASE = invoicing.Side(
     party="Supplier",

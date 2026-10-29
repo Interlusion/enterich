@@ -1,4 +1,4 @@
-# REQ-004: Erpel Order to Cash — Requirement Specification
+# REQ-004: Enterich Order to Cash — Requirement Specification
 
 | Meta | Value |
 | :- | :- |
@@ -46,7 +46,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-004-PRS-F001: Customer operations
 
-**Description**: Erpel SHALL offer `list_customers` and `get_customer` as the catalogue below defines them; `get_customer` SHALL return the customer's addresses.
+**Description**: Enterich SHALL offer `list_customers` and `get_customer` as the catalogue below defines them; `get_customer` SHALL return the customer's addresses.
 
 **Related URS**: REQ-004-URS-F001
 
@@ -54,11 +54,11 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - `get_customer` returns the addresses linked to the customer, and no other party's addresses.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-004-PRS-F002: Sales invoice reads
 
-**Description**: Erpel SHALL offer `list_sales_invoices` and `get_sales_invoice` as the catalogue below defines them, with the invoice states of REQ-001's Operation Conventions.
+**Description**: Enterich SHALL offer `list_sales_invoices` and `get_sales_invoice` as the catalogue below defines them, with the invoice states of REQ-001's Operation Conventions.
 
 **Related URS**: REQ-004-URS-F001
 
@@ -66,11 +66,11 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - `state` accepts exactly draft, unpaid, overdue, paid, return and cancelled; `overdue` uses today in the configured time zone.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-004-PRS-F003: Sales tax templates
 
-**Description**: Erpel SHALL offer `list_sales_tax_templates` as the catalogue below defines it.
+**Description**: Enterich SHALL offer `list_sales_tax_templates` as the catalogue below defines it.
 
 **Related URS**: REQ-004-URS-F001
 
@@ -78,11 +78,11 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - Only sales templates are returned, never purchase templates.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-004-PRS-F004: Receivables
 
-**Description**: Erpel SHALL offer `report_accounts_receivable` as the catalogue below defines it, with `total_outstanding` over all rows, not only the returned page.
+**Description**: Enterich SHALL offer `report_accounts_receivable` as the catalogue below defines it, with `total_outstanding` over all rows, not only the returned page.
 
 **Related URS**: REQ-004-URS-F001
 
@@ -92,11 +92,11 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - An `as_of_date` in the past ages the rows from that date, not from today; ERPNext's total row is not among the rows.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
-- Evidence: Erpel's test suite; the integration test against a real ERPNext v16 site (backlog).
+- Evidence: Enterich's test suite; the integration test against a real ERPNext v16 site (backlog).
 
 #### REQ-004-PRS-F005: Sales invoice drafts
 
-**Description**: Erpel SHALL offer `create_draft_sales_invoice` and `update_draft_sales_invoice` as the catalogue below defines them; it SHALL send `set_posting_time` 1 whenever it sends a `posting_date`, and SHALL send no `rate` for a row given without one, so that ERPNext prices it.
+**Description**: Enterich SHALL offer `create_draft_sales_invoice` and `update_draft_sales_invoice` as the catalogue below defines them; it SHALL send `set_posting_time` 1 whenever it sends a `posting_date`, and SHALL send no `rate` for a row given without one, so that ERPNext prices it.
 
 **Related URS**: REQ-004-URS-F002
 
@@ -105,7 +105,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - An update that sets `posting_date` on a draft created without one keeps it.
 - A row given without `rate` is sent without one, and the result shows the rate ERPNext set.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 #### REQ-004-PRS-F006: Duplicate match for sales invoices
 
@@ -118,7 +118,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - A create matching an existing draft is refused naming it; one that differs in a quantity, an item or the date goes through.
 - A create matches a draft that has an added free-item row as well.
 - Verification: test.
-- Evidence: Erpel's test suite.
+- Evidence: Enterich's test suite.
 
 ## Operation Catalogue
 
@@ -146,7 +146,7 @@ Customer names are not in report rows; `get_customer` gives them.
 
 - Clearable on update: `remarks`, `taxes_and_charges` (with its rows).
 - The customer isn't changed by an update: ERPNext would keep the first customer's address, payment terms, price list and receivable account. A draft for another customer is a new draft.
-- A row without `rate` gets the rate ERPNext sets from the price list and its pricing rules, as in the form. Erpel never sends `ignore_pricing_rule`, so a site's pricing rules apply to every row; REQ-001-PRS-F016 warns where they replaced a given rate.
+- A row without `rate` gets the rate ERPNext sets from the price list and its pricing rules, as in the form. Enterich never sends `ignore_pricing_rule`, so a site's pricing rules apply to every row; REQ-001-PRS-F016 warns where they replaced a given rate.
 - Results add: `customer`, `posting_date`, `due_date`, `currency`, `net_total`, `total_taxes_and_charges`, `grand_total`, `taxes` \[`account_head`, `rate`, `tax_amount`\], `items` \[`item_code`, `qty`, `rate`, `amount`, `is_free_item`\].
 
 ### ERPNext calls
@@ -187,7 +187,7 @@ Checked against ERPNext v16.52 source:
 - The customer's address, contact, payment terms, price list and accounts are filled in on save only where the draft has none (`update_if_missing`); a customer address of another customer is refused (`validate_party_address_and_contact`).
 - ERPNext looks up prices and pricing rules without a permission check, and creates or changes an Item Price from a draft only for a user with write on Item Price; the agent user has none.
 - A due date before the posting date, or later than the payment terms allow, is refused on save unless the user is a credit controller.
-- ERPNext adds a template's tax rows on save only when Accounts Settings say so (`add_taxes_from_taxes_and_charges_template`); Erpel therefore sends them itself.
+- ERPNext adds a template's tax rows on save only when Accounts Settings say so (`add_taxes_from_taxes_and_charges_template`); Enterich therefore sends them itself.
 - A PUT carrying `modified` is refused with `TimestampMismatchError` when the stored draft has another; rows given in a PUT replace the stored ones.
 - Without `age_as_on`, Accounts Receivable ages from today whatever the report date; without `range`, it uses 30, 60, 90, 120. It appends a total row as a list, and a prepared report answers with `prepared_report` set, with an earlier run's rows or none. It reads Sales Invoice and Journal Entry through permission-checked lists, Payment Ledger Entry without a permission check.
 - A list call can filter Address by its Dynamic Link rows, and can return Sales Invoice Item fields, one row per item.

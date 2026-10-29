@@ -8,8 +8,8 @@ from typing import Annotated, Any, Literal, Self
 
 from pydantic import AfterValidator, Field, model_validator
 
-from erpel.erpnext import ErpnextError
-from erpel.shapes import (
+from enterich.erpnext import ErpnextError
+from enterich.shapes import (
     Amount,
     Day,
     Flag,
@@ -32,7 +32,7 @@ from erpel.shapes import (
     split_outside,
     today,
 )
-from erpel.tools import (
+from enterich.tools import (
     Context,
     Operation,
     Refusal,
@@ -630,7 +630,7 @@ async def create_draft_journal_entry(
 async def update_draft_journal_entry(
     inputs: UpdateDraftJournalEntry, context: Context
 ) -> dict[str, Any]:
-    # Erpel changes only entries of the voucher type it creates.
+    # Enterich changes only entries of the voucher type it creates.
     stored = await drafts.editable(
         context,
         "Journal Entry",
@@ -641,7 +641,7 @@ async def update_draft_journal_entry(
     )
     if stored.get("multi_currency"):
         raise Refusal(
-            f"name: {inputs.name} has accounts in several currencies; Erpel changes only "
+            f"name: {inputs.name} has accounts in several currencies; Enterich changes only "
             "journal entries in the company's currency."
         )
     # The rules on the draft as it will be saved: stored values where none are given.

@@ -20,7 +20,7 @@ Compare `CHANGELOG.md`'s `Unreleased` section with the last release:
 
 ## The version
 
-The version lives in one place: `version` in `pyproject.toml`, set with `uv version X.Y.Z` and shown with `uv version --short`. Erpel reports it at start (`start` log event), and the release workflow refuses a tag that doesn't equal it.
+The version lives in one place: `version` in `pyproject.toml`, set with `uv version X.Y.Z` and shown with `uv version --short`. Enterich reports it at start (`start` log event), and the release workflow refuses a tag that doesn't equal it.
 
 ## Steps
 
@@ -28,10 +28,10 @@ The version lives in one place: `version` in `pyproject.toml`, set with `uv vers
 2. **Tag the merge commit on `main`:**
    ```sh
    git switch main && git pull --ff-only
-   git tag -a vX.Y.Z -m "Erpel vX.Y.Z"
+   git tag -a vX.Y.Z -m "Enterich vX.Y.Z"
    git push origin vX.Y.Z
    ```
-3. **CI** (`release.yml`, triggered by the tag) checks that the tag equals the version in `pyproject.toml`, is annotated, is on `main` and was pushed to `interlusion/erpel`, and that `CHANGELOG.md` has the version's section. Then `image.yml` builds the image for amd64 and arm64 once, runs the tests in its `test` stage for both, pushes the runtime image `ghcr.io/interlusion/erpel:X.Y.Z` with its SBOM and provenance, adds a build provenance attestation, and creates the GitHub release with the changelog section and the digest, attaching `tests/snapshots/tools.json` as `erpel-X.Y.Z-tools.json`.
+3. **CI** (`release.yml`, triggered by the tag) checks that the tag equals the version in `pyproject.toml`, is annotated, is on `main` and was pushed to `interlusion/enterich`, and that `CHANGELOG.md` has the version's section. Then `image.yml` builds the image for amd64 and arm64 once, runs the tests in its `test` stage for both, pushes the runtime image `ghcr.io/interlusion/enterich:X.Y.Z` with its SBOM and provenance, adds a build provenance attestation, and creates the GitHub release with the changelog section and the digest, attaching `tests/snapshots/tools.json` as `enterich-X.Y.Z-tools.json`.
 4. **Check** the release page: notes, digest, both architectures, the tools asset.
 
 ## Dry run

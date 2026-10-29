@@ -9,8 +9,8 @@
 ## Repository layout
 
 ```
-src/erpel/
-  __main__.py        entry point: python -m erpel
+src/enterich/
+  __main__.py        entry point: python -m enterich
   config.py          environment variables, validation
   app.py             ASGI assembly: SDK app, POST-only and size limit, healthz
   auth.py            token verifier, JWKS cache
@@ -24,7 +24,7 @@ src/erpel/
                      the reads the sales and purchase side share
 tests/
   unit/              per module
-  e2e/               Erpel against a fake JWKS and a fake ERPNext, named
+  e2e/               Enterich against a fake JWKS and a fake ERPNext, named
                      by area like tools/, an area's drafts in their own
                      module (test_order_to_cash_drafts.py)
   fakes/             the fakes, recording every request
@@ -61,10 +61,10 @@ uv run mdformat --check .  # Markdown; without --check it formats
 scripts/check-links.sh     # no wiki-links; local links and #anchors resolve (Docker)
 scripts/check-workflows.sh # actionlint with shellcheck (Docker), zizmor
 uv run basedpyright
-uv run erpel               # starts Erpel; needs the ERPEL_* variables
+uv run enterich            # starts Enterich; needs the ENTERICH_* variables
 ```
 
-Run Erpel locally against the fakes:
+Run Enterich locally against the fakes:
 
 ```sh
 uv run python -m tests.fakes   # fake JWKS and ERPNext; prints the env to use
@@ -73,9 +73,9 @@ uv run python -m tests.fakes   # fake JWKS and ERPNext; prints the env to use
 ## Container
 
 ```sh
-docker build -t erpel:dev .                     # runtime image
-docker build --target test -t erpel:test .      # runtime plus tests
-docker run --rm erpel:test                      # runs the tests
+docker build -t enterich:dev .                     # runtime image
+docker build --target test -t enterich:test .      # runtime plus tests
+docker run --rm enterich:test                      # runs the tests
 ```
 
 The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The runtime image carries neither tests nor dev dependencies; the `test` stage adds both on top of it, so the tests run against the same packages.
