@@ -23,6 +23,8 @@ on:
 env:
   IMAGE: ghcr.io/interlusion/erpel
   VERSION: ${{ inputs.version }}
+  # The build records stay out of the run's artefacts; the job summary remains.
+  DOCKER_BUILD_RECORD_UPLOAD: false
   # The SBOM scanner BuildKit runs, pinned like the actions; Dependabot can't see it.
   SBOM_SCANNER: docker/buildkit-syft-scanner:1.12.0@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
 
@@ -53,6 +55,12 @@ jobs:
           fi
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          # Without it, BuildKit's provenance carries GitHub's whole event payload,
+          # which for a tag push names the pusher and the commit's authors with their
+          # email addresses, published with the image. GitHub's own attestation
+          # identifies the workflow run.
+          driver-opts: provenance-add-gha=false
       - name: Test stage, amd64
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:

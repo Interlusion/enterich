@@ -26,7 +26,7 @@ Before the move:
 - [x] Issue and pull request templates; `CODEOWNERS`.
 - [ ] **Logo:** SVG in a light and a dark variant (`docs/assets/`); a drake fits the name; nothing that uses or resembles ERPNext's or Frappe's marks ([ADR-006](../arc42/adr/ADR-006-licence-and-name.md)). The README header shows it, switching with the reader's colour scheme (`<picture>`). A 1280×640 PNG made from it for the social preview.
 - [x] **Version source:** the version in `pyproject.toml`, which the release workflow compares with the tag.
-- [ ] **Release workflow** (`release.yml`) as the [releasing guide](../guides/releasing.md) describes it, including the dry run; the dry run passes on the default branch. It can't publish before the move: it lacks the permissions, and refuses a tag outside `interlusion/erpel`.
+- [x] **Release workflow** (`release.yml`) as the [releasing guide](../guides/releasing.md) describes it, including the dry run; the dry run passes on the default branch. It can't publish before the move: it lacks the permissions, and refuses a tag outside `interlusion/erpel`. The dry run passed on `main` on 2026-10-29; it is repeated after every change to the workflows, as the releasing guide says.
 - [x] **Verifying an image:** a section in the [configuration guide](../guides/configuration.md) showing deployers how to check an image's provenance before deploying it (`gh attestation verify`), written against the final workflow.
 
 The move:
