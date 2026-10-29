@@ -1,8 +1,10 @@
-# Enterich
+<p align="center"><img src="docs/assets/logo.webp" alt="Enterich's logo: a drake in a cap, holding a microphone, with an MCP chain" width="160"></p>
+
+<h1 align="center">Enterich</h1>
 
 An MCP server for ERPNext with hard limits: a short, fixed list of tools, tokens from an external OAuth authorization server, and only the rights of one ERPNext user.
 
-**Status:** not released yet. Every operation is built and tested; the first release follows the move to its organisation.
+**Status:** not released yet. Every operation is built and tested; the first release, v0.1.0, follows once the repository is public.
 
 ## What it is
 

@@ -24,7 +24,7 @@ Before the move:
 - [x] **No separate product description (light spec):** decided against. The README says what Enterich is and isn't, and its generated tool list names each area's scope from the specs index; the guides cover operators and reviewers; the specs hold the details. A prose copy of the specs would drift with no test to catch it, and a website writes its copy from these when it needs one.
 - [x] `CONTRIBUTING.md`: spec first, tests first, Conventional Commits, no deployment facts, how to run the tests.
 - [x] Issue and pull request templates; `CODEOWNERS`.
-- [ ] **Logo:** SVG in a light and a dark variant (`docs/assets/`); a drake fits the name; nothing that uses or resembles ERPNext's or Frappe's marks ([ADR-006](../arc42/adr/ADR-006-licence-and-name.md)). The README header shows it, switching with the reader's colour scheme (`<picture>`). A 1280×640 PNG made from it for the social preview.
+- [x] **Logo:** a drake, which fits the name, and nothing that uses or resembles ERPNext's or Frappe's marks ([ADR-006](../arc42/adr/ADR-006-licence-and-name.md)). `docs/assets/logo.webp` (320×320, round, transparent outside the circle) brings its own dark background, so one image serves both colour schemes; the README header shows it centred at 160 px, above the name. `docs/assets/social-preview.png` (1280×640) shows the same drake for the social preview.
 - [x] **Version source:** the version in `pyproject.toml`, which the release workflow compares with the tag.
 - [x] **Release workflow** (`release.yml`) as the [releasing guide](../guides/releasing.md) describes it, including the dry run; the dry run passes on the default branch. It can't publish before the move: it lacks the permissions, and refuses a tag outside `interlusion/enterich`. The dry run passed on `main` on 2026-10-29; it is repeated after every change to the workflows, as the releasing guide says.
 - [x] **The repository named `enterich`:** created empty and private as `Interlusion/enterich`, so the code moves by a push, not a transfer.
@@ -32,9 +32,10 @@ Before the move:
 
 The move:
 
-- [ ] The history check repeated over `main` since `2bee556`.
-- [ ] Push `main` to `Interlusion/enterich`, still private, and point the remotes there. Issues, pull requests and their refs stay behind in the old repository, and there is no redirect; tags follow with the first release.
-- [ ] CI and the release dry run pass in `Interlusion/enterich`; the dry run also covers the workflows as the rename changed them (image name, asset names, repository guard).
+- [x] The history check repeated over `main` since `2bee556`.
+- [x] Push `main` to `Interlusion/enterich`, still private, and point the remotes there. Issues, pull requests and their refs stay behind in the old repository, and there is no redirect; tags follow with the first release. Pushed on 2026-10-29.
+- [x] CI and the release dry run pass in `Interlusion/enterich`; the dry run also covers the workflows as the rename changed them (image name, asset names, repository guard). Both passed on 2026-10-29.
+- [x] Actions settings in `Interlusion/enterich`: the workflows' default token read-only; Actions may not create or approve pull requests. Set on 2026-10-29.
 - [ ] Make it public, and in the same step switch on private vulnerability reporting (`SECURITY.md`'s only channel, which GitHub offers for public repositories), secret scanning and push protection.
 - [ ] Archive the old repository.
 
@@ -43,6 +44,7 @@ After the move:
 - [ ] Organisation: two-factor authentication required for members; only owners may change repository visibility or create public packages; members' base permission read.
 - [ ] Settings: Dependabot alerts and security updates on.
 - [ ] Rulesets: `main` protected (pull request, green CI, no force push); tags `v*` immutable (no update, no deletion).
+- [ ] About box: a description following the README's first sentence; topics (`mcp`, `mcp-server`, `model-context-protocol`, `erpnext`, `oauth2`, `python`); the website field empty until there is one to link.
 - [ ] Social preview image uploaded in the repository settings.
 - [ ] `release.yml`'s `publish` job given `packages: write`, `id-token: write`, `attestations: write`, `artifact-metadata: write` (the attestation's storage record, which the action creates in an organisation) and `contents: write` (for the GitHub release), that job only; the dry run repeated in the organisation.
 - [ ] Confirm the image name (`ghcr.io/interlusion/enterich`).
