@@ -54,13 +54,20 @@ class Operation[I: Inputs]:
 
 
 def operations() -> list[Operation[Any]]:
-    from erpel.tools import master_data, order_to_cash, procure_to_pay, record_to_report
+    from erpel.tools import (
+        bank_and_cash,
+        master_data,
+        order_to_cash,
+        procure_to_pay,
+        record_to_report,
+    )
 
     return [
         *master_data.OPERATIONS,
         *order_to_cash.OPERATIONS,
         *procure_to_pay.OPERATIONS,
         *record_to_report.OPERATIONS,
+        *bank_and_cash.OPERATIONS,
     ]
 
 
