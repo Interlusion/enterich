@@ -45,7 +45,8 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --group test --no-editable
 COPY tests ./tests
-COPY docs/guides/configuration.md ./docs/guides/configuration.md
+# The docs whole: tests read the guides, the specs index and the README's sources.
+COPY docs ./docs
 COPY CHANGELOG.md ./
 COPY scripts/changelog.py scripts/image_index.py ./scripts/
 USER 10001:10001
