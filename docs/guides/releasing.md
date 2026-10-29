@@ -20,27 +20,34 @@ Compare `CHANGELOG.md`'s `Unreleased` section with the last release:
 
 ## The version
 
-The version lives in one place: `version` in `pyproject.toml`. Erpel reports it at start (`start` log event), and the release workflow refuses a tag that doesn't equal it.
+The version lives in one place: `version` in `pyproject.toml`, set with `uv version X.Y.Z` and shown with `uv version --short`. Erpel reports it at start (`start` log event), and the release workflow refuses a tag that doesn't equal it.
 
 ## Steps
 
-1. **On a branch:** set `version` in `pyproject.toml` to `X.Y.Z`, move `Unreleased` to `## [X.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md`, and add the compare link; the README's tool list is checked against `tests/snapshots/tools.json` by the tests. Open a pull request (`chore: release vX.Y.Z`); merge when CI is green.
+1. **On a branch:** run `uv version X.Y.Z`; check the `Unreleased` section against the `feat` and `fix` commits since the last tag (`git log --oneline vLAST.. | grep -E '^[0-9a-f]+ (feat|fix)'`), then move it to `## [X.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md` and add the compare link; the README's tool list is checked against `tests/snapshots/tools.json` by the tests. Open a pull request (`chore: release vX.Y.Z`); merge when CI is green.
 2. **Tag the merge commit on `main`:**
    ```sh
    git switch main && git pull --ff-only
    git tag -a vX.Y.Z -m "Erpel vX.Y.Z"
    git push origin vX.Y.Z
    ```
-3. **CI** (`release.yml`, triggered by the tag) checks that the tag equals the version in `pyproject.toml`, builds the image for amd64 and arm64 once, runs the tests in its `test` stage, pushes the runtime image `ghcr.io/interlusion/erpel:X.Y.Z`, attaches provenance and SBOM, and creates the GitHub release with the changelog section and the digest, and attaches `tests/snapshots/tools.json` as `erpel-X.Y.Z-tools.json`.
+3. **CI** (`release.yml`, triggered by the tag) checks that the tag equals the version in `pyproject.toml`, is annotated, is on `main` and was pushed to `interlusion/erpel`, and that `CHANGELOG.md` has the version's section. Then `image.yml` builds the image for amd64 and arm64 once, runs the tests in its `test` stage for both, pushes the runtime image `ghcr.io/interlusion/erpel:X.Y.Z` with its SBOM and provenance, adds a build provenance attestation, and creates the GitHub release with the changelog section and the digest, attaching `tests/snapshots/tools.json` as `erpel-X.Y.Z-tools.json`.
 4. **Check** the release page: notes, digest, both architectures, the tools asset.
 
 ## Dry run
 
-`release.yml` can also be started by hand (`workflow_dispatch`) with a version. It then does everything up to publishing (version check, build for both architectures, tests, SBOM, release notes and tools file as workflow artefacts) and pushes, tags and releases nothing. Run it before the first release and after every change to `release.yml`: a published image tag can never be reused, so a broken first publish can't be retried under the same version.
+`release.yml` can also be started by hand (`workflow_dispatch`) with a version: in GitHub under Actions, Release, Run workflow, or `gh workflow run release.yml -f version=X.Y.Z`. It runs the same `image.yml` as a release, with read rights only: the version check, the build for both architectures, the tests in both, and the same build step for the runtime image, which it writes as an OCI image layout instead of pushing it. `scripts/image_index.py` then checks that the layout holds the image under its release name for both architectures, each with SBOM and provenance. The run's artefact `dry-run-X.Y.Z` holds the release notes, the tools file, and the SBOM and provenance per architecture. The version must equal `pyproject.toml`'s, so a dry run checks the version about to be released; where `CHANGELOG.md` has no section for it yet, as before the first release, the notes are the `Unreleased` section.
+
+Only a tag run signs in to GHCR, pushes, attests and creates the release; those steps are first run for real. Run the dry run before the first release and after every change to `release.yml`, `image.yml`, the scripts they run or the `Dockerfile`.
 
 ## When it fails
 
-A release workflow that failed for a passing reason (a registry or runner outage) is re-run for the same tag, if nothing was pushed. Anything that needs a commit, including a fix to `release.yml`, needs a new patch version: the tag can't move to the fixed commit.
+A release run that failed for a passing reason (a registry or runner outage) is re-run with **Re-run failed jobs**:
+
+- If the `image` job failed, nothing was pushed, and it runs again. It refuses to start when the version's image exists already, so a published image tag is never overwritten.
+- If the `release` job failed (attestation or GitHub release), only it runs again, for the image already pushed.
+
+Anything that needs a commit, including a fix to the workflows, needs a new patch version: the tag can't move to the fixed commit.
 
 ## Security fixes
 

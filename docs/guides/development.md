@@ -31,11 +31,13 @@ tests/
   snapshots/         tools.json: the published tool list
   readme.py          the README's tool list, generated from tools.json
 docs/                specs, architecture, ADRs, guides, backlog
-scripts/             check-links.sh: the Markdown link check
+scripts/             check-links.sh: the Markdown link check;
+                     changelog.py: a version's release notes;
+                     image_index.py: the dry run's check of the image
 AGENTS.md            rules for coding agents; CLAUDE.md imports it
 Dockerfile           build, runtime and test stages
 pyproject.toml, uv.lock, .python-version
-.github/workflows/   ci.yml (later: release.yml)
+.github/workflows/   ci.yml; release.yml with image.yml (releasing guide)
 .github/gitleaks/, .github/lychee/
                      the images CI runs, pinned in a Dockerfile each
 .github/dependabot.yml
@@ -83,11 +85,13 @@ The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The run
 - **Never log** keys, secrets or tokens; tests check it.
 - **Changelog:** a line under `Unreleased` for every behaviour change, with **Rights** or **Configuration** headings where they apply ([ADR-004](../arc42/adr/ADR-004-releases-and-image.md)).
 - **Commits:** Conventional Commits (`feat`, `fix`, `docs`, `ci`, `chore`, `refactor`, `test`).
-- **Scripts and CI** stay off `api.github.com`; use `git ls-remote`, `raw.githubusercontent.com` or `releases.atom`.
+- **Scripts and CI** stay off `api.github.com`, which allows 60 requests an hour without a token; use `git ls-remote`, `raw.githubusercontent.com` or `releases.atom`. The one exception is the release job's `gh release create`, authenticated with the workflow's token: a release can't be created another way.
 
 ## CI
 
 `ci.yml` runs on pull requests and pushes to `main`, without secrets: lock check, ruff, mdformat, the Markdown link check, basedpyright, pytest with coverage, a vulnerability audit of the lock, actionlint, zizmor, gitleaks, and the image built for amd64 and arm64 with the tests run in its `test` stage. Nothing is published.
+
+`release.yml` runs on a version tag, or by hand as a dry run, and builds through `image.yml`; the [releasing guide](releasing.md) describes both.
 
 ## References
 
