@@ -6,7 +6,7 @@ Instructions for coding agents working on Enterich. `CLAUDE.md` imports this fil
 
 Enterich: an MCP server for ERPNext with a fixed tool list, tokens from an external OAuth authorization server, and only the rights of one ERPNext agent user. See `README.md`.
 
-The repository is private under `loxy` for now and moves to the Interlusion organisation before it goes public. Write everything as if it were public already.
+The repository is private under `loxy` for now and moves to `Interlusion/enterich` before it goes public. Write everything as if it were public already.
 
 ## Rules
 
