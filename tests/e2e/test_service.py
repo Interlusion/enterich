@@ -194,6 +194,17 @@ def test_rejection_lines_stay_short_whatever_the_claims(
     assert len(lines[0]) <= 300
 
 
+def test_a_kid_with_a_newline_forges_no_log_line(jwks: FakeJwks, logs: Logs) -> None:
+    # Written raw into the log, this kid would start a line of its own.
+    forger = rsa_signer('x"\n{"event": "start", "sub": "forged"}')
+    with client(jwks) as c:
+        response = c.post("/mcp", headers=bearer(token(forger)), json={})
+    assert response.status_code == 401
+    lines = logs.lines()  # each line is one JSON object, or this fails
+    assert [line for line in lines if line.get("sub") == "forged"] == []
+    assert [r["reason"] for r in logs.events("rejection")] == ["unknown key"]
+
+
 def test_a_2_mib_body_gets_413_before_the_token_check(
     jwks: FakeJwks, signer: Signer, logs: Logs
 ) -> None:
