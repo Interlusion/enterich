@@ -29,6 +29,7 @@ tests/
                      module (test_order_to_cash_drafts.py)
   fakes/             the fakes, recording every request
   snapshots/         tools.json: the published tool list
+  readme.py          the README's tool list, generated from tools.json
 docs/                specs, architecture, ADRs, guides, backlog
 scripts/             check-links.sh: the Markdown link check
 AGENTS.md            rules for coding agents; CLAUDE.md imports it
@@ -77,7 +78,7 @@ The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The run
 
 - **Spec first.** A new operation, input or output field starts as a change to its area spec's catalogue ([specs index](../specs/README.md)), then tests, then code. Read REQ-001 too: its rules apply to every operation.
 - **Tests first** for the token check and every operation: the e2e test asserts exactly what the fake ERPNext received.
-- **The tool-list snapshot** changes only together with the area spec and a changelog line. Regenerate with `uv run pytest --snapshot-update` (syrupy) and review the diff.
+- **The tool-list snapshot** changes only together with the area spec and a changelog line. Regenerate with `uv run pytest --snapshot-update` (syrupy) and review the diff; then write the README's tool list from it with `uv run python -m tests.readme`, which a test checks.
 - **No deployment facts:** hostnames, realms, client names, user IDs, company names or credentials of a real site never go into code, tests or docs. Use `example.com`, `Example GmbH`, zero UUIDs.
 - **Never log** keys, secrets or tokens; tests check it.
 - **Changelog:** a line under `Unreleased` for every behaviour change, with **Rights** or **Configuration** headings where they apply ([ADR-004](../arc42/adr/ADR-004-releases-and-image.md)).

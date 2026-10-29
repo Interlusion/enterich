@@ -24,7 +24,7 @@ The version lives in one place: `version` in `pyproject.toml`. Erpel reports it 
 
 ## Steps
 
-1. **On a branch:** set `version` in `pyproject.toml` to `X.Y.Z`, move `Unreleased` to `## [X.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md`, add the compare link, and check the README's tool list against `tests/snapshots/tools.json`. Open a pull request (`chore: release vX.Y.Z`); merge when CI is green.
+1. **On a branch:** set `version` in `pyproject.toml` to `X.Y.Z`, move `Unreleased` to `## [X.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md`, and add the compare link; the README's tool list is checked against `tests/snapshots/tools.json` by the tests. Open a pull request (`chore: release vX.Y.Z`); merge when CI is green.
 2. **Tag the merge commit on `main`:**
    ```sh
    git switch main && git pull --ff-only
