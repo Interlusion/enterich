@@ -315,7 +315,8 @@ class FakeErpnext:
         return httpx2.Response(404, json=error(404, "DoesNotExistError", "No such route"))
 
     def _insert(self, doctype: str, body: dict[str, Any]) -> httpx2.Response:
-        name = f"{INVOICES[doctype][1]}{101 + len(self.docs.get(doctype, {})):05d}"
+        series = "ACC-JV-2026-" if doctype == "Journal Entry" else INVOICES[doctype][1]
+        name = f"{series}{101 + len(self.docs.get(doctype, {})):05d}"
         doc = {"doctype": doctype, "name": name, "owner": "agent@example.com", **body}
         return self._save(doctype, copy.deepcopy(doc))
 
@@ -340,6 +341,8 @@ class FakeErpnext:
     def _save(self, doctype: str, doc: dict[str, Any]) -> httpx2.Response:
         """Save an invoice draft as v16 does: posting date, due date, prices, pricing rules,
         accounts, totals."""
+        if doctype == "Journal Entry":
+            return self._save_journal(doc)
         party_type, _ = INVOICES[doctype]
         party_field = party_type.lower()
         party = self.docs.get(party_type, {}).get(doc.get(party_field, ""))
@@ -392,6 +395,61 @@ class FakeErpnext:
             modified=f"2026-10-28 12:00:00.{self.saves:06d}",
         )
         self.add(doctype, doc)
+        return httpx2.Response(200, json={"data": doc})
+
+    def _save_journal(self, doc: dict[str, Any]) -> httpx2.Response:
+        """Save a journal entry draft as v16 does at save; the balance and a Bank Entry's
+        reference are checked only on submit."""
+        if not doc.get("posting_date"):
+            return _refused(417, "MandatoryError", "Value missing for Journal Entry: Posting Date")
+        accounts = self.docs.get("Account", {})
+        rows = _rows(doc, "accounts")
+        for number, row in enumerate(rows, start=1):
+            known = accounts.get(row["account"], {})
+            if known.get("account_currency", "EUR") != "EUR" and not doc.get("multi_currency"):
+                message = "Please check Multi Currency option to allow accounts with other currency"
+                return _refused(417, "ValidationError", message)
+            if known.get("account_type") in ("Receivable", "Payable") and not (
+                row.get("party_type") and row.get("party")
+            ):
+                message = (
+                    f"Row {number}: Party Type and Party is required for Receivable / Payable "
+                    f"account {row['account']}"
+                )
+                return _refused(417, "ValidationError", message)
+            # Rounded to the currency's precision before the totals are summed
+            debit = round(row.get("debit_in_account_currency") or 0.0, 2)
+            credit = round(row.get("credit_in_account_currency") or 0.0, 2)
+            if not debit and not credit:
+                message = f"Row {number}: Both Debit and Credit values cannot be zero"
+                return _refused(417, "ValidationError", message)
+            if debit and credit:
+                message = "You cannot credit and debit same account at the same time"
+                return _refused(417, "ValidationError", message)
+            row.update(
+                doctype="Journal Entry Account",
+                debit_in_account_currency=debit,
+                credit_in_account_currency=credit,
+                debit=debit,
+                credit=credit,
+                account_currency="EUR",
+                exchange_rate=1,
+            )
+        if doc.get("cheque_no") and not doc.get("cheque_date"):  # create_remarks
+            return _refused(417, "MandatoryError", "Please enter Reference date")
+        total_debit = round(sum(r["debit"] for r in rows), 2)
+        total_credit = round(sum(r["credit"] for r in rows), 2)
+        self.saves += 1
+        doc.update(
+            accounts=rows,
+            voucher_type=doc.get("voucher_type") or "Journal Entry",
+            total_debit=total_debit,
+            total_credit=total_credit,
+            difference=round(total_debit - total_credit, 2),
+            docstatus=0,
+            modified=f"2026-10-28 12:00:00.{self.saves:06d}",
+        )
+        self.add("Journal Entry", doc)
         return httpx2.Response(200, json={"data": doc})
 
     def _same_bill(self, doc: dict[str, Any]) -> str | None:
@@ -448,6 +506,10 @@ class FakeErpnext:
             return {"result": rows, "columns": [], "add_total_row": 0}
         total = ["Total"] + [""] * 5  # Frappe appends the total row as a list
         return {"result": [*rows, total] if rows else rows, "columns": [], "add_total_row": 1}
+
+
+def _refused(status: int, exc_type: str, message: str) -> httpx2.Response:
+    return httpx2.Response(status, json=error(status, exc_type, message))
 
 
 def _due_date(doctype: str, doc: dict[str, Any], party: dict[str, Any]) -> str | None:

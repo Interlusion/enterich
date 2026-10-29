@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-26 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: every variable is built; the operations so far are those of master data, order to cash, procure to pay and the reads of record to report |
+| **Status** | Draft: every variable is built; the operations so far are those of master data, order to cash, procure to pay and record to report |
 
 Erpel reads its whole configuration from environment variables at start and refuses to start if one is missing or invalid, naming the variable (spec REQ-002-PRS-NF005). There is no configuration file. Variables are part of the versioned interface ([ADR-004](../arc42/adr/ADR-004-releases-and-image.md)).
 

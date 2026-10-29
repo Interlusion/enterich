@@ -3,14 +3,14 @@ duplicate check, the update checks, the warnings and their comment, the result."
 
 import html
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
 from erpel.erpnext import ErpnextError, Refused
 from erpel.shapes import cut_rows, decimal, form_url, rows_of, shape
-from erpel.tools import Context, Refusal, get_named
+from erpel.tools import Context, Refusal, get_named, unknown_name
 
 MAX_DUPLICATE_ROWS = 1000
 MAX_NAMED = 5
@@ -74,11 +74,19 @@ def duplicate_warning(names: Sequence[str], match: str, kind: str = "draft") -> 
 
 
 async def editable(
-    context: Context, doctype: str, name: str, modified: str, what: str
+    context: Context,
+    doctype: str,
+    name: str,
+    modified: str,
+    what: str,
+    only: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The company's draft as last read; refuse an update of anything else (REQ-001-PRS-F003,
-    REQ-001-PRS-F004)."""
+    REQ-001-PRS-F004). A document without the values in `only` answers as an unknown one,
+    before its state is told."""
     stored = await get_named(context, doctype, name, field="name", what=what, company=True)
+    if any(stored.get(field) != value for field, value in (only or {}).items()):
+        raise unknown_name("name", what, name)
     state = DOCSTATUS.get(stored.get("docstatus", 0))
     if state is not None:
         raise Refusal(f"name: {name} is {state}; only drafts can be updated.")
@@ -125,7 +133,8 @@ def due_dates(
     return doc
 
 
-def _number(value: Decimal) -> str:
+def plain(value: Decimal) -> str:
+    """An amount as the warnings print it: 15, 15.01."""
     return f"{value.normalize():f}"
 
 
@@ -145,8 +154,8 @@ def row_warnings(
         asked = sent.get("rate")
         if asked is not None and Decimal(asked) != rate and row.get("pricing_rules"):
             warnings.append(
-                f"Row {number} ({code}): rate {_number(Decimal(asked))} was given, but ERPNext "
-                f"saved {_number(rate)}; a pricing rule set it."
+                f"Row {number} ({code}): rate {plain(Decimal(asked))} was given, but ERPNext "
+                f"saved {plain(rate)}; a pricing rule set it."
             )
         elif rate == 0:
             warnings.append(
