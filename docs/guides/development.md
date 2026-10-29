@@ -89,11 +89,11 @@ The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The run
 - **Never log** keys, secrets or tokens; tests check it.
 - **Changelog:** a line under `Unreleased` for every behaviour change, with **Rights** or **Configuration** headings where they apply ([ADR-004](../arc42/adr/ADR-004-releases-and-image.md)).
 - **Commits:** Conventional Commits (`feat`, `fix`, `docs`, `ci`, `chore`, `refactor`, `test`).
-- **Scripts and CI** stay off `api.github.com`, which allows 60 requests an hour without a token; use `git ls-remote`, `raw.githubusercontent.com` or `releases.atom`. The one exception is the release job's `gh release create`, authenticated with the workflow's token: a release can't be created another way.
+- **Scripts and CI** stay off `api.github.com`, which allows 60 requests an hour without a token; use `git ls-remote`, `raw.githubusercontent.com` or `releases.atom`. The exceptions are the release job's `gh release create` and CI's coverage comment (`gh pr comment`), both authenticated with the workflow's token: a release or a comment can't be created another way.
 
 ## CI
 
-`ci.yml` runs on pull requests and pushes to `main`, without secrets: lock check, ruff, mdformat, the Markdown link check, basedpyright, pytest with coverage, a vulnerability audit of the lock, actionlint with shellcheck and zizmor (`scripts/check-workflows.sh`), gitleaks, and the image built for amd64 and arm64 with the tests run in its `test` stage. Nothing is published.
+`ci.yml` runs on pull requests and pushes to `main`, without secrets: lock check, ruff, mdformat, the Markdown link check, basedpyright, pytest with branch coverage (the table in the run's summary and, for pull requests from this repository's branches, as one comment on the pull request that each push updates), a vulnerability audit of the lock, actionlint with shellcheck and zizmor (`scripts/check-workflows.sh`), gitleaks, and the image built for amd64 and arm64 with the tests run in its `test` stage. Nothing is published.
 
 `release.yml` runs on a version tag, or by hand as a dry run, and builds through `image.yml`; the [releasing guide](releasing.md) describes both.
 
