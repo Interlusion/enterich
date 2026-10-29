@@ -29,7 +29,8 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 ## Terms
 
-- **Reconciled**: a submitted bank transaction whose amount is fully allocated to vouchers (`unallocated_amount` 0).
+- **Reconciled**: a submitted bank transaction whose amount is fully allocated to vouchers (`unallocated_amount` 0 or less, as ERPNext sets its status).
+- **Pending**: a bank transaction still a draft, as a statement import leaves its lines unless it submits them; bank reconciliation doesn't offer it.
 
 ## URS — Functional
 
@@ -62,6 +63,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 **Definition of Done**:
 
 - Each `state` sends exactly its ERPNext filter; without `state`, only unreconciled transactions are returned (this spec's default, see REQ-001's States).
+- A pending transaction is returned for `pending` and `all`, never for `unreconciled` or `reconciled`.
 - Verification: test.
 - Evidence: Erpel's test suite.
 
@@ -83,15 +85,17 @@ REQ-001's [Operation Conventions](req-001-core.md#operation-conventions) apply.
 
 | Operation | Inputs | Returns per record |
 | :- | :- | :- |
-| `list_bank_accounts` | `include_disabled`, `limit`, `offset` | `name`, `account_name`, `bank`, `account`, `iban`, `is_default`, `disabled` |
-| `list_bank_transactions` | `bank_account`, `state` (unreconciled, reconciled, all; default unreconciled), `from_date`, `to_date`, `limit`, `offset` | `name`, `date`, `bank_account`, `deposit`, `withdrawal`, `currency`, `unallocated_amount`, `status`, *`description`*, *`reference_number`*, *`bank_party_name`*, *`bank_party_iban`*, *`bank_party_account_number`* |
-| `get_bank_transaction` | **`name`** | as above, plus `payment_entries` \[`payment_document`, `payment_entry`, `allocated_amount`\], `url`, `truncated` |
-| `list_payment_entries` | `payment_type` (Receive, Pay, Internal Transfer), `party_type` (Customer, Supplier), `party`, `state` (draft, submitted, cancelled), `from_date`, `to_date`, `limit`, `offset` | `name`, `payment_type`, `posting_date`, `party_type`, `party`, *`party_name`*, `paid_amount`, `received_amount`, `paid_from_account_currency`, `paid_to_account_currency`, `mode_of_payment`, *`reference_no`*, `reference_date`, `docstatus`, `modified` |
+| `list_bank_accounts` | `include_disabled`, `limit`, `offset` | `name`, `account_name`, `bank`, `account`, `iban`, `bank_account_no`, `is_default`, `disabled` |
+| `list_bank_transactions` | `bank_account`, `state` (unreconciled, reconciled, pending, all; default unreconciled), `from_date`, `to_date`, `limit`, `offset` | `name`, `date`, `bank_account`, `deposit`, `withdrawal`, `included_fee`, `currency`, `unallocated_amount`, `status`, `party_type`, `party`, *`description`*, *`reference_number`*, *`transaction_type`*, *`bank_party_name`*, *`bank_party_iban`*, *`bank_party_account_number`* |
+| `get_bank_transaction` | **`name`** | as above, plus `modified`, `payment_entries` \[`payment_document`, `payment_entry`, `allocated_amount`\], `url`, `truncated` |
+| `list_payment_entries` | `payment_type` (Receive, Pay, Internal Transfer), `party_type` (Customer, Supplier), `party`, `state` (draft, submitted, cancelled), `from_date`, `to_date`, `limit`, `offset` | `name`, `payment_type`, `posting_date`, `party_type`, `party`, *`party_name`*, `paid_amount`, `received_amount`, `paid_from_account_currency`, `paid_to_account_currency`, `mode_of_payment`, *`reference_no`*, `reference_date`, `bank_account`, `unallocated_amount`, `clearance_date`, `docstatus`, `modified` |
 | `get_payment_entry` | **`name`** | as above, plus `paid_from`, `paid_to`, `references` \[`reference_doctype`, `reference_name`, `allocated_amount`\], *`remarks`*, `url`, `truncated` |
 
-Bank transaction `state`: `unreconciled` is `docstatus` 1 with `unallocated_amount` > 0, `reconciled` is `docstatus` 1 with `unallocated_amount` 0, `all` is `docstatus` 1.
+Bank transaction `state`: `unreconciled` is `docstatus` 1 with `unallocated_amount` > 0, `reconciled` is `docstatus` 1 with `unallocated_amount` ≤ 0, `pending` is `docstatus` 0, `all` is `docstatus` < 2 (cancelled ones left out).
 
-`party` requires `party_type`. `reference_doctype` and `payment_document` are ERPNext's values in a result, never an input.
+A bank transaction's `party_type` and `party` are the party set on the line, by hand or by ERPNext's party matching where the site turns it on; it may be an Employee. `included_fee` is the bank's fee: part of a withdrawal, or already deducted from a deposit. An allocation's `payment_document` names the DocType of its `payment_entry`: Payment Entry, Journal Entry, Sales Invoice, Purchase Invoice or Bank Transaction. A payment entry's `clearance_date` is empty until bank reconciliation matches it; `unallocated_amount` is the part not allocated to invoices, such as an advance.
+
+`party` requires `party_type`; payment entries of other party types (Employee, Shareholder) come back in results but can't be filtered by party. `reference_doctype` and `payment_document` are ERPNext's values in a result, never an input.
 
 ### ERPNext calls
 
@@ -119,12 +123,16 @@ Bank transaction `state`: `unreconciled` is `docstatus` 1 with `unallocated_amou
 
 Checked against ERPNext v16.52 source:
 
-- None.
+- A bank transaction's `company` is fetched from its bank account and is read-only.
+- A company bank account (`is_company_account`) needs a company and a non-group account of type Bank of that company; its name is the account name and the bank (`account_name - bank`).
+- A bank transaction's `status` is Pending as a draft; on submit and every allocation ERPNext sets Unreconciled while `unallocated_amount` > 0, otherwise Reconciled; Cancelled on cancel (`set_status`). `unallocated_amount` is the difference of `withdrawal` and `deposit`, as a positive amount, less the allocations.
+- The Bank Statement Import based on Data Import submits its transactions only with "Submit After Import" and otherwise leaves drafts; the Bank Statement Import Log, the bank transaction upload and Plaid submit them. The bank reconciliation tool offers only submitted transactions.
+- On submit, and only with Accounts Settings' `enable_party_matching` (off by default), ERPNext matches a transaction's party from the counterparty's account number or IBAN, among parties' bank accounts and employees, and with `enable_fuzzy_matching` also from the name and description (`auto_set_party`); a party set by hand stays. A transaction's amount can be allocated to the DocTypes of the `bank_reconciliation_doctypes` hook (Payment Entry, Journal Entry, Sales Invoice, Purchase Invoice) and to another bank transaction.
+- Bank reconciliation sets the `clearance_date` of the voucher a transaction is allocated to, such as a payment entry; nothing sets the allocation row's own `clearance_date`, so Erpel doesn't return it.
 
 Not checked yet:
 
 - The rights in the Rights section are the minimum; the integration test proves them (REQ-002-PRS-NF013).
-- Bank transactions carry the company of their bank account.
 
 ## Open Questions
 

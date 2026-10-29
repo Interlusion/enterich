@@ -494,7 +494,7 @@ Numbers are read as decimals, never as binary floating point. Every operation re
 
 ### States
 
-Document `state` inputs map to ERPNext as follows. No `state` means all, unless the area spec sets a default; which states an operation accepts is in its catalogue.
+Document `state` inputs map to ERPNext as follows. No `state` means all, unless the area spec sets a default; which states an operation accepts is in its catalogue. An area spec may define states of its own DocTypes in its catalogue, with their filters; those count as part of this table.
 
 | `state` | Documents | ERPNext filter |
 | :- | :- | :- |
