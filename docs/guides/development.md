@@ -32,6 +32,7 @@ tests/
   readme.py          the README's tool list, generated from tools.json
 docs/                specs, architecture, ADRs, guides, backlog
 scripts/             check-links.sh: the Markdown link check;
+                     check-workflows.sh: actionlint and zizmor;
                      changelog.py: a version's release notes;
                      image_index.py: the dry run's check of the image
 AGENTS.md            rules for coding agents; CLAUDE.md imports it
@@ -39,7 +40,7 @@ CONTRIBUTING.md, SECURITY.md
 Dockerfile           build, runtime and test stages
 pyproject.toml, uv.lock, .python-version
 .github/workflows/   ci.yml; release.yml with image.yml (releasing guide)
-.github/gitleaks/, .github/lychee/
+.github/actionlint/, .github/gitleaks/, .github/lychee/
                      the images CI runs, pinned in a Dockerfile each
 .github/dependabot.yml
 .github/ISSUE_TEMPLATE/, pull_request_template.md, CODEOWNERS
@@ -58,6 +59,7 @@ uv run pytest              # all tests, no network, no ERPNext needed
 uv run ruff check && uv run ruff format --check
 uv run mdformat --check .  # Markdown; without --check it formats
 scripts/check-links.sh     # no wiki-links; local links and #anchors resolve (Docker)
+scripts/check-workflows.sh # actionlint with shellcheck (Docker), zizmor
 uv run basedpyright
 uv run erpel               # starts Erpel; needs the ERPEL_* variables
 ```
@@ -91,7 +93,7 @@ The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The run
 
 ## CI
 
-`ci.yml` runs on pull requests and pushes to `main`, without secrets: lock check, ruff, mdformat, the Markdown link check, basedpyright, pytest with coverage, a vulnerability audit of the lock, actionlint, zizmor, gitleaks, and the image built for amd64 and arm64 with the tests run in its `test` stage. Nothing is published.
+`ci.yml` runs on pull requests and pushes to `main`, without secrets: lock check, ruff, mdformat, the Markdown link check, basedpyright, pytest with coverage, a vulnerability audit of the lock, actionlint with shellcheck and zizmor (`scripts/check-workflows.sh`), gitleaks, and the image built for amd64 and arm64 with the tests run in its `test` stage. Nothing is published.
 
 `release.yml` runs on a version tag, or by hand as a dry run, and builds through `image.yml`; the [releasing guide](releasing.md) describes both.
 

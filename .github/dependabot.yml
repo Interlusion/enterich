@@ -10,7 +10,7 @@ updates:
         # The MCP SDK always gets its own pull request (ADR-005).
         exclude-patterns: [mcp, mcp-types]
   - package-ecosystem: docker
-    directories: [/, /.github/gitleaks, /.github/lychee]
+    directories: [/, /.github/actionlint, /.github/gitleaks, /.github/lychee]
     schedule:
       interval: weekly
     groups:
