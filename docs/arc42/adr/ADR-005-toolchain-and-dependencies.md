@@ -46,10 +46,10 @@ The MCP SDK changes how Erpel talks to clients; an SDK update needs more care th
 On every pull request and push to `main`, without secrets:
 
 - `uv lock --check` (lock matches `pyproject.toml`), then `uv sync --locked`;
-- ruff (check and format), mdformat (`--check`), basedpyright;
+- ruff (check and format), mdformat (`--check`), the Markdown link check, basedpyright;
 - pytest, including the token cases and the tool-list snapshot, with branch coverage reported (not yet a gate);
 - a vulnerability audit of the locked dependencies (`pip-audit` over `uv export`), because Dependabot alerts may only be switched on later;
-- actionlint and zizmor for the workflows;
+- actionlint, with shellcheck for their `run:` scripts, and zizmor for the workflows;
 - gitleaks over the diff;
 - the image built for `linux/amd64` and `linux/arm64`, with the tests run in its `test` stage on each architecture.
 
@@ -88,6 +88,12 @@ Workflows get `contents: read` and nothing else until publishing exists.
 ### Alternative 8: Prettier for Markdown
 
 **Rejected because**: it runs on Node, so contributors and CI would need npm next to uv; mdformat installs from the same lock, with hashes.
+
+### Alternative 9: actionlint and shellcheck from PyPI (`actionlint-py`, `shellcheck-py`)
+
+actionlint checks the workflows' `run:` scripts with shellcheck only where shellcheck is installed; from PyPI, both would come from the lock like the other tools.
+
+**Rejected because**: `shellcheck-py` has no Linux arm64 wheel, and built from source it downloads the shellcheck binary without a hash check. actionlint's own image brings shellcheck instead, pinned by digest like the other images CI runs.
 
 ## Consequences
 

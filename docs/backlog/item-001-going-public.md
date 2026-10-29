@@ -18,12 +18,12 @@ Before the move:
 
 - [x] REQ-001 to REQ-007 and ADR-001 to ADR-007 accepted; the operations of the specs built and tested.
 - [x] **History check:** search the whole Git history (all branches) for hostnames, realm and client names, user IDs, company names, keys and tokens of real deployments (`git log -p --all`, gitleaks over the history). If anything is found, rewrite or squash the history before the repository turns public, and have GitHub Support purge the old commits: pull request refs (`refs/pull/*`) keep them, and a rewrite doesn't remove those. Clean on 2026-10-29, covering every commit up to `2bee556`, all branches and the pull request refs.
-- [ ] `SECURITY.md`: report vulnerabilities privately through GitHub's private vulnerability reporting; what's in scope (token check, tool limits, secret handling); supported versions (the latest minor version only); no bounty; response on a best-effort basis.
+- [x] `SECURITY.md`: report vulnerabilities privately through GitHub's private vulnerability reporting; what's in scope (token check, tool limits, secret handling); supported versions (the latest minor version only); no bounty; response on a best-effort basis.
 - [ ] README scope: maintained for our own use, contributions welcome, no support promised; status; link to the docs.
 - [x] **Tool list in the README,** generated from the tool-list snapshot and checked against it in CI, so readers see every operation and the releasing guide's check has something to compare.
 - [ ] **Product description (light spec):** a readable description of what Erpel does and doesn't do, derived from the specs, for the README, the website and user documentation. The specs stay authoritative; the light spec is updated whenever they change ([ADR-007](../arc42/adr/ADR-007-specs-by-accounting-area.md)).
-- [ ] `CONTRIBUTING.md`: spec first, tests first, Conventional Commits, no deployment facts, how to run the tests.
-- [ ] Issue and pull request templates; `CODEOWNERS`.
+- [x] `CONTRIBUTING.md`: spec first, tests first, Conventional Commits, no deployment facts, how to run the tests.
+- [x] Issue and pull request templates; `CODEOWNERS`.
 - [ ] **Logo:** SVG in a light and a dark variant (`docs/assets/`); a drake fits the name; nothing that uses or resembles ERPNext's or Frappe's marks ([ADR-006](../arc42/adr/ADR-006-licence-and-name.md)). The README header shows it, switching with the reader's colour scheme (`<picture>`). A 1280×640 PNG made from it for the social preview.
 - [x] **Version source:** the version in `pyproject.toml`, which the release workflow compares with the tag.
 - [ ] **Release workflow** (`release.yml`) as the [releasing guide](../guides/releasing.md) describes it, including the dry run; the dry run passes on the default branch. It can't publish before the move: it lacks the permissions, and refuses a tag outside `interlusion/erpel`.
@@ -33,16 +33,17 @@ The move:
 
 - [ ] The history check repeated over the commits since `2bee556`.
 - [ ] Transfer the repository to the organisation; confirm the redirect from the old name works for existing clones; update remotes.
-- [ ] Make it public.
+- [ ] Make it public, and in the same step switch on private vulnerability reporting (`SECURITY.md`'s only channel, which GitHub offers for public repositories), secret scanning and push protection.
 
 After the move:
 
 - [ ] Organisation: two-factor authentication required for members; only owners may change repository visibility or create public packages; members' base permission read.
-- [ ] Settings: private vulnerability reporting on; secret scanning and push protection on; Dependabot alerts and security updates on.
+- [ ] Settings: Dependabot alerts and security updates on.
 - [ ] Rulesets: `main` protected (pull request, green CI, no force push); tags `v*` immutable (no update, no deletion).
 - [ ] Social preview image uploaded in the repository settings.
 - [ ] `release.yml`'s `publish` job given `packages: write`, `id-token: write`, `attestations: write`, `artifact-metadata: write` (the attestation's storage record, which the action creates in an organisation) and `contents: write` (for the GitHub release), that job only; the dry run repeated in the organisation.
 - [ ] Confirm the image name (`ghcr.io/interlusion/erpel`).
+- [ ] `CODEOWNERS` names an organisation team instead of `@loxy`.
 - [ ] First tag (`v0.1.0`) following the [releasing guide](../guides/releasing.md); the package linked to the repository and made public.
 - [ ] Check the published image pulls on amd64 and arm64 and its attestation verifies (`gh attestation verify`).
 

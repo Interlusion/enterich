@@ -1,0 +1,56 @@
+name: Bug report
+description: Erpel does something other than its specs and guides say.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Issues are public. Never paste keys, tokens, hostnames, user IDs or company
+        names of a real deployment, nor business data (customers, suppliers, items,
+        amounts, bank details): reproduce the problem with example data and
+        placeholders such as erp.example.com. A vulnerability goes through
+        [private vulnerability reporting](https://github.com/interlusion/erpel/security/advisories/new)
+        instead (SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Erpel version
+      description: The image tag, or its digest.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: erpnext
+    attributes:
+      label: ERPNext version
+      placeholder: v16.52.0
+    validations:
+      required: true
+  - type: input
+    id: tool
+    attributes:
+      label: Tool
+      description: The tool involved, if any.
+      placeholder: create_draft_sales_invoice
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The call (tool and inputs), what Erpel answered, and what ERPNext shows, with example data.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: Where possible, the spec requirement or guide section that says so.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log lines
+      description: >-
+        Erpel's operation log lines for the call, with deployment facts, names and
+        amounts replaced; leave out the start line unless it matters.
+      render: json
