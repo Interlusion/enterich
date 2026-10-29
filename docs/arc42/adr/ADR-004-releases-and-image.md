@@ -30,12 +30,13 @@ The repository is private until it moves to its organisation. Container packages
 - Removing or renaming any of these, tightening an input, or needing more ERPNext rights is breaking. A new tool, a new optional input or output field, a widened input limit or a new optional variable is a minor change. Fixes are patches.
 - **A new tool is offered at once only where `ERPEL_TOOLS` is unset.** A deployment that lists its operations gets new ones only by adding them, so a minor update never widens what its agent can do.
 - **Tags are immutable:** never moved, deleted or reused, enforced by a tag ruleset once the repository allows it.
-- **One source for the version:** `version` in `pyproject.toml`; the release workflow refuses a tag that differs.
+- **One source for the version:** `version` in `pyproject.toml`, set with `uv version`; the release workflow refuses a tag that differs.
 - **Security fixes for the latest minor version only,** released as a patch as soon as they are ready.
 
 ### Changelog
 
-- `CHANGELOG.md` in Keep a Changelog format (Added, Changed, Deprecated, Removed, Fixed, Security). Every pull request that changes behaviour adds a line under `Unreleased`.
+- `CHANGELOG.md` in Keep a Changelog format (Added, Changed, Deprecated, Removed, Fixed, Security), written for deployers. Every pull request that changes behaviour adds a line under `Unreleased`.
+- **Commits as the draft, not the text:** at release time, the `feat` and `fix` commits since the last tag (Conventional Commits) show what the section must cover; the section itself is written by hand.
 - Each release section has, besides Added/Changed/Fixed/Removed, a **Rights** heading when the agent user needs different ERPNext rights, and a **Configuration** heading when variables change.
 
 ### Image
@@ -73,6 +74,18 @@ Common for images that package an upstream product.
 ### Alternative 4: A `latest` tag
 
 **Rejected because**: it invites unpinned deployments of a service that holds an ERPNext key.
+
+### Alternative 5: The version from the Git tag (`hatch-vcs`, `setuptools-scm`, `uv-dynamic-versioning`)
+
+The build asks Git for the version: a tagged commit gets `X.Y.Z`, any other a development version naming the commit. Tag and code can't disagree, and a release needs no version edit.
+
+**Rejected because**: its gain, telling untagged builds apart, doesn't apply: only CI publishes images, only from a tag. The mismatch it prevents is caught by the release workflow before anything is pushed. Its costs are concrete: `uv_build` can't take a version from Git, so another build backend; `.git` stays out of the image's build context, so the version must be passed in as a build argument, and an image built without it reports a wrong one; CI needs full clones wherever a version is built.
+
+### Alternative 6: A changelog and version bump generated from commits (`git-cliff`, `release-please`, `python-semantic-release`)
+
+Conventional Commits drive the changelog and the next version: `feat` raises the minor, `fix` the patch, `feat!` or a `BREAKING CHANGE` footer the major. Nothing is forgotten, and the release pull request writes itself.
+
+**Rejected because**: the changelog is written for deployers, and commit subjects are written for developers. Its **Rights** and **Configuration** headings have no commit type. One change usually spans several commits (`docs`, `test`, `feat`), so entries would follow commits, not changes. And the version would be only as right as each commit's marking: a tightened input or a new required right committed as a plain `feat` would ship as a minor change after 1.0. The commits still serve as the draft (see Changelog).
 
 ## Consequences
 
