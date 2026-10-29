@@ -92,6 +92,23 @@ ERPEL_ERPNEXT_API_KEY=…
 ERPEL_ERPNEXT_API_SECRET=…
 ```
 
+## Verifying an image
+
+Erpel's images are `ghcr.io/interlusion/erpel:X.Y.Z`, one per release, never `latest` ([ADR-004](../arc42/adr/ADR-004-releases-and-image.md)). Deploy one by its digest, which the release page names, and check before deploying that Erpel's release workflow built it from the tag:
+
+```sh
+gh attestation verify oci://ghcr.io/interlusion/erpel:X.Y.Z@sha256:… \
+  --repo interlusion/erpel \
+  --signer-workflow interlusion/erpel/.github/workflows/image.yml \
+  --source-ref refs/tags/vX.Y.Z \
+  --deny-self-hosted-runners
+```
+
+- `--signer-workflow` is required: the image is built and attested in `image.yml`, a reusable workflow that the release workflow calls, and naming it makes sure no other workflow of the repository made the image.
+- `--source-ref` ties the image to the release's tag.
+- `gh` reads the image from GHCR; if it asks, sign in with `docker login ghcr.io`. With `--bundle-from-oci` it takes the attestation from the registry instead of GitHub's API.
+- The image also carries an SBOM and BuildKit's provenance for each architecture: `docker buildx imagetools inspect ghcr.io/interlusion/erpel:X.Y.Z --format '{{ json .SBOM }}'`.
+
 ## Kill switches
 
 In order of speed:
