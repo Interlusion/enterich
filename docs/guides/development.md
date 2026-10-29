@@ -30,11 +30,15 @@ tests/
   fakes/             the fakes, recording every request
   snapshots/         tools.json: the published tool list
 docs/                specs, architecture, ADRs, guides, backlog
+scripts/             check-links.sh: the Markdown link check
 AGENTS.md            rules for coding agents; CLAUDE.md imports it
 Dockerfile           build, runtime and test stages
 pyproject.toml, uv.lock, .python-version
 .github/workflows/   ci.yml (later: release.yml)
+.github/gitleaks/, .github/lychee/
+                     the images CI runs, pinned in a Dockerfile each
 .github/dependabot.yml
+lychee.toml          the link check's settings
 ```
 
 Why this toolchain: [ADR-005](../arc42/adr/ADR-005-toolchain-and-dependencies.md).
@@ -48,6 +52,7 @@ uv sync --locked           # creates .venv from uv.lock, with dev tools
 uv run pytest              # all tests, no network, no ERPNext needed
 uv run ruff check && uv run ruff format --check
 uv run mdformat --check .  # Markdown; without --check it formats
+scripts/check-links.sh     # no wiki-links; local links and #anchors resolve (Docker)
 uv run basedpyright
 uv run erpel               # starts Erpel; needs the ERPEL_* variables
 ```
@@ -81,7 +86,7 @@ The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The run
 
 ## CI
 
-`ci.yml` runs on pull requests and pushes to `main`, without secrets: lock check, ruff, mdformat, basedpyright, pytest with coverage, a vulnerability audit of the lock, actionlint, zizmor, gitleaks, and the image built for amd64 and arm64 with the tests run in its `test` stage. Nothing is published.
+`ci.yml` runs on pull requests and pushes to `main`, without secrets: lock check, ruff, mdformat, the Markdown link check, basedpyright, pytest with coverage, a vulnerability audit of the lock, actionlint, zizmor, gitleaks, and the image built for amd64 and arm64 with the tests run in its `test` stage. Nothing is published.
 
 ## References
 

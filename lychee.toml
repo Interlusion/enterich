@@ -1,0 +1,3 @@
+# Local links and their #anchors only (https://lychee.cli.rs/usage/config/).
+offline = true
+include_fragments = "full"
