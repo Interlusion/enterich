@@ -17,7 +17,7 @@ Run Enterich's operations against a real ERPNext v16 site with a seeded company 
 `tests/integration` runs the whole path an MCP client takes, against `FakeErpnext`, a model of ERPNext v16's REST API written from ERPNext's source. It proves Enterich right about the model, not the model right about ERPNext. What only a real site shows:
 
 - **Rights** ([REQ-002-PRS-NF013](../specs/req-002-service.md#req-002-prs-nf013-rights-listed-and-proven)): every operation works with exactly the rights its area spec's Rights section lists, and with one listed right removed, the operations that need it fail with ERPNext's permission refusal. Its evidence names this test.
-- **The ceiling:** the agent user's key is refused for submit (`frappe.client.submit` and a save with `docstatus` 1), cancel, delete, amend and discard, called directly, not through Enterich.
+- **The ceiling:** the agent user's key, called directly, not through Enterich, is refused for submit (`frappe.client.submit` and a save with `docstatus` 1), cancel and delete, while two of the doors REQ-001-URS-F003 names stay open as it says: discard with write alone, amend with create alone.
 - **Reports:** the filters and columns of Accounts Receivable, Accounts Payable, General Ledger and Trial Balance are the ones the area specs' catalogues name.
 - **Duplicates:** the duplicate check finds drafts that people made, not only Enterich's (REQ-001-PRS-F005).
 - **Select-only rights:** a DocType the agent may only select arrives without its fields, as the Rights sections say for Journal Entry in the receivable and payable reports.
@@ -39,7 +39,7 @@ Where the real site answers differently from `FakeErpnext`, the fake is correcte
 - [x] The site: script, pinned image, the company and the agent user with the rights of RIGHTS (`tests/e2e/seed.py`); locally and in the workflow (`e2e.yml`). About 70 seconds locally on a fresh site, a few seconds on a kept one; the workflow's first run on `main` (2026-10-30) took 3 minutes 8 seconds.
 - [x] The reads and reports of each area against the seed, with the catalogues' filters and columns. Every read answered as Enterich expects.
 - [x] The drafts: create, update, warnings as comments, the duplicate check with people's drafts. The rate-0 warning needs an item without a price: the seeded invoices gave the other one its price-list rates (Stock Settings' `auto_insert_price_list_rate_if_missing`, on by default).
-- [ ] The ceiling: submit, cancel, delete, amend and discard refused for the agent's key.
+- [x] The ceiling: submit, cancel and delete refused for the agent's key, and any change to a submitted document; a draft discarded with write alone and a cancelled document amended with create alone, so REQ-001-URS-F003 names the amendment among its doors (history entry).
 - [ ] The rights: each listed right removed in turn, and the operations that need it refused.
 - [ ] `FakeErpnext` corrected where the real site differs, with the tests that show it.
 - [ ] Where the specs and arc42's risks name the test as backlog (REQ-001's assumptions, REQ-002-PRS-NF013, the area specs' report requirements and assumptions), they name the test instead; history entries, since the specs are baselined.

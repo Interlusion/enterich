@@ -1,6 +1,7 @@
 import os
 from collections.abc import Iterator
 
+import httpx2
 import pytest
 
 from tests.conftest import Logs
@@ -48,3 +49,13 @@ def mcp(url: str, seeded: Seed, jwks: FakeJwks, signer: Signer, logs: Logs) -> I
         client(jwks, s), signer, logs, (seeded.api_key, seeded.api_secret)
     ) as session:
         yield session
+
+
+@pytest.fixture(scope="session")
+def agent(url: str, seeded: Seed) -> Iterator[httpx2.Client]:
+    """The agent user's key used directly, without Enterich: what ERPNext's role allows."""
+    key = f"token {seeded.api_key}:{seeded.api_secret}"
+    with httpx2.Client(
+        base_url=url, headers={"host": HOST, "authorization": key}, timeout=120.0
+    ) as client:
+        yield client

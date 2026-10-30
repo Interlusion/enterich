@@ -3,9 +3,11 @@
 | Meta | Value |
 | :- | :- |
 | **Status** | Baselined |
-| **Version** | 1.0 |
-| **Date** | 2026-10-27 |
+| **Version** | 1.1 |
+| **Date** | 2026-10-30 |
 | **Author** | loxy (drafted with Claude) |
+
+> **This file is the canonical requirement set.** For the dated narrative of *why* the spec evolved (rationale, trade-offs, refs), see [`req-001-core.history.md`](./req-001-core.history.md). The decision log is informational — requirements come from this file only.
 
 ## Intended Use
 
@@ -114,9 +116,10 @@ This spec holds the product's personas, user stories and terms, and the rules ev
 
 **Description**: No operation SHALL submit, cancel, amend, delete or discard a document, or change a document that is not a draft.
 
-**Related User Stories**: REQ-001-P1-3 | **Rationale**: ERPNext's role refuses submit, cancel, amend and delete to an agent user without those rights, and saving a submitted document needs the submit right too. It can't refuse everything, because some doors check only write or read and never look at `docstatus`:
+**Related User Stories**: REQ-001-P1-3 | **Rationale**: ERPNext's role refuses submit, cancel and delete to an agent user without those rights, and saving a submitted document needs the submit right too. It can't refuse everything, because some doors check only create, write or read and never look at `docstatus`:
 
 - `Document.discard` sets a draft to `docstatus` 2 with write alone.
+- A new document with `amended_from` amends a cancelled one with create alone; the amend right only shows the form's Amend button.
 - Purchase Invoice's `block_invoice`, `unblock_invoice` and `change_release_date` change the invoice by `db_set`, a submitted one too, with write alone.
 - The v1 `run_doc_method` checks only read before it calls a whitelisted method of a document.
 
@@ -258,9 +261,9 @@ Only a fixed list of operations, without generic method calls, closes these door
 **Definition of Done**:
 
 - The published tool list equals the operations of the area specs, held as a snapshot that changes only with a reviewed change to those specs.
-- No input schema has a property that accepts a DocType, report, method, field list, filter or path; no ERPNext call Enterich makes uses `docstatus` other than 0 in a body, `run_method` or `run_doc_method`, the submit, cancel, delete or discard routes, or the purchase invoice block and release-date methods.
+- No input schema has a property that accepts a DocType, report, method, field list, filter or path; no ERPNext call Enterich makes sends a document with `docstatus` other than 0 or with `amended_from`, or uses `run_method` or `run_doc_method`, the submit, cancel, delete or discard routes, or the purchase invoice block and release-date methods.
 - Verification: inspection and test.
-- Evidence: the tool-list snapshot in Enterich's test suite.
+- Evidence: the tool-list snapshot in Enterich's test suite; `FakeErpnext` refuses and records every such call, and each integration test fails on one.
 
 #### REQ-001-PRS-F007: The assigned company from configuration
 

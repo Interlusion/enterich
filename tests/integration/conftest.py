@@ -16,8 +16,12 @@ def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
-def erpnext() -> FakeErpnext:
-    return FakeErpnext()
+def erpnext() -> Iterator[FakeErpnext]:
+    """The fake ERPNext; afterwards Enterich must have used none of its side doors
+    (REQ-001-PRS-F006)."""
+    fake = FakeErpnext()
+    yield fake
+    assert fake.doors == []
 
 
 @pytest.fixture
