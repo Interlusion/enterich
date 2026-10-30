@@ -40,6 +40,18 @@ The version lives in one place: `version` in `pyproject.toml`, set with `uv vers
 
 Only a tag run signs in to GHCR, pushes, attests and creates the release. Run the dry run after every change to `release.yml`, `image.yml`, the scripts they run or the `Dockerfile`.
 
+## With an agent
+
+An agent does the steps above except the decisions and what needs GitHub's interface or API (`AGENTS.md`):
+
+- **The operator** decides to release and on the version, starts the dry run, opens and merges the pull request, and gives the go for the tag.
+- **The agent** proposes the version from `Unreleased` and the table above, prepares the release branch (step 1) and the pull request's title and description, pushes when asked, and creates and pushes the tag only after the operator's go: a tag can't be taken back. If the merge falls on a later day than the changelog's date, it changes the date first.
+- **The checks after the tag run** (step 4) without `api.github.com`:
+  - The release: `https://github.com/Interlusion/enterich/releases.atom` lists the pushed tag at once; the release is the entry titled `Enterich X.Y.Z`, with the digest at the end of its notes.
+  - Both architectures: `docker buildx imagetools inspect ghcr.io/interlusion/enterich:X.Y.Z`.
+  - The pull without a login: `docker pull` with `DOCKER_CONFIG` pointing at an empty directory, so a stored GHCR login doesn't hide a private package.
+  - The attestation: the command in the [configuration guide](configuration.md#verifying-an-image), run by the operator, or by the agent with a `gh` login that is logged out afterwards. Without a terminal, `gh attestation verify` prints nothing on success; read its exit code or add `--format json`.
+
 ## When it fails
 
 A release run that failed for a passing reason (a registry or runner outage) is re-run with **Re-run failed jobs**:

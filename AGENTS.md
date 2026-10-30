@@ -26,6 +26,7 @@ Start at `docs/README.md`. The specs in `docs/specs/` are the contract: a new op
 - For any operation, read REQ-001 (`docs/specs/req-001-core.md`) and the operation's area spec; REQ-001's Requirement Rules say how they relate. For access, configuration, logging or limits, read REQ-002 (`docs/specs/req-002-service.md`).
 - Which area an operation belongs to follows the rule and map in `docs/specs/README.md`, not judgement.
 - Write requirement IDs in full, as the specs index says (`REQ-004-PRS-F005`, not `PRS-F005`).
+- For a release, follow the releasing guide (`docs/guides/releasing.md`), its section for agents included.
 
 ## Conventions
 
