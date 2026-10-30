@@ -167,6 +167,8 @@ class Seed:
     payment_entry: str
     journal_entry: str
     bank_transaction: str
+    # Cancelled, to be amended: one per DocType the agent user drafts
+    cancelled: dict[str, str]
     posted: date
     sales_due: date
 
@@ -204,6 +206,7 @@ def seed(site: Site) -> Seed:
     payment_entry = vouchers.payment_entry(customer, sales_invoice)
     journal_entry = vouchers.journal_entry()
     bank_transaction = vouchers.bank_transaction()
+    cancelled = vouchers.cancelled(customer, supplier)
     keys = site.call("frappe.core.doctype.user.user.generate_keys", user=AGENT)
     return Seed(
         api_key=keys["api_key"],
@@ -223,6 +226,7 @@ def seed(site: Site) -> Seed:
         payment_entry=payment_entry,
         journal_entry=journal_entry,
         bank_transaction=bank_transaction,
+        cancelled=cancelled,
         posted=vouchers.posted,
         sales_due=vouchers.sales_due,
     )
@@ -349,6 +353,7 @@ def report_role(site: Site, report: str) -> None:
 # The accounts the seed books on, from the setup wizard's chart
 DEBTORS = f"1310 - Debtors - {ABBR}"
 CAPITAL = f"3100 - Capital Stock - {ABBR}"
+CASH = f"1110 - Cash - {ABBR}"
 BANK_GROUP = f"1200 - Bank Accounts - {ABBR}"
 SALES_VAT = ("VAT 19 %", f"2320 - Umsatzsteuer 19 % - {ABBR}")
 INPUT_VAT = ("Input VAT 19 %", f"1520 - Abziehbare Vorsteuer 19 % - {ABBR}")
@@ -520,6 +525,50 @@ class Vouchers:
             description="Example Customer, invoice payment",
         )
 
+    def cancelled(self, customer: str, supplier: str) -> dict[str, str]:
+        """A cancelled sales invoice, purchase invoice and journal entry. Their ledger
+        entries are cancelled too, so the balances, open items and reports stay as the
+        submitted vouchers make them; only a list of cancelled documents shows them."""
+        day = {"posting_date": self.posted.isoformat(), "set_posting_time": 1}
+        item = [{"item_code": self.item, "qty": 1, "rate": 1}]
+        return {
+            "Sales Invoice": self.cancel(
+                "Sales Invoice",
+                {"po_no": "SEED-SI-CANCELLED"},
+                customer=customer,
+                items=item,
+                **day,
+            ),
+            "Purchase Invoice": self.cancel(
+                "Purchase Invoice",
+                {"bill_no": "SEED-BILL-CANCELLED"},
+                supplier=supplier,
+                bill_date=self.posted.isoformat(),
+                items=item,
+                **day,
+            ),
+            "Journal Entry": self.cancel(
+                "Journal Entry",
+                {"cheque_no": "SEED-JE-CANCELLED"},
+                voucher_type="Journal Entry",
+                posting_date=self.posted.isoformat(),
+                cheque_date=self.posted.isoformat(),
+                accounts=[
+                    {"account": CASH, "debit_in_account_currency": 1},
+                    {"account": CAPITAL, "credit_in_account_currency": 1},
+                ],
+            ),
+        }
+
+    def cancel(self, doctype: str, identity: dict[str, str], **fields: Any) -> str:
+        """The voucher cancelled; submitted first if a run before stopped in between."""
+        found = self.site.get_list(doctype, {**identity, "docstatus": 2})
+        if found:
+            return found[0]["name"]
+        name = self.submitted(doctype, identity, **fields)
+        self.site.call("frappe.client.cancel", doctype=doctype, name=name)
+        return name
+
 
 def unpriced(site: Site) -> str:
     """An item without a price. ERPNext adds price-list rates from an invoice with a rate
@@ -546,24 +595,35 @@ REMOVAL_TIMEOUT = 60.0
 
 
 def remove_drafts(site: Site) -> None:
-    """Earlier runs' drafts, so none is taken for a duplicate. Frappe removes a deleted
-    document's comments by its name in a background job, and gives the last name of a
-    series out again; such a late job would remove a comment of this run's draft of that
-    name. So each draft gets a marker comment before it goes, and the seed waits until
-    the jobs have removed every marker."""
+    """Earlier runs' drafts, so none is taken for a duplicate."""
+    remove(
+        site,
+        [
+            (doctype, d["name"])
+            for doctype in DRAFTED
+            for d in site.get_list(doctype, {"docstatus": 0})
+        ],
+    )
+
+
+def remove(site: Site, documents: list[tuple[str, str]]) -> None:
+    """The documents deleted, as (DocType, name). Frappe removes a deleted document's
+    comments by its name in a background job, and gives the last name of a series out
+    again; such a late job would remove a comment of a later document of that name. So
+    each document gets a marker comment before it goes, and this waits until the jobs
+    have removed every marker."""
     removed: list[str] = []
-    for doctype in DRAFTED:
-        for draft in site.get_list(doctype, {"docstatus": 0}):
-            site.call(
-                "frappe.desk.form.utils.add_comment",
-                reference_doctype=doctype,
-                reference_name=draft["name"],
-                content=MARKER,
-                comment_email="",
-                comment_by="",
-            )
-            site.delete(doctype, draft["name"])
-            removed.append(draft["name"])
+    for doctype, name in documents:
+        site.call(
+            "frappe.desk.form.utils.add_comment",
+            reference_doctype=doctype,
+            reference_name=name,
+            content=MARKER,
+            comment_email="",
+            comment_by="",
+        )
+        site.delete(doctype, name)
+        removed.append(name)
     deadline = time.monotonic() + REMOVAL_TIMEOUT
     while removed and site.exists("Comment", {"reference_name": ["in", removed]}):
         if time.monotonic() > deadline:
