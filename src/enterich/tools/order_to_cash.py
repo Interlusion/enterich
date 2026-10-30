@@ -10,7 +10,6 @@ from enterich.shapes import (
     Inputs,
     InvoiceState,
     Limit,
-    Modified,
     Name,
     Offset,
     Quantity,
@@ -161,23 +160,12 @@ class CreateDraftSalesInvoice(Inputs):
     allow_duplicate: Flag = False
 
 
-class UpdateDraftSalesInvoice(Inputs):
-    name: Name
-    modified: Modified
+class UpdateDraftSalesInvoice(drafts.DraftUpdate):
     posting_date: Day | None = None
     due_date: Day | None = None
     items: SalesInvoiceItems | None = None
     taxes_and_charges: Name | Literal[""] | None = None
     remarks: Remarks | None = None
-
-    @model_validator(mode="after")
-    def _changes(self) -> Self:
-        given = self.model_dump(exclude={"name", "modified"}, exclude_none=True)
-        if not given:
-            raise ValueError(
-                "give at least one of posting_date, due_date, items, taxes_and_charges, remarks"
-            )
-        return self
 
 
 async def list_customers(inputs: ListCustomers, context: Context) -> dict[str, Any]:

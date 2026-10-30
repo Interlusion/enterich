@@ -6,10 +6,12 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Self
+
+from pydantic import model_validator
 
 from enterich.erpnext import ErpnextError, Refused
-from enterich.shapes import cut_rows, decimal, form_url, rows_of, shape
+from enterich.shapes import Inputs, Modified, Name, cut_rows, decimal, form_url, rows_of, shape
 from enterich.tools import Context, Refusal, get_named, unknown_name
 
 MAX_DUPLICATE_ROWS = 1000
@@ -22,6 +24,20 @@ STALE = (
 DOCSTATUS = {1: "submitted", 2: "cancelled"}
 ROW_FIELDS = ("item_code", "qty", "rate", "amount", "is_free_item")
 TAX_FIELDS = ("account_head", "rate", "tax_amount")
+
+
+# The inputs of an update: the draft as read, and at least one of the subclass's changes.
+# No docstring: an operation's schema takes its description from its own class.
+class DraftUpdate(Inputs):
+    name: Name
+    modified: Modified
+
+    @model_validator(mode="after")
+    def _changes(self) -> Self:
+        changes = [field for field in type(self).model_fields if field not in ("name", "modified")]
+        if not self.model_dump(include=set(changes), exclude_none=True):
+            raise ValueError(f"give at least one of {', '.join(changes)}")
+        return self
 
 
 async def tax_rows(context: Context, doctype: str, template: str) -> list[dict[str, Any]]:

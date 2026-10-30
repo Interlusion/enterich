@@ -15,7 +15,6 @@ from enterich.shapes import (
     Flag,
     Inputs,
     Limit,
-    Modified,
     Name,
     Offset,
     Remarks,
@@ -248,23 +247,12 @@ class CreateDraftJournalEntry(Inputs):
         return self
 
 
-class UpdateDraftJournalEntry(Inputs):
-    name: Name
-    modified: Modified
+class UpdateDraftJournalEntry(drafts.DraftUpdate):
     posting_date: Day | None = None
     cheque_no: ChequeNo | Literal[""] | None = None
     cheque_date: Day | None = None
     user_remark: Remarks | None = None
     accounts: JournalEntryRows | None = None
-
-    @model_validator(mode="after")
-    def _changes(self) -> Self:
-        given = self.model_dump(exclude={"name", "modified"}, exclude_none=True)
-        if not given:
-            raise ValueError(
-                "give at least one of posting_date, cheque_no, cheque_date, user_remark, accounts"
-            )
-        return self
 
 
 def _reference_rule(number: Any, day: Any) -> None:
