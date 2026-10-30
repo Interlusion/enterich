@@ -46,8 +46,8 @@ After the move:
 - [x] Rulesets: `main` protected (pull request, green CI, no force push); tags `v*` immutable (no update, no deletion).
 - [x] About box: a description following the README's first sentence; topics (`mcp`, `mcp-server`, `model-context-protocol`, `erpnext`, `oauth2`, `python`); the website field empty until there is one to link.
 - [x] Social preview image uploaded in the repository settings.
-- [ ] `release.yml`'s `publish` job given `packages: write`, `id-token: write`, `attestations: write`, `artifact-metadata: write` (the attestation's storage record, which the action creates in an organisation) and `contents: write` (for the GitHub release), that job only; the dry run repeated in the organisation.
-- [ ] Confirm the image name (`ghcr.io/interlusion/enterich`).
+- [x] `release.yml`'s `publish` job given `packages: write`, `id-token: write`, `attestations: write`, `artifact-metadata: write` (the attestation's storage record, which the action creates in an organisation) and `contents: write` (for the GitHub release), that job only; the dry run repeated in the organisation.
+- [x] Confirm the image name (`ghcr.io/interlusion/enterich`).
 - [ ] First tag (`v0.1.0`) following the [releasing guide](../guides/releasing.md); the package linked to the repository and made public.
 - [ ] Check the published image pulls on amd64 and arm64 and its attestation verifies (`gh attestation verify`).
 
