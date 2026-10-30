@@ -1,4 +1,4 @@
-"""The service end to end, against a fake JWKS: REQ-002-PRS-NF001, REQ-002-PRS-NF002,
+"""The service as a whole, against a fake JWKS: REQ-002-PRS-NF001, REQ-002-PRS-NF002,
 REQ-002-PRS-NF003, REQ-002-PRS-NF008, REQ-002-PRS-NF009, REQ-002-PRS-NF010,
 REQ-002-PRS-NF011, REQ-002-PRS-NF012."""
 
@@ -12,9 +12,9 @@ from starlette.testclient import TestClient
 from enterich.app import create_app
 from enterich.tools import names
 from tests.conftest import Logs
-from tests.e2e.mcp import ACCEPT, BASE, METADATA, bearer, client
 from tests.fakes.jwks import FakeJwks, Signer, rsa_signer, token
 from tests.fakes.settings import ISSUER, RESOURCE_URL, settings
+from tests.integration.mcp import ACCEPT, BASE, METADATA, bearer, client
 
 
 def offered(answer: Any) -> list[str]:

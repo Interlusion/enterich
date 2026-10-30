@@ -12,7 +12,7 @@
 | Contribute or work on it | [Contributing](../CONTRIBUTING.md), [Development](guides/development.md) |
 | Report a vulnerability | [Security policy](../SECURITY.md) |
 | Release it | [Releasing](guides/releasing.md) |
-| See open work | [Backlog](backlog/backlog.md), [ITEM-002 OpenTelemetry](backlog/item-002-opentelemetry.md), [ITEM-003 MCP Registry and announcement](backlog/item-003-mcp-registry-and-announcement.md); done items in [archive](backlog/archive/) |
+| See open work | [Backlog](backlog/backlog.md), [ITEM-002 OpenTelemetry](backlog/item-002-opentelemetry.md), [ITEM-003 MCP Registry and announcement](backlog/item-003-mcp-registry-and-announcement.md), [ITEM-004 End-to-end tests against a real ERPNext](backlog/item-004-real-erpnext-test.md); done items in [archive](backlog/archive/) |
 
 ## Directories
 

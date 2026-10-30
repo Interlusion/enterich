@@ -288,7 +288,7 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 - Every operation of the area specs has its rights listed in its area spec's Rights section.
 - Run as an agent user holding exactly the listed rights, every operation works; with one listed right removed, the operations that need it fail with ERPNext's permission refusal.
 - Verification: inspection and test.
-- Evidence: the area specs' Rights sections; the integration test against a real ERPNext v16 site (backlog).
+- Evidence: the area specs' Rights sections; the end-to-end test against a real ERPNext v16 site (backlog).
 
 ## Acceptance Criteria Summary
 

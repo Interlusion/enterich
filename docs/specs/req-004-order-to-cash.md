@@ -92,7 +92,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - An `as_of_date` in the past ages the rows from that date, not from today; ERPNext's total row is not among the rows.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
-- Evidence: Enterich's test suite; the integration test against a real ERPNext v16 site (backlog).
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site (backlog).
 
 #### REQ-004-PRS-F005: Sales invoice drafts
 
@@ -194,7 +194,7 @@ Checked against ERPNext v16.52 source:
 
 Not checked yet:
 
-- The rights in the Rights section are the minimum; the integration test proves them (REQ-002-PRS-NF013).
+- The rights in the Rights section are the minimum; the end-to-end test proves them (REQ-002-PRS-NF013).
 - ERPNext computes `due_date` from the customer's payment terms when it isn't given (the template is filled in; the date computation runs through several validation steps).
 
 ## Open Questions

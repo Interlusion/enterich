@@ -16,6 +16,12 @@ updates:
     groups:
       images:
         update-types: [minor, patch]
+  # The ERPNext site of the end-to-end tests: each newer ERPNext is a pull request of its
+  # own, so a run against it can be started on its branch before merging.
+  - package-ecosystem: docker-compose
+    directory: /tests/e2e
+    schedule:
+      interval: weekly
   - package-ecosystem: github-actions
     directory: /
     schedule:

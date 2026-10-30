@@ -91,7 +91,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - The report call carries exactly the fixed filters of the ERPNext calls table; `total_outstanding` equals the sum over all rows when `limit` returns fewer.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
-- Evidence: Enterich's test suite; the integration test against a real ERPNext v16 site (backlog).
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site (backlog).
 
 #### REQ-005-PRS-F005: Purchase invoice drafts
 
@@ -213,7 +213,7 @@ Checked against ERPNext v16.52 source:
 
 Not checked yet:
 
-- The rights in the Rights section are the minimum; the integration test proves them (REQ-002-PRS-NF013).
+- The rights in the Rights section are the minimum; the end-to-end test proves them (REQ-002-PRS-NF013).
 
 ## Open Questions
 

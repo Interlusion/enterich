@@ -1,4 +1,4 @@
-"""Sales invoice drafts end to end (REQ-004-PRS-F005, REQ-004-PRS-F006), and through them
+"""Sales invoice drafts (REQ-004-PRS-F005, REQ-004-PRS-F006), and through them
 REQ-001's draft rules: bodies, duplicates, stale updates, clearing, warnings and their
 comment (REQ-001-PRS-F002, REQ-001-PRS-F003, REQ-001-PRS-F004, REQ-001-PRS-F005,
 REQ-001-PRS-F012, REQ-001-PRS-F015, REQ-001-PRS-F016)."""
@@ -7,8 +7,6 @@ from typing import Any
 
 import pytest
 
-from tests.e2e.clock import TODAY
-from tests.e2e.mcp import Result, Session
 from tests.fakes.erpnext import (
     COMMENT_METHOD,
     COMPANY,
@@ -19,6 +17,8 @@ from tests.fakes.erpnext import (
     sales_invoice,
     tax_template,
 )
+from tests.integration.clock import TODAY
+from tests.integration.mcp import Result, Session
 
 PATH = "/api/resource/Sales Invoice"
 DRAFT = "ACC-SINV-2026-00010"

@@ -10,9 +10,9 @@ from syrupy.extensions.json import JSONSnapshotExtension
 from syrupy.location import PyTestLocation
 from syrupy.types import SnapshotIndex
 
-from tests.e2e.mcp import Session, client
 from tests.fakes.erpnext import FakeErpnext
 from tests.fakes.jwks import FakeJwks, Signer, token
+from tests.integration.mcp import Session, client
 
 
 class ToolsJson(JSONSnapshotExtension):

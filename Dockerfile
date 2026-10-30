@@ -48,6 +48,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY tests ./tests
 USER 10001:10001
 ENTRYPOINT []
-CMD ["python", "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/unit", "tests/e2e"]
+CMD ["python", "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/unit", "tests/integration"]
 
 FROM runtime

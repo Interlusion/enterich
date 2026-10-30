@@ -83,7 +83,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - An answer whose first row or last two rows aren't summary rows (with a posting date) is refused as a faulty answer.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
-- Evidence: Enterich's test suite; the integration test against a real ERPNext v16 site (backlog).
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site (backlog).
 
 #### REQ-006-PRS-F004: Trial Balance
 
@@ -98,7 +98,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - ERPNext's total row isn't among the rows; `totals` are Enterich's sums over the root accounts' rows, as decimals.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
-- Evidence: Enterich's test suite; the integration test against a real ERPNext v16 site (backlog).
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site (backlog).
 
 #### REQ-006-PRS-F005: Journal entry drafts
 
@@ -214,7 +214,7 @@ ERPNext v16's voucher types: Journal Entry, Inter Company Journal Entry, Bank En
 | `list_accounts` | Account: read |
 | `list_cost_centers` | Cost Center: read |
 | `list_journal_entries`, `get_journal_entry` | Journal Entry: read |
-| `report_general_ledger` | GL Entry: read, report; Account read; Customer or Supplier read when `party` is given; the role added to the General Ledger report |
+| `report_general_ledger` | GL Entry: read, report; Account: read; Customer, Supplier: read (the one of the `party` given); the role added to the General Ledger report |
 | `report_trial_balance` | GL Entry: read, report; Account, Fiscal Year: read; the role added to the Trial Balance report |
 | `create_draft_journal_entry`, `update_draft_journal_entry` | Journal Entry: read, create, write; Account, Cost Center: read; Company, Customer, Supplier, Sales Invoice, Purchase Invoice: select (for parties and references in rows) |
 
@@ -247,7 +247,7 @@ Checked against ERPNext v16.52 source:
 
 Not checked yet:
 
-- The rights in the Rights section are the minimum; the integration test proves them (REQ-002-PRS-NF013).
+- The rights in the Rights section are the minimum; the end-to-end test proves them (REQ-002-PRS-NF013).
 
 ## Open Questions
 

@@ -10,3 +10,4 @@ htmlcov
 dist
 tests/repo
 tests/readme.py
+tests/e2e

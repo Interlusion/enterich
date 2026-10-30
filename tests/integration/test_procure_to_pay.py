@@ -1,4 +1,4 @@
-"""Procure to pay end to end, the reads (REQ-005-PRS-F001, REQ-005-PRS-F002,
+"""Procure to pay, the reads (REQ-005-PRS-F001, REQ-005-PRS-F002,
 REQ-005-PRS-F003, REQ-005-PRS-F004). The code both sides share is tested through order to
 cash; these tests show the buying side's calls, fields and outside text, and that it
 stays apart from the selling side."""
@@ -7,8 +7,6 @@ from typing import Any
 
 import pytest
 
-from tests.e2e.clock import TODAY
-from tests.e2e.mcp import Session
 from tests.fakes.erpnext import (
     COMPANY,
     FakeErpnext,
@@ -20,6 +18,8 @@ from tests.fakes.erpnext import (
     supplier,
     tax_template,
 )
+from tests.integration.clock import TODAY
+from tests.integration.mcp import Session
 
 SUPPLIER_FIELDS = [
     "name",

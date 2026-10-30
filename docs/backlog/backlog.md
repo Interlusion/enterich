@@ -2,7 +2,6 @@
 
 Quick items. Items with detail have their own file (`item-NNN-*.md`); done or rejected ones move to `archive/`.
 
-- [ ] Integration test against a real ERPNext v16 container (seeded company, agent user with the minimum role), run on demand or nightly, not on every pull request. Besides each operation, it shows that the agent user's key is refused for submit (`frappe.client.submit` and a save with `docstatus` 1), cancel, delete, amend and discard; that report filters and columns match the catalogue; that the duplicate check finds drafts made by people; and that select-only rights lose fields.
 - [ ] Licence check of the locked dependencies in CI (no copyleft in the image).
 - [ ] Release candidates (`vX.Y.Z-rc.N`) published as GitHub pre-releases, to rehearse a whole release, including GHCR sign-in, push, attestation and the GitHub release, which the dry run can't run. Needs ADR-004 and the release workflow's version check to allow pre-release versions, and leaves the candidates' images public. Not for the first release (decided 2026-10-30); reconsider after it.
 - [ ] Signed commits or tags: should the organisation require them?
