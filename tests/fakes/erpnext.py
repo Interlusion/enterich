@@ -324,6 +324,14 @@ class FakeErpnext:
     def fail(self, path: str, status: int, body: Any) -> None:
         self.failures[path] = (status, body)
 
+    def writes(self, path: str = "") -> list[Received]:
+        """The POST and PUT requests received, those to `path` and below when given."""
+        return [r for r in self.received if r.method in ("POST", "PUT") and r.path.startswith(path)]
+
+    def lists(self, path: str) -> list[Received]:
+        """The list calls: GET requests to `path` itself."""
+        return [r for r in self.received if r.method == "GET" and r.path == path]
+
     def transport(self) -> httpx2.MockTransport:
         return httpx2.MockTransport(self.handle)
 

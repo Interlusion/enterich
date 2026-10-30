@@ -6,21 +6,18 @@ from typing import Any, Literal, Self
 from pydantic import model_validator
 
 from enterich.shapes import (
+    DOCSTATUS,
     Day,
     Flag,
     Inputs,
     Limit,
     Name,
     Offset,
-    cut_rows,
-    cut_texts,
-    form_url,
     in_order,
     page,
-    rows_of,
     shape,
 )
-from enterich.tools import Context, Operation, get_named
+from enterich.tools import Context, Operation, Table, get_document
 
 BANK_ACCOUNT_FIELDS = (
     "name",
@@ -93,7 +90,6 @@ PAYMENT_FIELDS = (
 PAYMENT_DETAIL_FIELDS = ("paid_from", "paid_to", "remarks")
 PAYMENT_OUTSIDE = frozenset({"party_name", "reference_no", "remarks"})
 REFERENCE_FIELDS = ("reference_doctype", "reference_name", "allocated_amount")
-PAYMENT_STATES = {"draft": 0, "submitted": 1, "cancelled": 2}
 
 
 class ListBankAccounts(Inputs):
@@ -186,26 +182,14 @@ async def list_bank_transactions(inputs: ListBankTransactions, context: Context)
 
 
 async def get_bank_transaction(inputs: GetBankTransaction, context: Context) -> dict[str, Any]:
-    doc = await get_named(
+    return await get_document(
         context,
         "Bank Transaction",
         inputs.name,
-        field="name",
         what="the bank transaction",
-        company=True,
-    )
-    rows, cut = cut_rows(rows_of(doc, "payment_entries"))
-    record = shape(doc, (*TRANSACTION_FIELDS, "modified"), outside=TRANSACTION_OUTSIDE)
-    outside = record.pop("outside_text")
-    name = str(doc.get("name", inputs.name))
-    return cut_texts(
-        {
-            **record,
-            "payment_entries": [shape(r, ALLOCATION_FIELDS) for r in rows],
-            "url": form_url(context.settings.erpnext_public_url, "Bank Transaction", name),
-            "truncated": ["payment_entries"] if cut else [],
-            "outside_text": outside,
-        }
+        fields=(*TRANSACTION_FIELDS, "modified"),
+        outside=TRANSACTION_OUTSIDE,
+        tables={"payment_entries": Table(ALLOCATION_FIELDS)},
     )
 
 
@@ -218,7 +202,7 @@ async def list_payment_entries(inputs: ListPaymentEntries, context: Context) -> 
     if inputs.party is not None:
         filters.append(["party", "=", inputs.party])
     if inputs.state is not None:
-        filters.append(["docstatus", "=", PAYMENT_STATES[inputs.state]])
+        filters.append(["docstatus", "=", DOCSTATUS[inputs.state]])
     if inputs.from_date is not None:
         filters.append(["posting_date", ">=", inputs.from_date.isoformat()])
     if inputs.to_date is not None:
@@ -236,21 +220,14 @@ async def list_payment_entries(inputs: ListPaymentEntries, context: Context) -> 
 
 
 async def get_payment_entry(inputs: GetPaymentEntry, context: Context) -> dict[str, Any]:
-    doc = await get_named(
-        context, "Payment Entry", inputs.name, field="name", what="the payment entry", company=True
-    )
-    rows, cut = cut_rows(rows_of(doc, "references"))
-    record = shape(doc, (*PAYMENT_FIELDS, *PAYMENT_DETAIL_FIELDS), outside=PAYMENT_OUTSIDE)
-    outside = record.pop("outside_text")
-    name = str(doc.get("name", inputs.name))
-    return cut_texts(
-        {
-            **record,
-            "references": [shape(r, REFERENCE_FIELDS) for r in rows],
-            "url": form_url(context.settings.erpnext_public_url, "Payment Entry", name),
-            "truncated": ["references"] if cut else [],
-            "outside_text": outside,
-        }
+    return await get_document(
+        context,
+        "Payment Entry",
+        inputs.name,
+        what="the payment entry",
+        fields=(*PAYMENT_FIELDS, *PAYMENT_DETAIL_FIELDS),
+        outside=PAYMENT_OUTSIDE,
+        tables={"references": Table(REFERENCE_FIELDS)},
     )
 
 

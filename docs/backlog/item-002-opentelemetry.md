@@ -34,7 +34,7 @@ Take this up when:
 - **Spans carry no secrets and no raw arguments:** operation name, outcome category, durations, ERPNext call count and status codes. No tokens, keys, document contents, party names or outside text; the same rules as the log (REQ-002-URS-NF006, REQ-001-URS-NF002).
 - **Log lines carry the trace and span IDs** when tracing is on, so logs and traces link.
 - **Incoming trace context** (`traceparent`) is accepted, but never decides anything.
-- A REQ-001 change first (new variables, what spans contain), then tests, then code; the image grows only by the SDK and the HTTP exporter.
+- A REQ-002 change first (new variables, what spans contain), then tests, then code; the image grows only by the SDK and the HTTP exporter.
 
 ## Open Questions
 

@@ -12,7 +12,7 @@ Enterich is deployed by others from its image, and agents depend on its tool nam
 
 Deployments run on amd64; development machines may be arm64.
 
-The repository is private until it moves to its organisation. Container packages on GHCR don't move with a repository, so nothing is published before the move.
+The repository moved to its organisation before the first release: container packages on GHCR don't move with a repository.
 
 ## Decision
 
@@ -29,7 +29,7 @@ The repository is private until it moves to its organisation. Container packages
   - the ERPNext rights the agent user needs.
 - Removing or renaming any of these, tightening an input, or needing more ERPNext rights is breaking. A new tool, a new optional input or output field, a widened input limit or a new optional variable is a minor change. Fixes are patches.
 - **A new tool is offered at once only where `ENTERICH_TOOLS` is unset.** A deployment that lists its operations gets new ones only by adding them, so a minor update never widens what its agent can do.
-- **Tags are immutable:** never moved, deleted or reused, enforced by a tag ruleset once the repository allows it.
+- **Tags are immutable:** never moved, deleted or reused, enforced by a tag ruleset.
 - **One source for the version:** `version` in `pyproject.toml`, set with `uv version`; the release workflow refuses a tag that differs.
 - **Security fixes for the latest minor version only,** released as a patch as soon as they are ready.
 
@@ -41,12 +41,12 @@ The repository is private until it moves to its organisation. Container packages
 
 ### Image
 
-- **`ghcr.io/interlusion/enterich:X.Y.Z`** (no `v`), published after the move only. No `latest`, no floating `X.Y` or `X` tags: deployments pin an exact version, preferably by digest.
+- **`ghcr.io/interlusion/enterich:X.Y.Z`** (no `v`). No `latest`, no floating `X.Y` or `X` tags: deployments pin an exact version, preferably by digest.
 - **Built once per tag** by CI from the tagged commit, for `linux/amd64` and `linux/arm64`, as one multi-arch index. A published version is never rebuilt; a fix is a new patch version.
 - **Labels:** `org.opencontainers.image.version`, `.revision`, `.source`, `.licenses`.
-- **Provenance and SBOM:** build provenance attestation and an SBOM, attached to the image, once the repository is public.
+- **Provenance and SBOM:** build provenance attestation and an SBOM, attached to the image.
 - **Pull requests and `main`** build and test the image for both architectures without pushing.
-- **A dry run** of the release workflow, started by hand, does everything but publish; it runs before the first release and after every change to the workflow.
+- **A dry run** of the release workflow, started by hand, does everything but publish; it runs before the first release and after every change the [releasing guide](../../guides/releasing.md#dry-run) names.
 
 ### What a release contains
 
@@ -109,7 +109,7 @@ Revisit this decision when:
 ## Compliance
 
 - A tag SHALL NOT be moved, deleted or reused, and a published image tag SHALL NOT be overwritten.
-- Images SHALL be pushed only by CI from a version tag, and not before the repository has moved to its organisation.
+- Images SHALL be pushed only by CI from a version tag.
 - A breaking change SHALL raise the major version (minor while 0.x) and SHALL be listed in the changelog.
 - A change of the agent user's required ERPNext rights SHALL appear under **Rights** in the changelog.
 - A new operation SHALL NOT be offered by an instance whose `ENTERICH_TOOLS` doesn't name it.

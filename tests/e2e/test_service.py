@@ -1,5 +1,6 @@
-"""The service end to end, against a fake JWKS: REQ-002-PRS-NF001 to
-REQ-002-PRS-NF003, REQ-002-PRS-NF008 to REQ-002-PRS-NF012."""
+"""The service end to end, against a fake JWKS: REQ-002-PRS-NF001, REQ-002-PRS-NF002,
+REQ-002-PRS-NF003, REQ-002-PRS-NF008, REQ-002-PRS-NF009, REQ-002-PRS-NF010,
+REQ-002-PRS-NF011, REQ-002-PRS-NF012."""
 
 import json
 from typing import Any
@@ -196,7 +197,7 @@ def test_rejection_lines_stay_short_whatever_the_claims(
 
 def test_a_kid_with_a_newline_forges_no_log_line(jwks: FakeJwks, logs: Logs) -> None:
     # Written raw into the log, this kid would start a line of its own.
-    forger = rsa_signer('x"\n{"event": "start", "sub": "forged"}')
+    forger = rsa_signer('x"\n{"event": "start", "sub": "forged"}', key=1)
     with client(jwks) as c:
         response = c.post("/mcp", headers=bearer(token(forger)), json={})
     assert response.status_code == 401
@@ -255,7 +256,7 @@ def test_no_token_part_reaches_the_log_or_responses(
     tokens = [
         token(signer),
         token(signer, sub="someone-else"),
-        token(rsa_signer("key-1"), sub="forged"),
+        token(rsa_signer("key-1", key=1), sub="forged"),
         token(signer, exp=1),
     ]
     bodies: list[str] = []

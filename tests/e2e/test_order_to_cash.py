@@ -1,14 +1,13 @@
-"""Order to cash end to end, the reads (REQ-004-PRS-F001 to REQ-004-PRS-F004),
-and through them REQ-001's states, dates, reports and the company check
-(REQ-001-PRS-F007, REQ-001-PRS-F014)."""
+"""Order to cash end to end, the reads (REQ-004-PRS-F001, REQ-004-PRS-F002,
+REQ-004-PRS-F003, REQ-004-PRS-F004), and through them REQ-001's states, dates, reports
+and the company check (REQ-001-PRS-F007, REQ-001-PRS-F014)."""
 
-from collections.abc import Iterator
 from typing import Any
 
 import pytest
 
-from tests.e2e.clock import TIMEZONE, TODAY, freeze
-from tests.e2e.mcp import Session, client
+from tests.e2e.clock import TODAY
+from tests.e2e.mcp import Session
 from tests.fakes.erpnext import (
     COMPANY,
     FakeErpnext,
@@ -18,8 +17,6 @@ from tests.fakes.erpnext import (
     sales_invoice,
     tax_template,
 )
-from tests.fakes.jwks import FakeJwks, Signer, token
-from tests.fakes.settings import settings
 
 CUSTOMER_FIELDS = [
     "name",
@@ -59,11 +56,6 @@ INVOICE_FIELDS = [
 TEMPLATE_FIELDS = ["name", "title", "is_default", "tax_category", "disabled"]
 
 
-@pytest.fixture(autouse=True)
-def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
-    freeze(monkeypatch)
-
-
 @pytest.fixture
 def erp(erpnext: FakeErpnext) -> FakeErpnext:
     erpnext.add("Customer", customer("CUST-0001"))
@@ -79,12 +71,6 @@ def erp(erpnext: FakeErpnext) -> FakeErpnext:
     erpnext.add("Sales Taxes and Charges Template", tax_template("Old VAT - EX", disabled=1))
     erpnext.add("Purchase Taxes and Charges Template", tax_template("Input VAT - EX"))
     return erpnext
-
-
-@pytest.fixture
-def mcp(jwks: FakeJwks, signer: Signer, erp: FakeErpnext) -> Iterator[Session]:
-    with client(jwks, settings(timezone=TIMEZONE), erp) as c:
-        yield Session(c, token(signer))
 
 
 # list_customers

@@ -1,6 +1,6 @@
 # Requirement Specifications
 
-REQ-001 holds the core: the personas, stories and terms, and what every operation shares. REQ-002 holds the service around the operations. Each further spec holds the operations of one accounting area. Every spec has user requirements (URS, what is needed), product requirements (PRS, what is built, each with a Definition of Done) and acceptance criteria, and always shows the current state.
+REQ-001 holds the core: the personas, stories and terms, and what every operation shares. REQ-002 holds the service around the operations. Each further spec holds the operations of one accounting area. Every spec has an intended use, user stories, its requirement rules, user requirements (URS, what is needed), product requirements (PRS, what is built, each with a Definition of Done), acceptance criteria, assumptions and open questions (kept when empty), and always shows the current state. Personas and shared terms live in REQ-001; an area spec defines only the terms its own requirements depend on.
 
 | Spec | Area | Status |
 | :- | :- | :- |
@@ -33,10 +33,15 @@ Why the specs are cut this way: [ADR-007](../arc42/adr/ADR-007-specs-by-accounti
 
 Requirement, user story and persona IDs always carry the spec's ID: `REQ-004-PRS-F005`, `REQ-001-P1-2`, `REQ-001-P1`, never a bare `PRS-F005`. This holds in the specs, the other docs, code comments, tests and commit messages.
 
-The project code is **ERPL**. Outside this repository, IDs carry it: `ERPL-REQ-004-PRS-F005`, or `ERPL-REQ-004` for a whole spec. The code never changes, since other repositories cite it.
+The project code is **ENTR**. Outside this repository, IDs carry it: `ENTR-REQ-004-PRS-F005`, or `ENTR-REQ-004` for a whole spec. The code never changes, since other repositories cite it.
 
 ## Changes
 
-A spec is Draft until the maintainer baselines it, and edited in place until then. After baseline, a substantive change (a requirement added, removed or changed) is folded into the body and a sibling `req-NNN-name.history.md` records the dated reason, most recent first. Until the first release, details found while building Enterich are folded into the body without a history entry.
+A spec is Draft until the maintainer baselines it, and edited in place until then. After baseline:
+
+- **A substantive change** (a requirement added, removed or reworded, or a term changed so that a requirement covers other cases) is folded into the body, and a sibling `req-NNN-name.history.md` records the dated reason, most recent first. The spec's `Version` goes up with each entry.
+- **A change that keeps the meaning** (a typo, a link, formatting, clearer wording) is made in the body only.
+
+Until the first release, details found while building Enterich are folded into the body without a history entry.
 
 Deployments keep their own requirements elsewhere and trace them to these IDs. A change a deployment needs arrives here as a change to these specs, never as a deployment fact.

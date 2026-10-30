@@ -23,8 +23,7 @@ jobs:
         with:
           version: "0.13.6"
           enable-cache: false
-      - name: Lock matches pyproject.toml
-        run: uv lock --check
+      # Fails too when uv.lock doesn't match pyproject.toml.
       - run: uv sync --locked
       - run: uv run ruff check
       - run: uv run ruff format --check
@@ -35,13 +34,11 @@ jobs:
       - name: Tests with branch coverage
         run: |
           uv run coverage run -m pytest -q
-          uv run coverage report --skip-covered
           {
-            echo "### Test coverage: $(uv run coverage report --format=total)%"
+            echo "### Test coverage"
             echo
             uv run coverage report --format=markdown --skip-covered
-          } > "$RUNNER_TEMP/coverage.md"
-          cat "$RUNNER_TEMP/coverage.md" >> "$GITHUB_STEP_SUMMARY"
+          } | tee "$RUNNER_TEMP/coverage.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Coverage artefact
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -51,9 +48,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Vulnerability audit of the lock
-        run: |
-          uv export --locked --format requirements-txt --no-emit-project > "$RUNNER_TEMP/requirements.txt"
-          uv run pip-audit --strict --require-hashes --disable-pip -r "$RUNNER_TEMP/requirements.txt"
+        run: uv audit --locked
       - name: Workflows
         run: scripts/check-workflows.sh
 
@@ -118,18 +113,11 @@ jobs:
         with:
           persist-credentials: false
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - name: Runtime image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          file: Dockerfile
-          platforms: ${{ matrix.platform }}
-          push: false
+      # The test stage is built on the runtime stage, so this builds the runtime image too.
       - name: Test stage
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          file: Dockerfile
           target: test
           platforms: ${{ matrix.platform }}
           load: true

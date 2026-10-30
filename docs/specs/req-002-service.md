@@ -220,7 +220,7 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 
 - A test that creates a draft finds one `operation` line with the operation, `sid` and the draft's number; a refused update finds one with the refusal.
 - With a fake ERPNext that delays each answer by 1 s, a create making three ERPNext calls logs 3 calls and an ERPNext duration of at least 3 s, within its total duration.
-- A newline or quote in an argument doesn't break the line; a 10,000-character key and a list of 10,000 items are cut.
+- A newline, a quote or a Unicode line separator (U+0085, U+2028, U+2029) in an argument doesn't break the line; a 10,000-character key and a list of 10,000 items are cut.
 - An unexpected exception in an operation writes one `error` line with the operation and traceback and one `operation` line; the agent gets a tool error without the exception's text.
 - Every captured line of a test run parses as JSON and has a known event.
 - With `ENTERICH_LOG_LEVEL=ERROR`, `start` and `rejection` lines are still written, and library lines below error are not.

@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-26 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: describes the planned behaviour; nothing is built yet |
+| **Status** | Draft: matches what is built |
 
 For the people who check and submit what the agent prepares (the bookkeeper of [REQ-001](../specs/req-001-core.md#personas)). Everything happens in ERPNext; Enterich adds nothing to its interface.
 
@@ -17,10 +17,12 @@ The agent works as its own ERPNext user, so its drafts carry that user as owner.
 
 ## Warnings
 
-When something about a draft looks wrong, Enterich adds a comment to it, in the draft's timeline, starting with "Enterich:". Two cases today:
+When something about a draft looks wrong, Enterich adds a comment to it, in the draft's timeline, starting with "Enterich:" ([REQ-001-PRS-F015](../specs/req-001-core.md#req-001-prs-f015-warnings-on-the-draft)). For example:
 
 - **Possible duplicate:** a matching document existed, and the agent created the draft anyway. The comment names the match.
-- **Tax template without tax:** a tax template was given, but the draft's tax is zero.
+- **A value ERPNext set differently:** a rate a pricing rule changed, an expense account ERPNext replaced, or journal totals that differ after ERPNext rounded each row. The comment names the row and both values.
+
+Each area spec lists the warnings of its operations ([specs index](../specs/README.md)).
 
 Read the timeline before submitting.
 

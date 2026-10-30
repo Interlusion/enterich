@@ -1,14 +1,14 @@
-"""Procure to pay end to end, the reads (REQ-005-PRS-F001 to REQ-005-PRS-F004). The code
-both sides share is tested through order to cash; these tests show the buying side's
-calls, fields and outside text, and that it stays apart from the selling side."""
+"""Procure to pay end to end, the reads (REQ-005-PRS-F001, REQ-005-PRS-F002,
+REQ-005-PRS-F003, REQ-005-PRS-F004). The code both sides share is tested through order to
+cash; these tests show the buying side's calls, fields and outside text, and that it
+stays apart from the selling side."""
 
-from collections.abc import Iterator
 from typing import Any
 
 import pytest
 
-from tests.e2e.clock import TIMEZONE, TODAY, freeze
-from tests.e2e.mcp import Session, client
+from tests.e2e.clock import TODAY
+from tests.e2e.mcp import Session
 from tests.fakes.erpnext import (
     COMPANY,
     FakeErpnext,
@@ -20,8 +20,6 @@ from tests.fakes.erpnext import (
     supplier,
     tax_template,
 )
-from tests.fakes.jwks import FakeJwks, Signer, token
-from tests.fakes.settings import settings
 
 SUPPLIER_FIELDS = [
     "name",
@@ -53,11 +51,6 @@ INVOICE_FIELDS = [
 SUPPLIER_OUTSIDE = {"supplier_name": "Supplier SUPP-0001", "tax_id": "DE987654321"}
 
 
-@pytest.fixture(autouse=True)
-def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
-    freeze(monkeypatch)
-
-
 @pytest.fixture
 def erp(erpnext: FakeErpnext) -> FakeErpnext:
     erpnext.add("Supplier", supplier("SUPP-0001"))
@@ -71,12 +64,6 @@ def erp(erpnext: FakeErpnext) -> FakeErpnext:
     erpnext.add("Purchase Taxes and Charges Template", purchase_tax_template())
     erpnext.add("Sales Taxes and Charges Template", tax_template("VAT 19% - EX"))
     return erpnext
-
-
-@pytest.fixture
-def mcp(jwks: FakeJwks, signer: Signer, erp: FakeErpnext) -> Iterator[Session]:
-    with client(jwks, settings(timezone=TIMEZONE), erp) as c:
-        yield Session(c, token(signer))
 
 
 # list_suppliers, get_supplier

@@ -1,13 +1,11 @@
-"""Bank and cash end to end (REQ-007-PRS-F001 to REQ-007-PRS-F003): the company's bank
-accounts, its bank transactions and its payment entries."""
+"""Bank and cash end to end (REQ-007-PRS-F001, REQ-007-PRS-F002, REQ-007-PRS-F003): the
+company's bank accounts, its bank transactions and its payment entries."""
 
-from collections.abc import Iterator
 from typing import Any
 
 import pytest
 
-from tests.e2e.clock import TIMEZONE, freeze
-from tests.e2e.mcp import Session, client
+from tests.e2e.mcp import Session
 from tests.fakes.erpnext import (
     COMPANY,
     FakeErpnext,
@@ -15,8 +13,6 @@ from tests.fakes.erpnext import (
     bank_transaction,
     payment_entry,
 )
-from tests.fakes.jwks import FakeJwks, Signer, token
-from tests.fakes.settings import settings
 
 BANK_ACCOUNT_FIELDS = [
     "name",
@@ -73,11 +69,6 @@ PENDING = "ACC-BTN-2026-00002"
 PAYMENT = "ACC-PAY-2026-00001"
 
 
-@pytest.fixture(autouse=True)
-def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
-    freeze(monkeypatch)
-
-
 @pytest.fixture
 def erp(erpnext: FakeErpnext) -> FakeErpnext:
     erpnext.add("Bank Account", bank_account(MAIN))
@@ -125,12 +116,6 @@ def erp(erpnext: FakeErpnext) -> FakeErpnext:
     erpnext.add("Payment Entry", payment_entry(PAYMENT))
     erpnext.add("Payment Entry", payment_entry("ACC-PAY-2026-00002", company="Other AG"))
     return erpnext
-
-
-@pytest.fixture
-def mcp(jwks: FakeJwks, signer: Signer, erp: FakeErpnext) -> Iterator[Session]:
-    with client(jwks, settings(timezone=TIMEZONE), erp) as c:
-        yield Session(c, token(signer))
 
 
 # list_bank_accounts (REQ-007-PRS-F001)

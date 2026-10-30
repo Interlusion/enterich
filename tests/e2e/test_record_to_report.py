@@ -1,13 +1,12 @@
-"""Record to report end to end, the reads (REQ-006-PRS-F001 to REQ-006-PRS-F004): accounts,
-cost centres, journal entries, the General Ledger and the Trial Balance."""
+"""Record to report end to end, the reads (REQ-006-PRS-F001, REQ-006-PRS-F002,
+REQ-006-PRS-F003, REQ-006-PRS-F004): accounts, cost centres, journal entries, the General
+Ledger and the Trial Balance."""
 
-from collections.abc import Iterator
 from typing import Any
 
 import pytest
 
-from tests.e2e.clock import TIMEZONE, freeze
-from tests.e2e.mcp import Session, client
+from tests.e2e.mcp import Session
 from tests.fakes.erpnext import (
     COMPANY,
     FakeErpnext,
@@ -22,8 +21,6 @@ from tests.fakes.erpnext import (
     ledger,
     ledger_entry,
 )
-from tests.fakes.jwks import FakeJwks, Signer, token
-from tests.fakes.settings import settings
 
 ACCOUNT_FIELDS = [
     "name",
@@ -78,11 +75,6 @@ VOUCHER_TYPES = [
 ]
 
 
-@pytest.fixture(autouse=True)
-def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
-    freeze(monkeypatch)
-
-
 @pytest.fixture
 def erp(erpnext: FakeErpnext) -> FakeErpnext:
     erpnext.add("Account", account(BANK))
@@ -96,12 +88,6 @@ def erp(erpnext: FakeErpnext) -> FakeErpnext:
     erpnext.add("Fiscal Year", fiscal_year("2026", "2026-01-01", "2026-12-31"))
     erpnext.add("Fiscal Year", fiscal_year("2025", "2025-01-01", "2025-12-31"))
     return erpnext
-
-
-@pytest.fixture
-def mcp(jwks: FakeJwks, signer: Signer, erp: FakeErpnext) -> Iterator[Session]:
-    with client(jwks, settings(timezone=TIMEZONE), erp) as c:
-        yield Session(c, token(signer))
 
 
 def report_call(erp: FakeErpnext, name: str) -> Received:

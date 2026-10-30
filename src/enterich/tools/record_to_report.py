@@ -10,18 +10,16 @@ from pydantic import AfterValidator, Field, model_validator
 
 from enterich.erpnext import ErpnextError
 from enterich.shapes import (
+    DOCSTATUS,
     Amount,
     Day,
     Flag,
     Inputs,
     Limit,
-    Modified,
     Name,
     Offset,
     Remarks,
     Search,
-    cut_rows,
-    cut_texts,
     decimal,
     form_url,
     in_order,
@@ -36,7 +34,9 @@ from enterich.tools import (
     Context,
     Operation,
     Refusal,
+    Table,
     drafts,
+    get_document,
     get_named,
     report_rows,
 )
@@ -85,7 +85,6 @@ JOURNAL_ROW_FIELDS = (
     "user_remark",
 )
 JOURNAL_ROW_OUTSIDE = {"user_remark"}
-JOURNAL_STATES = {"draft": 0, "submitted": 1, "cancelled": 2}
 LEDGER_FIELDS = (
     "posting_date",
     "account",
@@ -248,23 +247,12 @@ class CreateDraftJournalEntry(Inputs):
         return self
 
 
-class UpdateDraftJournalEntry(Inputs):
-    name: Name
-    modified: Modified
+class UpdateDraftJournalEntry(drafts.DraftUpdate):
     posting_date: Day | None = None
     cheque_no: ChequeNo | Literal[""] | None = None
     cheque_date: Day | None = None
     user_remark: Remarks | None = None
     accounts: JournalEntryRows | None = None
-
-    @model_validator(mode="after")
-    def _changes(self) -> Self:
-        given = self.model_dump(exclude={"name", "modified"}, exclude_none=True)
-        if not given:
-            raise ValueError(
-                "give at least one of posting_date, cheque_no, cheque_date, user_remark, accounts"
-            )
-        return self
 
 
 def _reference_rule(number: Any, day: Any) -> None:
@@ -335,7 +323,7 @@ async def list_cost_centers(inputs: ListCostCenters, context: Context) -> dict[s
 async def list_journal_entries(inputs: ListJournalEntries, context: Context) -> dict[str, Any]:
     filters: list[list[Any]] = [["company", "=", context.settings.company]]
     if inputs.state is not None:
-        filters.append(["docstatus", "=", JOURNAL_STATES[inputs.state]])
+        filters.append(["docstatus", "=", DOCSTATUS[inputs.state]])
     if inputs.voucher_type is not None:
         filters.append(["voucher_type", "=", inputs.voucher_type])
     if inputs.from_date is not None:
@@ -355,21 +343,14 @@ async def list_journal_entries(inputs: ListJournalEntries, context: Context) -> 
 
 
 async def get_journal_entry(inputs: GetJournalEntry, context: Context) -> dict[str, Any]:
-    doc = await get_named(
-        context, "Journal Entry", inputs.name, field="name", what="the journal entry", company=True
-    )
-    rows, cut = cut_rows(rows_of(doc, "accounts"))
-    record = shape(doc, (*JOURNAL_FIELDS, *JOURNAL_DETAIL_FIELDS), outside=JOURNAL_OUTSIDE)
-    outside = record.pop("outside_text")
-    name = str(doc.get("name", inputs.name))
-    return cut_texts(
-        {
-            **record,
-            "accounts": [shape(r, JOURNAL_ROW_FIELDS, outside=JOURNAL_ROW_OUTSIDE) for r in rows],
-            "url": form_url(context.settings.erpnext_public_url, "Journal Entry", name),
-            "truncated": ["accounts"] if cut else [],
-            "outside_text": outside,
-        }
+    return await get_document(
+        context,
+        "Journal Entry",
+        inputs.name,
+        what="the journal entry",
+        fields=(*JOURNAL_FIELDS, *JOURNAL_DETAIL_FIELDS),
+        outside=JOURNAL_OUTSIDE,
+        tables={"accounts": Table(JOURNAL_ROW_FIELDS, JOURNAL_ROW_OUTSIDE)},
     )
 
 

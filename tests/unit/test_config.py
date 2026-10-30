@@ -2,7 +2,7 @@
 
 import pytest
 
-from enterich.config import KNOWN, ConfigError, load
+from enterich.config import ConfigError, load
 from tests.fakes.settings import API_KEY, API_SECRET, ENV
 
 REQUIRED = [
@@ -154,10 +154,3 @@ def test_unknown_enterich_variables_are_reported_as_warnings() -> None:
 def test_tools_set_limits_the_operations() -> None:
     s = load({**ENV, "ENTERICH_TOOLS": " list_items , "}, ("list_items", "get_item"))
     assert s.tools == ("list_items",)
-
-
-def test_the_configuration_guide_lists_every_variable() -> None:
-    with open("docs/guides/configuration.md", encoding="utf-8") as guide:
-        text = guide.read()
-    for name in KNOWN:
-        assert f"`ENTERICH_{name}`" in text

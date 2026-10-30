@@ -44,11 +44,13 @@ class Result:
 
 
 class Session:
-    """Stateless MCP calls with one token; the client never confirms anything."""
+    """Stateless MCP calls with one token; the client never confirms anything
+    (REQ-001-PRS-F013)."""
 
     def __init__(self, c: TestClient, token: str) -> None:
         self._c = c
         self._headers = {**bearer(token), "mcp-protocol-version": VERSION}
+        self.answers: list[str] = []
 
     def _rpc(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         response = self._c.post(
@@ -56,6 +58,7 @@ class Session:
             headers=self._headers,
             json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
         )
+        self.answers.append(response.text)
         assert response.status_code == 200, response.text
         return response.json()
 

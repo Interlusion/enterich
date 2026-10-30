@@ -8,7 +8,8 @@ returns errors as results, so the agent gets Enterich's text unchanged.
 
 import logging
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from itertools import islice
 from typing import Any, Literal, cast
@@ -23,7 +24,16 @@ from pydantic import ConfigDict, ValidationError
 from enterich import erpnext, log
 from enterich.config import Settings
 from enterich.erpnext import MAX_MESSAGE, Erpnext, ErpnextError, Refused
-from enterich.shapes import OUTSIDE_TEXT_NOTE, Inputs, to_text
+from enterich.shapes import (
+    OUTSIDE_TEXT_NOTE,
+    Inputs,
+    cut_rows,
+    cut_texts,
+    form_url,
+    rows_of,
+    shape,
+    to_text,
+)
 
 OPERATION_TIMEOUT = 60.0
 MAX_LOGGED_STRING = 200
@@ -146,6 +156,40 @@ async def get_named(
     if company and doc.get("company") != context.settings.company:
         raise unknown
     return doc
+
+
+@dataclass(frozen=True)
+class Table:
+    """A child table as a get returns it: its catalogued fields, outside text apart."""
+
+    fields: Sequence[str]
+    outside: AbstractSet[str] = frozenset()
+
+
+async def get_document(
+    context: Context,
+    doctype: str,
+    name: str,
+    *,
+    what: str,
+    fields: Sequence[str],
+    outside: AbstractSet[str] = frozenset(),
+    flags: AbstractSet[str] = frozenset(),
+    tables: Mapping[str, Table],
+) -> dict[str, Any]:
+    """A document of the assigned company with its child tables, each cut at 100 rows,
+    its link and its texts cut (REQ-001-PRS-F007, REQ-001-PRS-F009, REQ-001-PRS-NF003)."""
+    doc = await get_named(context, doctype, name, field="name", what=what, company=True)
+    record = shape(doc, fields, outside=outside, flags=flags)
+    outside_text = record.pop("outside_text")
+    truncated: list[str] = []
+    for table, spec in tables.items():
+        rows, cut = cut_rows(rows_of(doc, table))
+        record[table] = [shape(row, spec.fields, outside=spec.outside) for row in rows]
+        if cut:
+            truncated.append(table)
+    url = form_url(context.settings.erpnext_public_url, doctype, str(doc.get("name", name)))
+    return cut_texts({**record, "url": url, "truncated": truncated, "outside_text": outside_text})
 
 
 async def report_rows(

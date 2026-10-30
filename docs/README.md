@@ -25,7 +25,7 @@
 
 | Document | Status |
 | :- | :- |
-| Specs | Draft until baselined and edited in place until then; after baseline, changes are recorded in a history file next to each (`req-NNN-name.history.md`) |
+| Specs | Draft until baselined; after that, changes as the [specs index](specs/README.md#changes) says |
 | ADRs | Proposed until accepted; superseded by new ADRs rather than rewritten |
 | Architecture, guides | Kept current with every change they describe |
 | Backlog | Living |
@@ -34,7 +34,6 @@
 
 - **Generic only.** Docs describe Enterich, never a deployment: placeholders such as `erp.example.com`, `id.example.com`, `Example GmbH`.
 - **Plain Markdown links**, so they work on GitHub.
-- **Requirement IDs in full:** `REQ-001-PRS-F005`, never `PRS-F005`.
-- **The name:** Enterich in prose, like Git; `enterich` where it is an identifier (package, command, repository, image); `ENTERICH_` for variables.
+- **Requirement IDs** as the [specs index](specs/README.md#ids) says; **the name** as [AGENTS.md](../AGENTS.md) says.
 - **Source of truth:** the specs for what Enterich must do; the code for what it does. When docs and code disagree, fix one of them in the same change.
 - Agent-drafted documents say so under Author.

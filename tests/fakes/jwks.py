@@ -1,5 +1,6 @@
 """A fake JWKS endpoint and tokens signed by its keys."""
 
+import functools
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -23,8 +24,16 @@ class Signer:
         return {**public, "kid": self.kid, "use": "sig", "alg": self.alg}
 
 
-def rsa_signer(kid: str = "key-1") -> Signer:
-    return Signer(kid, rsa.generate_private_key(public_exponent=65537, key_size=2048), "RS256")
+@functools.cache
+def _rsa_key(number: int) -> rsa.RSAPrivateKey:
+    # Generated once per run: a 2048-bit key takes tens of milliseconds.
+    return rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+
+def rsa_signer(kid: str = "key-1", key: int = 0) -> Signer:
+    """A signer with the run's RSA key `key`: the identity's signer has key 0, and a
+    signer that must not share its key material (a stranger, a rotated key) another."""
+    return Signer(kid, _rsa_key(key), "RS256")
 
 
 def ec_signer(kid: str = "key-ec") -> Signer:

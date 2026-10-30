@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-26 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: no release before the repository has moved ([ITEM-001](../backlog/item-001-going-public.md)) |
+| **Status** | Draft: no release yet; the first follows [ITEM-001](../backlog/item-001-going-public.md) |
 
 Why it works this way: [ADR-004](../arc42/adr/ADR-004-releases-and-image.md).
 

@@ -21,7 +21,7 @@ The options are listed under Alternatives. ERPNext's modules don't fit the cut: 
 - **One spec per accounting area** holds that area's operations, user requirements and catalogue: master data (REQ-003), order to cash (REQ-004), procure to pay (REQ-005), record to report (REQ-006), bank and cash (REQ-007). Each is self-contained, with the same template as REQ-001, and refers to REQ-001 for what all share.
 - **Area specs may tighten REQ-001's rules, never loosen them.** Rights REQ-001 withholds, such as submitting, are widened only in REQ-001, by naming the exception and its area; the area spec then specifies it. So autonomy can grow area by area, while every widening stays visible in one place.
 - **Placement follows a map:** an operation belongs to the area of its main DocType or report. The map in the [specs index](../../specs/README.md) assigns each one to an area; a new one goes to the area that uses it, or, if several do, to the area in which people create and change it, or else to master data.
-- **IDs are written in full** (`REQ-004-PRS-F005`), and with the project code outside this repository (`ERPL-REQ-004-PRS-F005`).
+- **IDs are written in full** (`REQ-004-PRS-F005`), and with the project code outside this repository (`ENTR-REQ-004-PRS-F005`).
 
 ## Alternatives Considered
 

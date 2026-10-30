@@ -4,29 +4,21 @@
 | :- | :- |
 | **Date** | 2026-10-24 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: everything below is built except `python -m tests.fakes` (the fakes run in tests only) |
+| **Status** | Draft: matches what is built |
 
 ## Repository layout
 
+The package's modules and what each is responsible for: [architecture, section 5](../arc42/README.md#5-building-block-view).
+
 ```
-src/enterich/
-  __main__.py        entry point: python -m enterich
-  config.py          environment variables, validation
-  app.py             ASGI assembly: SDK app, POST-only and size limit, healthz
-  auth.py            token verifier, JWKS cache
-  erpnext.py         REST client, error mapping, name encoding
-  shapes.py          shared input types, paging, outside_text
-  log.py             JSON-lines logging
-  tools/             one module per accounting area, named like its spec:
-                     master_data, order_to_cash, procure_to_pay,
-                     record_to_report, bank_and_cash; drafts.py holds
-                     what every draft operation shares, invoicing.py
-                     the reads the sales and purchase side share
+src/enterich/        the package; __main__.py is the entry point (python -m enterich)
 tests/
   unit/              per module
   e2e/               Enterich against a fake JWKS and a fake ERPNext, named
                      by area like tools/, an area's drafts in their own
                      module (test_order_to_cash_drafts.py)
+  repo/              checks of repository files (README, changelog, guides,
+                     scripts); not in the image, which runs unit/ and e2e/
   fakes/             the fakes, recording every request
   snapshots/         tools.json: the published tool list
   readme.py          the README's tool list, from tools.json and the specs index
@@ -64,12 +56,6 @@ uv run basedpyright
 uv run enterich            # starts Enterich; needs the ENTERICH_* variables
 ```
 
-Run Enterich locally against the fakes:
-
-```sh
-uv run python -m tests.fakes   # fake JWKS and ERPNext; prints the env to use
-```
-
 ## Container
 
 ```sh
@@ -83,9 +69,9 @@ The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The run
 ## Rules for changes
 
 - **Spec first.** A new operation, input or output field starts as a change to its area spec's catalogue ([specs index](../specs/README.md)), then tests, then code. Read REQ-001 too: its rules apply to every operation.
-- **Tests first** for the token check and every operation: the e2e test asserts exactly what the fake ERPNext received.
+- **Tests first** where a spec's Definition of Done describes the behaviour: the failing test is written from it, run red and committed before the code (`test:`, then `feat:` or `fix:`). Infrastructure (image, CI) and trying out a library's behaviour are exceptions; what they teach becomes a test afterwards. An operation's e2e test asserts exactly what the fake ERPNext received.
 - **The tool-list snapshot** changes only together with the area spec and a changelog line. Regenerate with `uv run pytest --snapshot-update` (syrupy) and review the diff; then write the README's tool list from it with `uv run python -m tests.readme`, which a test checks.
-- **No deployment facts:** hostnames, realms, client names, user IDs, company names or credentials of a real site never go into code, tests or docs. Use `example.com`, `Example GmbH`, zero UUIDs.
+- **No deployment facts:** hostnames, realms, client names, user IDs, company names, credentials or a site's tool selection never go into code, tests, docs or commit messages. Use `example.com`, `Example GmbH`, zero UUIDs.
 - **Never log** keys, secrets or tokens; tests check it.
 - **Changelog:** a line under `Unreleased` for every behaviour change, with **Rights** or **Configuration** headings where they apply ([ADR-004](../arc42/adr/ADR-004-releases-and-image.md)).
 - **Commits:** Conventional Commits (`feat`, `fix`, `docs`, `ci`, `chore`, `refactor`, `test`).
@@ -93,7 +79,7 @@ The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The run
 
 ## CI
 
-`ci.yml` runs on pull requests and pushes to `main`, without secrets: lock check, ruff, mdformat, the Markdown link check, basedpyright, pytest with branch coverage (the table in the run's summary and, for pull requests from this repository's branches, as one comment on the pull request that each push updates), a vulnerability audit of the lock, actionlint with shellcheck and zizmor (`scripts/check-workflows.sh`), gitleaks, and the image built for amd64 and arm64, each on a runner of its own architecture, with the tests run in its `test` stage. Nothing is published.
+`ci.yml` runs on pull requests and pushes to `main`, without secrets: the lock, ruff, mdformat, the Markdown link check, basedpyright, pytest with branch coverage (the table in the run's summary and, for pull requests from this repository's branches, as one comment on the pull request that each push updates), a vulnerability audit of the lock, actionlint with shellcheck and zizmor (`scripts/check-workflows.sh`), gitleaks, and the image built for amd64 and arm64, each on a runner of its own architecture, with the tests run in its `test` stage. Nothing is published.
 
 `release.yml` runs on a version tag, or by hand as a dry run, and builds through `image.yml`; the [releasing guide](releasing.md) describes both.
 

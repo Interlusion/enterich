@@ -1,6 +1,6 @@
 # Enterich architecture
 
-Compact [arc42](https://arc42.org/): all twelve sections in this file, until one of them outgrows it. The service is built with the operations of every area; this describes the design the requirement specifications ([index](../specs/README.md)) and the [ADRs](adr/README.md) set out. When code exists and disagrees, the code wins and this file is fixed.
+Compact [arc42](https://arc42.org/): all twelve sections in this file, until one of them outgrows it. The service is built with the operations of every area; this describes the design the requirement specifications ([index](../specs/README.md)) and the [ADRs](adr/README.md) set out. Where the code disagrees, the code wins and this file is fixed.
 
 Diagrams are Mermaid, rendered by GitHub.
 
@@ -42,7 +42,7 @@ The first five are the personas of [REQ-001](../specs/req-001-core.md#personas).
 | No tool takes a DocType, method, field list or file path | [REQ-001-PRS-F006](../specs/req-001-core.md#req-001-prs-f006-no-generic-operations), [ADR-001](adr/ADR-001-separate-service-fixed-tools.md) |
 | No limit depends on the client asking for approval | [REQ-001-URS-NF001](../specs/req-001-core.md#req-001-urs-nf001-safe-without-client-side-approval) |
 | Apache-2.0; "ERPNext" and "Frappe" not in the project or package name | [ADR-006](adr/ADR-006-licence-and-name.md) |
-| No published images before the repository moves to its organisation | [ADR-004](adr/ADR-004-releases-and-image.md) |
+| Images pushed only by the release workflow, from a version tag | [ADR-004](adr/ADR-004-releases-and-image.md) |
 
 ## 3. Context and scope
 
@@ -85,8 +85,6 @@ flowchart LR
 
 ## 5. Building block view
 
-*Built: `config`, `app`, `auth`, `log`, `erpnext`, `shapes`, and `tools/` with every area.*
-
 ```mermaid
 flowchart TB
     subgraph enterich["Enterich"]
@@ -117,7 +115,7 @@ flowchart TB
 | `erpnext` | One `httpx2` client with `trust_env=False`: base URL, Host, token header, 30 s per call, 10 MiB per response, no redirects; maps refusals to [REQ-001-PRS-F008](../specs/req-001-core.md#req-001-prs-f008-refusals-reported) messages; encodes name inputs |
 | `log` | JSON-lines logging for Enterich's events and the SDK's and uvicorn's loggers |
 
-Planned repository layout: [development guide](../guides/development.md).
+Repository layout: [development guide](../guides/development.md).
 
 ## 6. Runtime view
 
@@ -202,7 +200,7 @@ flowchart LR
 | Secrets | `ENTERICH_ERPNEXT_API_KEY`, `ENTERICH_ERPNEXT_API_SECRET` |
 | Clock | Synchronised (NTP), drift well under the 5 s leeway |
 | Tokens | Short-lived access tokens (minutes), so the authorization-server kill switch acts soon |
-| Image | `ghcr.io/interlusion/enterich:X.Y.Z`, pinned (after the move; [ADR-004](adr/ADR-004-releases-and-image.md)) |
+| Image | `ghcr.io/interlusion/enterich:X.Y.Z`, pinned ([ADR-004](adr/ADR-004-releases-and-image.md)) |
 
 Variables: [configuration guide](../guides/configuration.md).
 
@@ -229,7 +227,7 @@ Variables: [configuration guide](../guides/configuration.md).
 
   Enterich exports no traces or metrics of its own. The MCP SDK brings `opentelemetry-api`, which stays inert because no OpenTelemetry SDK or exporter is installed. Opt-in traces are [ITEM-002](../backlog/item-002-opentelemetry.md).
 
-- **Limits:** 1 MiB request body, 100 records per call, 100 rows per child table, 100,000 characters per result, 10 MiB per ERPNext response, 30 s per ERPNext call, 60 s per operation. They stay below what hosted clients enforce, so Enterich's own message arrives rather than a client's cut-off: Claude's hosted apps, for example, allowed about 150,000 characters per tool result and 240 s per tool call (October 2026).
+- **Limits** ([REQ-001-PRS-NF003](../specs/req-001-core.md#req-001-prs-nf003-result-limits), [REQ-002-PRS-NF011](../specs/req-002-service.md#req-002-prs-nf011-limits)) stay below what hosted clients enforce, so Enterich's own message arrives rather than a client's cut-off: Claude's hosted apps, for example, allowed about 150,000 characters per tool result and 240 s per tool call (October 2026).
 
 - **Testing:** unit tests per block; end-to-end tests run Enterich against a fake JWKS and a fake ERPNext that records every request, so each test can assert exactly what ERPNext received. A snapshot of `tools/list` pins the public tool contract.
 
@@ -239,7 +237,7 @@ See the [ADR index](adr/README.md).
 
 ## 10. Quality requirements
 
-The quality goals of section 1, made testable. Each scenario names what happens, the response, and how it is measured; the requirement in [REQ-001](../specs/req-001-core.md) holds the test.
+The quality goals of section 1, made testable. Each scenario names what happens, the response, and how it is measured; the requirement it cites holds the test.
 
 ### Containment
 
@@ -295,7 +293,7 @@ The quality goals of section 1, made testable. Each scenario names what happens,
 | MCP SDK breaking releases or new protocol revisions | Exact pin, separate update pull requests, tests per revision, ADR-002 triggers |
 | The SDK behaves differently from what its API suggests: three cases found before any code (extra arguments ignored, no leeway on `expires_at`, the verifier not seeing every rejection) | Each case has a test of Enterich's own behaviour, so a later SDK change shows up; ADR-002 and ADR-003 record the workarounds |
 | Enterich takes the raw arguments and returns tool errors through SDK parts that aren't its documented API (`ArgModelBase`, `FuncMetadata`, a returned `CallToolResult`) | Tests fail when unknown arguments stop arriving or an error loses its text; SDK updates come in their own pull requests |
-| ERPNext API or report output changes between versions | Fake ERPNext mirrors v16 responses; report operations verified against a real v16 site when built |
+| ERPNext API or report output changes between versions | Fake ERPNext mirrors v16 responses; report filters and columns checked against ERPNext v16.52's source (area specs); an integration test against a real site is in the [backlog](../backlog/backlog.md) |
 | Two identical creates at the same instant both pass the duplicate check | Accepted ([REQ-001 assumptions](../specs/req-001-core.md#assumptions)): one agent works in sequence, and a person reviews every draft |
 | A site gives the agent user select instead of read; lists silently lose fields | Configuration guide's rights table; integration test against a real site (backlog) |
 | A site runs a report as a prepared report, or ERPNext turns one into it after a run over 15 seconds | Enterich refuses with a clear message instead of waiting; the configuration guide says how to turn off the automatic switch |
@@ -305,7 +303,7 @@ The quality goals of section 1, made testable. Each scenario names what happens,
 | Abandoned drafts use up numbers of the naming series | The deployment's decision ([REQ-001 assumptions](../specs/req-001-core.md#assumptions)); the duplicate check catches retries |
 | Document IDs can carry outside text | Documented in [REQ-001's assumptions](../specs/req-001-core.md#assumptions); IDs are needed as inputs |
 | Prompt injection that leads the agent to leak data through other connectors | Outside text marked; the deployment keeps the connector apart from outbound ones |
-| One maintainer | Small scope, tests that run without ERPNext; the README will say "no support promised" when the repository goes public ([ITEM-001](../backlog/item-001-going-public.md)) |
+| One maintainer | Small scope, tests that run without ERPNext; the README says "no support promised" |
 
 ## 12. Glossary
 
