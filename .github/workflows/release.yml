@@ -32,10 +32,6 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-        with:
-          version: "0.13.6"
-          enable-cache: false
       - name: The version equals pyproject.toml's
         id: version
         env:
@@ -48,7 +44,7 @@ jobs:
             echo "::error::$version isn't a version X.Y.Z"
             exit 1
           fi
-          project=$(uv version --short)
+          project=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
           if [ "$project" != "$version" ]; then
             echo "::error::$version doesn't equal the version in pyproject.toml ($project)"
             exit 1

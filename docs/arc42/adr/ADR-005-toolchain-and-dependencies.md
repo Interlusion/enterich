@@ -45,7 +45,7 @@ The MCP SDK changes how Enterich talks to clients; an SDK update needs more care
 
 On every pull request and push to `main`, without secrets:
 
-- `uv lock --check` (lock matches `pyproject.toml`), then `uv sync --locked`;
+- `uv sync --locked`, which also fails when the lock doesn't match `pyproject.toml`;
 - ruff (check and format), mdformat (`--check`), the Markdown link check, basedpyright;
 - pytest, including the token cases and the tool-list snapshot, with branch coverage reported (not a gate) in the run's summary and, for pull requests from this repository's branches, as a comment;
 - a vulnerability audit of the locked dependencies with `uv audit` (OSV), so a known vulnerability stops a pull request before Dependabot's alert after the merge;
