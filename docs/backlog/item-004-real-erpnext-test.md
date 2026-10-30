@@ -36,8 +36,8 @@ Where the real site answers differently from `FakeErpnext`, the fake is correcte
 
 ## Steps
 
-- [ ] The site: script, pinned image, the company and the agent user with the rights of RIGHTS (`tests/e2e/seed.py`); locally and in the workflow (`e2e.yml`). Built and run locally: about 70 seconds on a fresh site, a few seconds on a kept one. Open until the workflow's first run, which needs `e2e.yml` on `main`.
-- [ ] The reads and reports of each area against the seed, with the catalogues' filters and columns.
+- [x] The site: script, pinned image, the company and the agent user with the rights of RIGHTS (`tests/e2e/seed.py`); locally and in the workflow (`e2e.yml`). About 70 seconds locally on a fresh site, a few seconds on a kept one; the workflow's first run on `main` (2026-10-30) took 3 minutes 8 seconds.
+- [x] The reads and reports of each area against the seed, with the catalogues' filters and columns. Every read answered as Enterich expects.
 - [ ] The drafts: create, update, warnings as comments, the duplicate check with people's drafts.
 - [ ] The ceiling: submit, cancel, delete, amend and discard refused for the agent's key.
 - [ ] The rights: each listed right removed in turn, and the operations that need it refused.
