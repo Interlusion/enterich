@@ -2,11 +2,12 @@
 
 | Meta | Value |
 | :- | :- |
-| **Status** | CANDIDATE |
+| **Status** | IMPLEMENTED |
 | **Type** | feature |
-| **Origin** | [ADR-004](../arc42/adr/ADR-004-releases-and-image.md); project rules in `AGENTS.md` |
+| **Origin** | [ADR-004](../../arc42/adr/ADR-004-releases-and-image.md); project rules in `AGENTS.md` |
 | **Created** | 2026-10-23 |
 | **Author** | loxy (drafted with Claude) |
+| **Implemented** | [v0.1.0](https://github.com/Interlusion/enterich/releases/tag/v0.1.0), 2026-10-30 |
 
 ## Summary
 
@@ -24,11 +25,11 @@ Before the move:
 - [x] **No separate product description (light spec):** decided against. The README says what Enterich is and isn't, and its generated tool list names each area's scope from the specs index; the guides cover operators and reviewers; the specs hold the details. A prose copy of the specs would drift with no test to catch it, and a website writes its copy from these when it needs one.
 - [x] `CONTRIBUTING.md`: spec first, tests first, Conventional Commits, no deployment facts, how to run the tests.
 - [x] Issue and pull request templates; `CODEOWNERS`.
-- [x] **Logo:** a drake, which fits the name, and nothing that uses or resembles ERPNext's or Frappe's marks ([ADR-006](../arc42/adr/ADR-006-licence-and-name.md)). `docs/assets/logo.webp` (320×320, round, transparent outside the circle) brings its own dark background, so one image serves both colour schemes; the README header shows it centred at 160 px, above the name. `docs/assets/social-preview.png` (1280×640) shows the same drake for the social preview.
+- [x] **Logo:** a drake, which fits the name, and nothing that uses or resembles ERPNext's or Frappe's marks ([ADR-006](../../arc42/adr/ADR-006-licence-and-name.md)). `docs/assets/logo.webp` (320×320, round, transparent outside the circle) brings its own dark background, so one image serves both colour schemes; the README header shows it centred at 160 px, above the name. `docs/assets/social-preview.png` (1280×640) shows the same drake for the social preview.
 - [x] **Version source:** the version in `pyproject.toml`, which the release workflow compares with the tag.
-- [x] **Release workflow** (`release.yml`) as the [releasing guide](../guides/releasing.md) describes it, including the dry run; the dry run passes on the default branch. It can't publish until its `publish` job gets its permissions (below), and refuses a tag outside `interlusion/enterich`. The dry run passed on `main` on 2026-10-29; it is repeated after every change to the workflows, as the releasing guide says.
+- [x] **Release workflow** (`release.yml`) as the [releasing guide](../../guides/releasing.md) describes it, including the dry run; the dry run passes on the default branch. It can't publish until its `publish` job gets its permissions (below), and refuses a tag outside `interlusion/enterich`. The dry run passed on `main` on 2026-10-29; it is repeated after every change to the workflows, as the releasing guide says.
 - [x] **The repository named `enterich`:** created empty and private as `Interlusion/enterich`, so the code moves by a push, not a transfer.
-- [x] **Verifying an image:** a section in the [configuration guide](../guides/configuration.md) showing deployers how to check an image's provenance before deploying it (`gh attestation verify`), written against the final workflow.
+- [x] **Verifying an image:** a section in the [configuration guide](../../guides/configuration.md) showing deployers how to check an image's provenance before deploying it (`gh attestation verify`), written against the final workflow.
 
 The move:
 
@@ -41,22 +42,18 @@ The move:
 
 After the move:
 
-- [x] Organisation: two-factor authentication required for members. Set on 2026-10-30. The other member settings wait for a second member ([backlog](backlog.md)).
+- [x] Organisation: two-factor authentication required for members. Set on 2026-10-30. The other member settings wait for a second member ([backlog](../backlog.md)).
 - [x] Settings: Dependabot alerts and security updates on.
 - [x] Rulesets: `main` protected (pull request, green CI, no force push); tags `v*` immutable (no update, no deletion).
 - [x] About box: a description following the README's first sentence; topics (`mcp`, `mcp-server`, `model-context-protocol`, `erpnext`, `oauth2`, `python`); the website field empty until there is one to link.
 - [x] Social preview image uploaded in the repository settings.
 - [x] `release.yml`'s `publish` job given `packages: write`, `id-token: write`, `attestations: write`, `artifact-metadata: write` (the attestation's storage record, which the action creates in an organisation) and `contents: write` (for the GitHub release), that job only; the dry run repeated in the organisation.
 - [x] Confirm the image name (`ghcr.io/interlusion/enterich`).
-- [ ] First tag (`v0.1.0`) following the [releasing guide](../guides/releasing.md); the package linked to the repository and made public.
-- [ ] Check the published image pulls on amd64 and arm64 and its attestation verifies (`gh attestation verify`).
+- [x] First tag (`v0.1.0`) following the [releasing guide](../../guides/releasing.md); the package linked to the repository and made public. Released on 2026-10-30; the organisation's package settings allow public packages for it.
+- [x] Check the published image pulls on amd64 and arm64 and its attestation verifies (`gh attestation verify`). Checked on 2026-10-30, the pull without a login.
 
-After the first release:
-
-- [ ] **MCP Registry:** a `server.json` in the repository describing Enterich and its image (reviewed and versioned like the code; updated by each release), published to the official MCP Registry. Check how third-party directories that copy the registry describe Enterich.
-- [ ] **Announcement:** planned and done outside this repository; it follows the first release, never comes before it.
+After the first release: the MCP Registry entry and the announcement moved to [ITEM-003](../item-003-mcp-registry-and-announcement.md) on 2026-10-30, since the registry needs a label the v0.1.0 image doesn't carry.
 
 ## Open Questions
 
-- Should the organisation require signed commits or tags?
-- OpenSSF Scorecard as a CI job after going public?
+None. Signed commits or tags, and OpenSSF Scorecard, moved to the [backlog](../backlog.md) on 2026-10-30.

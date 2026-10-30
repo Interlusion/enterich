@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-26 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: no release yet; the first follows [ITEM-001](../backlog/item-001-going-public.md) |
+| **Status** | Draft: every step run for v0.1.0, the first release |
 
 Why it works this way: [ADR-004](../arc42/adr/ADR-004-releases-and-image.md).
 
@@ -36,9 +36,21 @@ The version lives in one place: `version` in `pyproject.toml`, set with `uv vers
 
 ## Dry run
 
-`release.yml` can also be started by hand (`workflow_dispatch`) with a version: in GitHub under Actions, Release, Run workflow, or `gh workflow run release.yml -f version=X.Y.Z`. It runs the same `image.yml` as a release, with read rights only: the version check, the build for both architectures, the tests in both, and the same build step for the runtime image, which it writes as an OCI image layout instead of pushing it. `scripts/image_index.py` then checks that the layout holds the image under its release name for both architectures, each with SBOM and provenance, and that no provenance carries GitHub's event payload, which for a tag push names people with their email addresses. The run's artefact `dry-run-X.Y.Z` holds the release notes, the tools file, and the SBOM and provenance per architecture. The version must equal `pyproject.toml`'s, so a dry run checks the version about to be released; where `CHANGELOG.md` has no section for it yet, as before the first release, the notes are the `Unreleased` section.
+`release.yml` can also be started by hand (`workflow_dispatch`) with a version: in GitHub under Actions, Release, Run workflow, or `gh workflow run release.yml -f version=X.Y.Z`. It runs the same `image.yml` as a release, with read rights only: the version check, the build for both architectures, the tests in both, and the same build step for the runtime image, which it writes as an OCI image layout instead of pushing it. `scripts/image_index.py` then checks that the layout holds the image under its release name for both architectures, each with SBOM and provenance, and that no provenance carries GitHub's event payload, which for a tag push names people with their email addresses. The run's artefact `dry-run-X.Y.Z` holds the release notes, the tools file, and the SBOM and provenance per architecture. The version must equal `pyproject.toml`'s, so a dry run checks the version about to be released; where `CHANGELOG.md` has no section for it yet, the notes are the `Unreleased` section.
 
-Only a tag run signs in to GHCR, pushes, attests and creates the release; those steps are first run for real. Run the dry run before the first release and after every change to `release.yml`, `image.yml`, the scripts they run or the `Dockerfile`.
+Only a tag run signs in to GHCR, pushes, attests and creates the release. Run the dry run after every change to `release.yml`, `image.yml`, the scripts they run or the `Dockerfile`.
+
+## With an agent
+
+An agent does the steps above except the decisions and what needs GitHub's interface or API (`AGENTS.md`):
+
+- **The operator** decides to release and on the version, starts the dry run, opens and merges the pull request, and gives the go for the tag.
+- **The agent** proposes the version from `Unreleased` and the table above, prepares the release branch (step 1) and the pull request's title and description, pushes when asked, and creates and pushes the tag only after the operator's go: a tag can't be taken back. If the merge falls on a later day than the changelog's date, it changes the date first.
+- **The checks after the tag run** (step 4) without `api.github.com`:
+  - The release: `https://github.com/Interlusion/enterich/releases.atom` lists the pushed tag at once; the release is the entry titled `Enterich X.Y.Z`, with the digest at the end of its notes.
+  - Both architectures: `docker buildx imagetools inspect ghcr.io/interlusion/enterich:X.Y.Z`.
+  - The pull without a login: `docker pull` with `DOCKER_CONFIG` pointing at an empty directory, so a stored GHCR login doesn't hide a private package.
+  - The attestation: the command in the [configuration guide](configuration.md#verifying-an-image), run by the operator, or by the agent with a `gh` login that is logged out afterwards. Without a terminal, `gh attestation verify` prints nothing on success; read its exit code or add `--format json`.
 
 ## When it fails
 
