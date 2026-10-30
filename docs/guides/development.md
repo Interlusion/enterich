@@ -27,6 +27,8 @@ tests/
   e2e/               Enterich against a fake JWKS and a fake ERPNext, named
                      by area like tools/, an area's drafts in their own
                      module (test_order_to_cash_drafts.py)
+  repo/              checks of repository files (README, changelog, guides,
+                     scripts); not in the image, which runs unit/ and e2e/
   fakes/             the fakes, recording every request
   snapshots/         tools.json: the published tool list
   readme.py          the README's tool list, from tools.json and the specs index

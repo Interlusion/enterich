@@ -40,17 +40,14 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=0 \
     UV_PROJECT_ENVIRONMENT=/app/.venv
-COPY pyproject.toml uv.lock README.md LICENSE ./
-COPY src ./src
+# The test group added to the runtime's environment, leaving Enterich as installed.
+COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --group test --no-editable
+    uv sync --locked --no-dev --group test --no-install-project --inexact
+# tests/repo and tests/readme.py read repository files; they run on the runner only.
 COPY tests ./tests
-# The docs whole: tests read the guides, the specs index and the README's sources.
-COPY docs ./docs
-COPY CHANGELOG.md ./
-COPY scripts/changelog.py scripts/image_index.py ./scripts/
 USER 10001:10001
 ENTRYPOINT []
-CMD ["python", "-m", "pytest", "-q", "-p", "no:cacheprovider"]
+CMD ["python", "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/unit", "tests/e2e"]
 
 FROM runtime

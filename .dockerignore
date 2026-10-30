@@ -8,3 +8,5 @@
 .coverage
 htmlcov
 dist
+tests/repo
+tests/readme.py
