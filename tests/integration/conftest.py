@@ -3,11 +3,11 @@ from collections.abc import Iterator
 import pytest
 
 from tests.conftest import Logs
-from tests.e2e.clock import TIMEZONE, freeze
-from tests.e2e.mcp import Session, client
 from tests.fakes.erpnext import FakeErpnext
 from tests.fakes.jwks import FakeJwks, Signer, token
 from tests.fakes.settings import API_KEY, API_SECRET, settings
+from tests.integration.clock import TIMEZONE, freeze
+from tests.integration.mcp import Session, client
 
 
 @pytest.fixture(autouse=True)

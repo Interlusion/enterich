@@ -1,4 +1,4 @@
-"""Purchase invoice drafts end to end (REQ-005-PRS-F005, REQ-005-PRS-F006,
+"""Purchase invoice drafts (REQ-005-PRS-F005, REQ-005-PRS-F006,
 REQ-005-PRS-F007). REQ-001's draft rules are tested through the sales drafts; these tests
 show the buying side's bodies, its duplicate match by supplier invoice number, and its
 warnings."""
@@ -8,8 +8,6 @@ from typing import Any
 
 import pytest
 
-from tests.e2e.clock import TODAY
-from tests.e2e.mcp import Result, Session
 from tests.fakes.erpnext import (
     COMPANY,
     STOCK_NOT_BILLED,
@@ -20,6 +18,8 @@ from tests.fakes.erpnext import (
     supplier,
     tax_template,
 )
+from tests.integration.clock import TODAY
+from tests.integration.mcp import Result, Session
 
 PATH = "/api/resource/Purchase Invoice"
 DRAFT = "ACC-PINV-2026-00010"

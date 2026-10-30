@@ -1,11 +1,10 @@
-"""Bank and cash end to end (REQ-007-PRS-F001, REQ-007-PRS-F002, REQ-007-PRS-F003): the
+"""Bank and cash (REQ-007-PRS-F001, REQ-007-PRS-F002, REQ-007-PRS-F003): the
 company's bank accounts, its bank transactions and its payment entries."""
 
 from typing import Any
 
 import pytest
 
-from tests.e2e.mcp import Session
 from tests.fakes.erpnext import (
     COMPANY,
     FakeErpnext,
@@ -13,6 +12,7 @@ from tests.fakes.erpnext import (
     bank_transaction,
     payment_entry,
 )
+from tests.integration.mcp import Session
 
 BANK_ACCOUNT_FIELDS = [
     "name",

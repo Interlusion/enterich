@@ -132,7 +132,7 @@ Checked against ERPNext v16.52 source:
 
 Not checked yet:
 
-- The rights in the Rights section are the minimum; the integration test proves them (REQ-002-PRS-NF013).
+- The rights in the Rights section are the minimum; the end-to-end test proves them (REQ-002-PRS-NF013).
 
 ## Open Questions
 

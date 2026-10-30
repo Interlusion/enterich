@@ -229,7 +229,7 @@ Variables: [configuration guide](../guides/configuration.md).
 
 - **Limits** ([REQ-001-PRS-NF003](../specs/req-001-core.md#req-001-prs-nf003-result-limits), [REQ-002-PRS-NF011](../specs/req-002-service.md#req-002-prs-nf011-limits)) stay below what hosted clients enforce, so Enterich's own message arrives rather than a client's cut-off: Claude's hosted apps, for example, allowed about 150,000 characters per tool result and 240 s per tool call (October 2026).
 
-- **Testing:** unit tests per block; end-to-end tests run Enterich against a fake JWKS and a fake ERPNext that records every request, so each test can assert exactly what ERPNext received. A snapshot of `tools/list` pins the public tool contract.
+- **Testing:** unit tests per block; integration tests run Enterich against a fake JWKS and a fake ERPNext that records every request, so each test can assert exactly what ERPNext received. A snapshot of `tools/list` pins the public tool contract.
 
 ## 9. Architecture decisions
 
@@ -246,7 +246,7 @@ The quality goals of section 1, made testable. Each scenario names what happens,
 | QS-01 | A manipulated agent tries to submit, cancel or delete, or sends `docstatus: 1` in a create | No operation exists for it; the extra input is refused before ERPNext; zero writes reach ERPNext | [REQ-001-PRS-F002](../specs/req-001-core.md#req-001-prs-f002-draft-create-operations), [REQ-001-PRS-F006](../specs/req-001-core.md#req-001-prs-f006-no-generic-operations) |
 | QS-02 | The agent updates a draft that a person submitted after the agent read it | Refused by Enterich's check or by ERPNext (stale `modified`, no submit right); the document is unchanged | [REQ-001-PRS-F003](../specs/req-001-core.md#req-001-prs-f003-draft-update-operations), [REQ-001-PRS-F004](../specs/req-001-core.md#req-001-prs-f004-stale-updates-refused) |
 | QS-03 | The agent asks for another company's invoice by name | Answered as "doesn't exist or isn't permitted"; no field of the other company's document returned | [REQ-001-PRS-F007](../specs/req-001-core.md#req-001-prs-f007-the-assigned-company-from-configuration) |
-| QS-04 | The client calls every write operation without asking a person | The same limits apply; the end-to-end suite passes with a client that never confirms | [REQ-001-PRS-F013](../specs/req-001-core.md#req-001-prs-f013-no-approval-in-the-loop) |
+| QS-04 | The client calls every write operation without asking a person | The same limits apply; the integration suite passes with a client that never confirms | [REQ-001-PRS-F013](../specs/req-001-core.md#req-001-prs-f013-no-approval-in-the-loop) |
 | QS-05 | A name input is `X?run_method=discard` | It reaches ERPNext as one encoded path segment; no document method runs | [REQ-001-PRS-F010](../specs/req-001-core.md#req-001-prs-f010-name-inputs-stay-names) |
 
 ### Access control
@@ -293,9 +293,9 @@ The quality goals of section 1, made testable. Each scenario names what happens,
 | MCP SDK breaking releases or new protocol revisions | Exact pin, separate update pull requests, tests per revision, ADR-002 triggers |
 | The SDK behaves differently from what its API suggests: three cases found before any code (extra arguments ignored, no leeway on `expires_at`, the verifier not seeing every rejection) | Each case has a test of Enterich's own behaviour, so a later SDK change shows up; ADR-002 and ADR-003 record the workarounds |
 | Enterich takes the raw arguments and returns tool errors through SDK parts that aren't its documented API (`ArgModelBase`, `FuncMetadata`, a returned `CallToolResult`) | Tests fail when unknown arguments stop arriving or an error loses its text; SDK updates come in their own pull requests |
-| ERPNext API or report output changes between versions | Fake ERPNext mirrors v16 responses; report filters and columns checked against ERPNext v16.52's source (area specs); an integration test against a real site is in the [backlog](../backlog/backlog.md) |
+| ERPNext API or report output changes between versions | Fake ERPNext mirrors v16 responses; report filters and columns checked against ERPNext v16.52's source (area specs); an end-to-end test against a real site is in the [backlog](../backlog/backlog.md) |
 | Two identical creates at the same instant both pass the duplicate check | Accepted ([REQ-001 assumptions](../specs/req-001-core.md#assumptions)): one agent works in sequence, and a person reviews every draft |
-| A site gives the agent user select instead of read; lists silently lose fields | Configuration guide's rights table; integration test against a real site (backlog) |
+| A site gives the agent user select instead of read; lists silently lose fields | Configuration guide's rights table; end-to-end test against a real site (backlog) |
 | A site runs a report as a prepared report, or ERPNext turns one into it after a run over 15 seconds | Enterich refuses with a clear message instead of waiting; the configuration guide says how to turn off the automatic switch |
 | The authorization server's agent-only login flow is missing or wrong; a person's session then gets a token through the agent's client | Enterich's subject check refuses it in any case (tested in Enterich); the Keycloak guide gives the flow and a check, marked untested |
 | An authorization server issues long-lived access tokens; disabling the identity there acts late | Deployment requirement in the configuration and Keycloak guides; optional maximum lifetime in the backlog |

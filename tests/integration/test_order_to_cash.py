@@ -1,4 +1,4 @@
-"""Order to cash end to end, the reads (REQ-004-PRS-F001, REQ-004-PRS-F002,
+"""Order to cash, the reads (REQ-004-PRS-F001, REQ-004-PRS-F002,
 REQ-004-PRS-F003, REQ-004-PRS-F004), and through them REQ-001's states, dates, reports
 and the company check (REQ-001-PRS-F007, REQ-001-PRS-F014)."""
 
@@ -6,8 +6,6 @@ from typing import Any
 
 import pytest
 
-from tests.e2e.clock import TODAY
-from tests.e2e.mcp import Session
 from tests.fakes.erpnext import (
     COMPANY,
     FakeErpnext,
@@ -17,6 +15,8 @@ from tests.fakes.erpnext import (
     sales_invoice,
     tax_template,
 )
+from tests.integration.clock import TODAY
+from tests.integration.mcp import Session
 
 CUSTOMER_FIELDS = [
     "name",

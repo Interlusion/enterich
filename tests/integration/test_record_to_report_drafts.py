@@ -1,4 +1,4 @@
-"""Journal entry drafts end to end (REQ-006-PRS-F005, REQ-006-PRS-F006, REQ-006-PRS-F007,
+"""Journal entry drafts (REQ-006-PRS-F005, REQ-006-PRS-F006, REQ-006-PRS-F007,
 REQ-006-PRS-F008). REQ-001's draft rules are tested through the sales drafts; these tests
 show the journal entry's bodies, its rules before ERPNext, its duplicate match and its
 rounding warning."""
@@ -7,8 +7,6 @@ from typing import Any
 
 import pytest
 
-from tests.e2e.clock import TODAY
-from tests.e2e.mcp import Result, Session
 from tests.fakes.erpnext import (
     COMPANY,
     FakeErpnext,
@@ -16,6 +14,8 @@ from tests.fakes.erpnext import (
     customer,
     journal_entry,
 )
+from tests.integration.clock import TODAY
+from tests.integration.mcp import Result, Session
 
 PATH = "/api/resource/Journal Entry"
 DRAFT = "ACC-JV-2026-00010"

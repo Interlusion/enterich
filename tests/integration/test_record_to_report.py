@@ -1,4 +1,4 @@
-"""Record to report end to end, the reads (REQ-006-PRS-F001, REQ-006-PRS-F002,
+"""Record to report, the reads (REQ-006-PRS-F001, REQ-006-PRS-F002,
 REQ-006-PRS-F003, REQ-006-PRS-F004): accounts, cost centres, journal entries, the General
 Ledger and the Trial Balance."""
 
@@ -6,7 +6,6 @@ from typing import Any
 
 import pytest
 
-from tests.e2e.mcp import Session
 from tests.fakes.erpnext import (
     COMPANY,
     FakeErpnext,
@@ -21,6 +20,7 @@ from tests.fakes.erpnext import (
     ledger,
     ledger_entry,
 )
+from tests.integration.mcp import Session
 
 ACCOUNT_FIELDS = [
     "name",

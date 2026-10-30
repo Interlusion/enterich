@@ -349,7 +349,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 **Definition of Done**:
 
-- The end-to-end suite calls every operation, including every refusal case, with a client that never confirms anything.
+- The integration suite calls every operation, including every refusal case, with a client that never confirms anything.
 - No code path sends a request to the client or reads an annotation for a decision.
 - Verification: test and inspection.
 - Evidence: Enterich's test suite; code review at each release.
@@ -538,7 +538,7 @@ Checked against Frappe and ERPNext v16.52 source:
 
 Not checked yet:
 
-- ERPNext v16's REST API: `/api/resource` for lists, inserts and updates; `frappe.client.get` for a document with its rows; `frappe.desk.query_report.run` for reports; ERPNext's `get_taxes_and_charges` for a template's rows. Enterich calls these only with fixed DocTypes, reports and methods. Report filters and columns are checked against ERPNext v16.52's source (area specs); an integration test against a real site is in the backlog.
+- ERPNext v16's REST API: `/api/resource` for lists, inserts and updates; `frappe.client.get` for a document with its rows; `frappe.desk.query_report.run` for reports; ERPNext's `get_taxes_and_charges` for a template's rows. Enterich calls these only with fixed DocTypes, reports and methods. Report filters and columns are checked against ERPNext v16.52's source (area specs); an end-to-end test against a real site is in the backlog.
 - The deployment gives the agent user a role without submit, cancel, amend, delete, share, import or export, and a User Permission on the assigned company. Enterich neither creates nor checks the role.
 - A draft takes the next number of its naming series when created, and an abandoned draft keeps it. Whether that's acceptable is the deployment's decision.
 - Two identical creates at the same instant can both pass the duplicate check. One agent works through one conversation in sequence, and a person reviews every draft, so this is accepted.

@@ -14,11 +14,11 @@ The package's modules and what each is responsible for: [architecture, section 5
 src/enterich/        the package; __main__.py is the entry point (python -m enterich)
 tests/
   unit/              per module
-  e2e/               Enterich against a fake JWKS and a fake ERPNext, named
+  integration/       Enterich against a fake JWKS and a fake ERPNext, named
                      by area like tools/, an area's drafts in their own
                      module (test_order_to_cash_drafts.py)
   repo/              checks of repository files (README, changelog, guides,
-                     scripts); not in the image, which runs unit/ and e2e/
+                     scripts); not in the image, which runs unit/ and integration/
   fakes/             the fakes, recording every request
   snapshots/         tools.json: the published tool list
   readme.py          the README's tool list, from tools.json and the specs index
@@ -38,6 +38,12 @@ pyproject.toml, uv.lock, .python-version
 .github/ISSUE_TEMPLATE/, pull_request_template.md, CODEOWNERS
 lychee.toml          the link check's settings
 ```
+
+The tests have three levels:
+
+- **Unit:** one module, its collaborators replaced where they reach outside.
+- **Integration:** Enterich as a whole, from the MCP request to its ERPNext calls, with its neighbours faked: the authorization server's keys (`FakeJwks`) and ERPNext (`FakeErpnext`).
+- **End-to-end:** from the MCP request to a real ERPNext site; only the token issuer is faked. Not built yet.
 
 Why this toolchain: [ADR-005](../arc42/adr/ADR-005-toolchain-and-dependencies.md).
 
@@ -69,7 +75,7 @@ The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The run
 ## Rules for changes
 
 - **Spec first.** A new operation, input or output field starts as a change to its area spec's catalogue ([specs index](../specs/README.md)), then tests, then code. Read REQ-001 too: its rules apply to every operation.
-- **Tests first** where a spec's Definition of Done describes the behaviour: the failing test is written from it, run red and committed before the code (`test:`, then `feat:` or `fix:`). Infrastructure (image, CI) and trying out a library's behaviour are exceptions; what they teach becomes a test afterwards. An operation's e2e test asserts exactly what the fake ERPNext received.
+- **Tests first** where a spec's Definition of Done describes the behaviour: the failing test is written from it, run red and committed before the code (`test:`, then `feat:` or `fix:`). Infrastructure (image, CI) and trying out a library's behaviour are exceptions; what they teach becomes a test afterwards. An operation's integration test asserts exactly what the fake ERPNext received.
 - **The tool-list snapshot** changes only together with the area spec and a changelog line. Regenerate with `uv run pytest --snapshot-update` (syrupy) and review the diff; then write the README's tool list from it with `uv run python -m tests.readme`, which a test checks.
 - **No deployment facts:** hostnames, realms, client names, user IDs, company names, credentials or a site's tool selection never go into code, tests, docs or commit messages. Use `example.com`, `Example GmbH`, zero UUIDs.
 - **Never log** keys, secrets or tokens; tests check it.
