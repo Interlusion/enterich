@@ -263,7 +263,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - The published tool list equals the operations of the area specs, held as a snapshot that changes only with a reviewed change to those specs.
 - No input schema has a property that accepts a DocType, report, method, field list, filter or path; no ERPNext call Enterich makes sends a document with `docstatus` other than 0 or with `amended_from`, or uses `run_method` or `run_doc_method`, the submit, cancel, delete or discard routes, or the purchase invoice block and release-date methods.
 - Verification: inspection and test.
-- Evidence: the tool-list snapshot in Enterich's test suite.
+- Evidence: the tool-list snapshot in Enterich's test suite; `FakeErpnext` refuses and records every such call, and each integration test fails on one.
 
 #### REQ-001-PRS-F007: The assigned company from configuration
 

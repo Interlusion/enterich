@@ -291,6 +291,9 @@ class FakeErpnext:
     redirect: bool = False
     huge_response: bool = False
     raw: tuple[int, bytes] | None = None  # (status, body) for every request
+    # The side doors Enterich used (REQ-001-PRS-F006); the integration tests' fixture fails
+    # on any
+    doors: list[str] = field(default_factory=list[str])
     # report name -> rows, as the report's execute() returns them
     reports: dict[str, list[dict[str, Any]]] = field(
         default_factory=dict[str, list[dict[str, Any]]]
@@ -341,6 +344,9 @@ class FakeErpnext:
         self.received.append(
             Received(request.method, request.url.path, params, dict(request.headers), body)
         )
+        if door := _door(request, body):
+            self.doors.append(door)
+            return httpx2.Response(403, json=error(403, "PermissionError", door))
         if self.delay:
             await anyio.sleep(self.delay)
         headers = {"set-cookie": "sid=abc; Path=/"} if self.set_cookie else {}
@@ -629,6 +635,60 @@ def _rows(doc: dict[str, Any], table: str) -> list[dict[str, Any]]:
 
 TAXES_METHOD = "/api/method/erpnext.controllers.accounts_controller.get_taxes_and_charges"
 COMMENT_METHOD = "/api/method/frappe.desk.form.utils.add_comment"
+
+
+# REQ-001-PRS-F006's doors: methods that post, cancel, delete, discard or run a document's
+# methods, or change a submitted purchase invoice
+DOOR_METHODS = (
+    "submit",
+    "cancel",
+    "delete",
+    "discard",
+    "run_method",
+    "run_doc_method",
+    "runserverobj",
+    "delete_items",
+    "cancel_all_linked_docs",
+    "apply_workflow",
+    "block_invoice",
+    "unblock_invoice",
+    "change_release_date",
+)
+# The last name of a method route: v1 and v2 by dotted path, v2 by a document's method.
+# Matched on the raw path, where a slash in a name stays encoded.
+METHOD_ROUTE = re.compile(
+    r"/api/(?:v[12]/)?method/(?:[^/]*\.)?([^/.]+)|/api/v2/document/[^/]+/[^/]+/method/([^/]+)"
+)
+
+
+def _door(request: httpx2.Request, body: Any) -> str | None:
+    """The side door a request takes, if any: a DELETE, a document that posts or amends,
+    a method or parameter that runs one. Names are data, so only method routes and
+    parameter keys count, never a name a resource path or a parameter value carries."""
+    if request.method == "DELETE":
+        return f"DELETE {request.url.path}"
+    # Frappe reads parameters from the query and the body alike
+    params: dict[str, Any] = {
+        **request.url.params,
+        **(cast("dict[str, Any]", body) if isinstance(body, dict) else {}),
+    }
+    nested = params.get("doc")
+    if isinstance(nested, str):
+        nested = json.loads(nested) if nested.startswith("{") else None
+    for doc in (cast("dict[str, Any]", body) if isinstance(body, dict) else {}, nested or {}):
+        if doc.get("docstatus", 0) != 0:
+            return "a document with docstatus other than 0"
+        if "amended_from" in doc:
+            return "a document with amended_from"
+    if "run_method" in params:
+        return "the run_method parameter"
+    if route := METHOD_ROUTE.fullmatch(request.url.raw_path.decode().split("?")[0]):
+        method = route[1] or route[2]
+        if method in DOOR_METHODS:
+            return f"the method {method}"
+        if method == "savedocs" and params.get("action") != "Save":
+            return f"savedocs with the action {params.get('action')}"
+    return None
 
 
 def _unknown_field(doctype: str, params: dict[str, str]) -> str | None:
