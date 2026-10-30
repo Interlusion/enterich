@@ -48,7 +48,7 @@ On every pull request and push to `main`, without secrets:
 - `uv lock --check` (lock matches `pyproject.toml`), then `uv sync --locked`;
 - ruff (check and format), mdformat (`--check`), the Markdown link check, basedpyright;
 - pytest, including the token cases and the tool-list snapshot, with branch coverage reported (not a gate) in the run's summary and, for pull requests from this repository's branches, as a comment;
-- a vulnerability audit of the locked dependencies (`pip-audit` over `uv export`), because Dependabot alerts may only be switched on later;
+- a vulnerability audit of the locked dependencies with `uv audit` (OSV), so a known vulnerability stops a pull request before Dependabot's alert after the merge;
 - actionlint, with shellcheck for their `run:` scripts, and zizmor for the workflows;
 - gitleaks over the diff;
 - the image built for `linux/amd64` and `linux/arm64`, each on a runner of its own architecture, with the tests run in its `test` stage.

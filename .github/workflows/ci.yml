@@ -51,9 +51,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Vulnerability audit of the lock
-        run: |
-          uv export --locked --format requirements-txt --no-emit-project > "$RUNNER_TEMP/requirements.txt"
-          uv run pip-audit --strict --require-hashes --disable-pip -r "$RUNNER_TEMP/requirements.txt"
+        run: uv audit --locked
       - name: Workflows
         run: scripts/check-workflows.sh
 

@@ -22,16 +22,15 @@ enterich = "enterich.__main__:main"
 [dependency-groups]
 # What the image's test stage installs.
 test = [
-    "coverage>=7.17.0",
     "pytest>=9.1.1",
     "syrupy>=6.1.1",
 ]
 dev = [
     { include-group = "test" },
     "basedpyright>=1.40.2",
+    "coverage>=7.17.0",
     "mdformat>=1.0.0",
     "mdformat-gfm>=1.0.0",
-    "pip-audit>=2.10.1",
     "ruff>=0.17.3",
     "zizmor>=1.31.1",
 ]
