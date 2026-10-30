@@ -4,27 +4,27 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+The first release.
+
 ### Added
 
-- Requirement specifications (REQ-001 core, REQ-002 service, REQ-003 to REQ-007 by accounting area), architecture, ADRs 001–007, guides (including Keycloak as authorization server) and backlog.
-- The service without operations: configuration from `ENTERICH_*` variables (REQ-002-PRS-NF005), the token check with JWKS cache (REQ-002-PRS-NF001, REQ-002-PRS-NF007), protected resource metadata (REQ-002-PRS-NF002), MCP over stateless Streamable HTTP with an empty tool list (REQ-002-PRS-NF003), the JSON log with `start`, `rejection`, `jwks` and `error` events (REQ-002-PRS-NF008, REQ-002-PRS-NF009), the 1 MiB body limit (REQ-002-PRS-NF011) and `/healthz` (REQ-002-PRS-NF012).
-- Container image (runtime and test stages, amd64 and arm64), CI with a Markdown link check, the release workflow with its dry run, and Dependabot.
-- The ERPNext client: the agent user's key only, the configured Host, no cookies, redirects or proxies (REQ-002-PRS-NF006), 30 s per call and 10 MiB per answer (REQ-002-PRS-NF011), ERPNext's refusals as plain text (REQ-001-PRS-F008).
-- REQ-001's conventions for every operation: strict input schemas, name inputs, literal search, outside text apart, child tables cut at 100 rows and texts in gets at 500 characters, results under 100,000 characters, the 60 s operation limit, the `operation` log line, `ENTERICH_TOOLS`.
-- Master data: `list_items` and `get_item` (REQ-003).
-- Order to cash, the reads: `list_customers`, `get_customer`, `list_sales_invoices`, `get_sales_invoice`, `list_sales_tax_templates` and `report_accounts_receivable` (REQ-004); with them REQ-001's invoice states, dates, the company check on gets, and reports paged by Enterich without ERPNext's total row.
-- Order to cash, the drafts: `create_draft_sales_invoice` and `update_draft_sales_invoice` (REQ-004); with them REQ-001's draft rules: tax rows from the template, the duplicate check and `allow_duplicate`, stale updates refused, clearable fields, and warnings for a template without tax and for rates ERPNext set (REQ-001-PRS-F016), added to the draft as a comment. A row without `rate` is priced by ERPNext. Due dates follow REQ-001-PRS-F017: a given due date stands as the only payment term, and an update that changes a date, or saves a draft whose posting date moves to today, lets ERPNext rebuild the payment schedule and count the due date again.
-- Procure to pay: `list_suppliers`, `get_supplier`, `list_purchase_invoices`, `get_purchase_invoice`, `list_purchase_tax_templates`, `report_accounts_payable` with the supplier's invoice number and date, `create_draft_purchase_invoice` and `update_draft_purchase_invoice` (REQ-005). Purchase drafts never update stock; a supplier invoice number already recorded for the supplier is refused unless `allow_duplicate` is true; an update to a recorded one is a warning; an expense account ERPNext replaced is a warning (REQ-005-PRS-F007); a supplier with a tax withholding category or group gets `apply_tds`, as in the form.
-- Record to report, the reads: `list_accounts`, `list_cost_centers`, `list_journal_entries`, `get_journal_entry`, `report_general_ledger` and `report_trial_balance` (REQ-006). The General Ledger gives opening, closing and running balance with an account or party; the Trial Balance finds its fiscal year as ERPNext does. Both take ERPNext's summary rows by position, not by their translated labels, and Enterich sums the totals as decimals. Reports ERPNext runs as snapshot reports are refused, as prepared reports are.
-- Record to report, the drafts: `create_draft_journal_entry` and `update_draft_journal_entry` (REQ-006), for the voucher type Journal Entry in the company's currency. Enterich refuses a draft that wouldn't balance as exact decimals, a row with both or neither of debit and credit, a party without its type and a reference number without its date before ERPNext sees it, and warns when ERPNext's rounding leaves the totals apart (REQ-006-PRS-F008).
-- Bank and cash: `list_bank_accounts`, `list_bank_transactions`, `get_bank_transaction`, `list_payment_entries` and `get_payment_entry` (REQ-007). Bank transactions are unreconciled by default; `pending` shows the drafts a statement import left, and each line comes with its party where one is set or matched. Payment entries carry their bank account, unallocated amount and clearance date.
+- **An MCP server for ERPNext** over stateless Streamable HTTP, with 31 tools in five accounting areas, each with a fixed purpose and input schema. The README lists them; `enterich-X.Y.Z-tools.json` with each release holds their full contract.
+- **Access by OAuth:** access tokens from an external authorization server, checked by Enterich itself against the server's keys (issuer, audience, client, subject), and protected resource metadata for MCP clients. The Keycloak guide shows a setup.
+- **One ERPNext user:** Enterich calls ERPNext's REST API with the API key of a dedicated agent user and nothing else. Whatever Enterich does, that user's role is the upper limit.
+- **Master data:** items.
+- **Order to cash:** customers, sales invoices, sales tax templates and Accounts Receivable; draft sales invoices, created and updated.
+- **Procure to pay:** suppliers, purchase invoices, purchase tax templates and Accounts Payable; draft purchase invoices, created and updated. A supplier's invoice number already recorded is refused.
+- **Record to report:** accounts, cost centres, journal entries, General Ledger and Trial Balance; draft journal entries, created and updated, refused unless they balance.
+- **Bank and cash:** bank accounts, bank transactions (unreconciled by default) and payment entries.
+- **Drafts only:** the agent can create and update drafts but never submit, cancel, amend or delete. A create that matches an existing document is refused unless the agent says it is meant; an update to a draft that changed since it was read is refused. Warnings, such as a rate a pricing rule changed, are added to the draft as a comment starting with "Enterich:" (reviewing-drafts guide).
+- **Limits:** long results and texts are cut and marked, request bodies are limited to 1 MiB, ERPNext calls to 30 s and operations to 60 s.
+- **Operations:** one JSON line per event, with no keys, secrets or tokens, and `/healthz`.
+- **Image:** `ghcr.io/interlusion/enterich:X.Y.Z` for amd64 and arm64, with SBOM, provenance and an attestation to check before deploying (configuration guide).
+
+### Configuration
+
+- Everything comes from environment variables starting with `ENTERICH_`: the authorization server and the token's expected issuer, audience, client and subject; ERPNext's URL, the agent user's API key and secret, and the company; optionally `ENTERICH_TOOLS` to offer only some operations. The configuration guide lists each variable.
 
 ### Rights
 
-- `list_items`, `get_item`: Item read (REQ-003's Rights section).
-- The REQ-004 reads: Customer, Address, Sales Invoice, Sales Taxes and Charges Template read; Accounts Receivable needs Sales Invoice read and report, Journal Entry read, and the agent's role on the report (REQ-004's Rights section; the configuration guide says how to grant a report).
-- The REQ-004 drafts: Sales Invoice read, create and write, and the reads and selects ERPNext makes while saving (REQ-004's Rights section).
-- REQ-005: Supplier, Address, Purchase Invoice, Purchase Taxes and Charges Template read; Accounts Payable needs Purchase Invoice read and report, Journal Entry read, and the agent's role on the report; the drafts need Purchase Invoice create and write, and the reads and selects ERPNext makes while saving (REQ-005's Rights section).
-- The REQ-006 reads: Account, Cost Center, Journal Entry read; General Ledger and Trial Balance need GL Entry read and report and the agent's role on each report; General Ledger also Account read, and Customer or Supplier read for a party; Trial Balance also Fiscal Year read (REQ-006's Rights section).
-- The REQ-006 drafts: Journal Entry read, create and write; Account and Cost Center read; Company, Customer, Supplier, Sales Invoice and Purchase Invoice select (REQ-006's Rights section).
-- REQ-007: Bank Account, Bank Transaction and Payment Entry read (REQ-007's Rights section).
+- The agent user needs read rights for the reads, report rights for the reports, and create and write for the drafts' DocTypes, never submit, cancel, amend or delete. Each area spec's Rights section lists them; the configuration guide says how to grant them.
