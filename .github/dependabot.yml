@@ -22,6 +22,13 @@ updates:
     directory: /tests/e2e
     schedule:
       interval: weekly
+    # The database and cache follow frappe_docker's major versions (mariadb 11.8 LTS);
+    # their patches still come.
+    ignore:
+      - dependency-name: mariadb
+        update-types: [version-update:semver-major]
+      - dependency-name: valkey/valkey
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule:

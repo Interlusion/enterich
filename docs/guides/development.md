@@ -98,7 +98,7 @@ The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The run
 
 `ci.yml` runs on pull requests and pushes to `main`, without secrets: the lock, ruff, mdformat, the Markdown link check, basedpyright, pytest with branch coverage (the table in the run's summary and, for pull requests from this repository's branches, as one comment on the pull request that each push updates), a vulnerability audit of the lock, actionlint with shellcheck and zizmor (`scripts/check-workflows.sh`), gitleaks, and the image built for amd64 and arm64, each on a runner of its own architecture, with the tests run in its `test` stage. Nothing is published.
 
-`e2e.yml` runs the end-to-end tests weekly and when started by hand (Actions, End-to-end, Run workflow), not on pull requests and not as a required check. Dependabot proposes each newer ERPNext for `tests/e2e/compose.yml` as a pull request of its own; start the workflow on its branch before merging.
+`e2e.yml` runs the end-to-end tests weekly and when started by hand (Actions, End-to-end, Run workflow), not on pull requests and not as a required check. Dependabot proposes each newer ERPNext for `tests/e2e/compose.yml` as a pull request of its own; start the workflow on its branch before merging. MariaDB and Valkey get only their patches there: they stay on the major versions frappe_docker runs.
 
 `release.yml` runs on a version tag, or by hand as a dry run, and builds through `image.yml`; the [releasing guide](releasing.md) describes both.
 
