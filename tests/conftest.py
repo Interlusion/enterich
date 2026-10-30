@@ -8,12 +8,23 @@ from typing import Any
 import pytest
 
 from enterich import log
+from tests.fakes.jwks import FakeJwks, Signer, rsa_signer
 from tests.fakes.settings import API_KEY, API_SECRET
 
 
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
+
+
+@pytest.fixture
+def signer() -> Signer:
+    return rsa_signer()
+
+
+@pytest.fixture
+def jwks(signer: Signer) -> FakeJwks:
+    return FakeJwks([signer])
 
 
 @pytest.fixture(autouse=True)

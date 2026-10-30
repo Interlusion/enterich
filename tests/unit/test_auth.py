@@ -29,16 +29,6 @@ class Clock:
         return self.now
 
 
-@pytest.fixture
-def signer() -> Signer:
-    return rsa_signer()
-
-
-@pytest.fixture
-def jwks(signer: Signer) -> FakeJwks:
-    return FakeJwks([signer])
-
-
 def verifier(jwks: FakeJwks, s: Settings | None = None, clock: Clock | None = None) -> Verifier:
     s = s or settings()
     return Verifier(s, JwksCache(s.jwks_url, jwks.client(), clock or Clock()))
@@ -128,7 +118,7 @@ async def test_signature_valid_refusals_carry_subject_and_client(
 
 
 async def test_signature_invalid_refusals_carry_nothing_unsigned(jwks: FakeJwks) -> None:
-    stranger = rsa_signer("key-1")  # same kid, another key
+    stranger = rsa_signer("key-1", key=1)  # same kid, another key
     v = verifier(jwks)
     assert await refusal(v, token(stranger, sub="person")) == "bad signature"
     found = last_refusal.get()
@@ -209,12 +199,12 @@ async def test_an_algorithm_outside_the_configured_list_is_refused(jwks: FakeJwk
 
 
 async def test_unknown_kid_is_refused(jwks: FakeJwks) -> None:
-    other = rsa_signer("key-2")
+    other = rsa_signer("key-2", key=1)
     assert await refusal(verifier(jwks), token(other)) == "unknown key"
 
 
 async def test_a_kid_with_a_newline_is_refused(jwks: FakeJwks) -> None:
-    other = rsa_signer('x"\n{"event":"start"}')
+    other = rsa_signer('x"\n{"event":"start"}', key=1)
     assert await refusal(verifier(jwks), token(other)) == "unknown key"
 
 
@@ -235,19 +225,19 @@ async def test_a_jku_header_causes_no_fetch(jwks: FakeJwks, signer: Signer) -> N
 
 
 async def test_an_embedded_jwk_header_is_not_used(jwks: FakeJwks) -> None:
-    attacker = rsa_signer("key-1")
+    attacker = rsa_signer("key-1", key=1)
     t = token(attacker, {"jwk": attacker.jwk()})
     assert await refusal(verifier(jwks), t) == "bad signature"
 
 
 async def test_encryption_keys_in_the_jwks_are_ignored(signer: Signer) -> None:
-    oaep = {**rsa_signer("enc-1").jwk(), "use": "enc", "alg": "RSA-OAEP"}
+    oaep = {**rsa_signer("enc-1", key=1).jwk(), "use": "enc", "alg": "RSA-OAEP"}
     jwks = FakeJwks([signer], extra_keys=[oaep])
     assert await verifier(jwks).verify_token(token(signer)) is not None
 
 
 async def test_a_key_marked_for_encryption_never_verifies_a_token(signer: Signer) -> None:
-    encryption = rsa_signer("enc-2")
+    encryption = rsa_signer("enc-2", key=1)
     jwks = FakeJwks([signer], extra_keys=[{**encryption.jwk(), "use": "enc"}])
     assert await refusal(verifier(jwks), token(encryption)) == "unknown key"
 
@@ -270,7 +260,7 @@ async def test_a_removed_key_stops_working_within_5_minutes(jwks: FakeJwks, sign
     clock = Clock()
     v = verifier(jwks, clock=clock)
     assert await v.verify_token(token(signer)) is not None
-    jwks.signers[:] = [rsa_signer("key-2")]  # rotated: key-1 removed, key-2 added
+    jwks.signers[:] = [rsa_signer("key-2", key=1)]  # rotated: key-1 removed, key-2 added
     clock.now += 301
     assert await refusal(v, token(signer)) == "unknown key"
 
@@ -282,7 +272,7 @@ async def test_unknown_kids_refetch_at_most_once_in_30_s(jwks: FakeJwks, signer:
     assert jwks.fetches == 1
     clock.now += 31
     for i in range(5):
-        await v.verify_token(token(rsa_signer(f"unknown-{i}")))
+        await v.verify_token(token(rsa_signer(f"unknown-{i}", key=1)))
     assert jwks.fetches == 2
 
 
@@ -290,7 +280,7 @@ async def test_a_new_key_is_found_by_its_kid(jwks: FakeJwks, signer: Signer) -> 
     clock = Clock()
     v = verifier(jwks, clock=clock)
     await v.verify_token(token(signer))
-    rotated = rsa_signer("key-2")
+    rotated = rsa_signer("key-2", key=1)
     jwks.signers.append(rotated)
     clock.now += 31
     assert await v.verify_token(token(rotated)) is not None
@@ -330,7 +320,7 @@ async def test_an_empty_refresh_keeps_the_known_keys(jwks: FakeJwks, signer: Sig
     saved = list(jwks.signers)
     jwks.signers.clear()
     clock.now += 31
-    await v.verify_token(token(rsa_signer("unknown")))
+    await v.verify_token(token(rsa_signer("unknown", key=1)))
     jwks.signers.extend(saved)
     assert await v.verify_token(token(signer)) is not None
 
@@ -354,7 +344,7 @@ async def test_a_slow_fetch_doesnt_hold_up_known_keys(signer: Signer) -> None:
     assert await v.verify_token(token(signer)) is not None
     clock.now += 31
     async with anyio.create_task_group() as tg:
-        tg.start_soon(v.verify_token, token(rsa_signer("unknown")))
+        tg.start_soon(v.verify_token, token(rsa_signer("unknown", key=1)))
         await anyio.sleep(0.05)
         with anyio.fail_after(1):
             assert await v.verify_token(token(signer)) is not None
