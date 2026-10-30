@@ -33,7 +33,7 @@ Why the specs are cut this way: [ADR-007](../arc42/adr/ADR-007-specs-by-accounti
 
 Requirement, user story and persona IDs always carry the spec's ID: `REQ-004-PRS-F005`, `REQ-001-P1-2`, `REQ-001-P1`, never a bare `PRS-F005`. This holds in the specs, the other docs, code comments, tests and commit messages.
 
-The project code is **ERPL**. Outside this repository, IDs carry it: `ERPL-REQ-004-PRS-F005`, or `ERPL-REQ-004` for a whole spec. The code never changes, since other repositories cite it.
+The project code is **ENTR**. Outside this repository, IDs carry it: `ENTR-REQ-004-PRS-F005`, or `ENTR-REQ-004` for a whole spec. The code never changes, since other repositories cite it.
 
 ## Changes
 
