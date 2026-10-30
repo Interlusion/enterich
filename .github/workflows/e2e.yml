@@ -1,0 +1,36 @@
+name: End-to-end
+
+# Enterich against a real ERPNext site (ITEM-004), weekly and started by hand; not on
+# pull requests and not a required check. A newer ERPNext pinned in tests/e2e/compose.yml
+# (Dependabot) runs here before a deployment updates.
+on:
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.13.6"
+          enable-cache: false
+      - run: uv sync --locked
+      - name: ERPNext site
+        run: scripts/erpnext-site.sh up
+      - name: End-to-end tests
+        env:
+          E2E_ERPNEXT_URL: http://127.0.0.1:8080
+        run: uv run pytest -q -p no:cacheprovider tests/e2e
+      - name: ERPNext's logs
+        if: failure()
+        run: docker compose -f tests/e2e/compose.yml logs --no-color --tail 300

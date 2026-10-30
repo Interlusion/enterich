@@ -1,0 +1,93 @@
+# A throwaway ERPNext site for the end-to-end tests (ITEM-004), cut down from
+# frappe_docker's pwd.yml: no nginx, scheduler or websocket, since only the REST
+# API is used. Started and removed by scripts/erpnext-site.sh; the backend
+# listens on 127.0.0.1 only. The passwords are for this local site alone.
+# The ERPNext image is written out in each service, where Dependabot finds it.
+name: enterich-e2e
+
+x-sites: &sites
+  - sites:/home/frappe/frappe-bench/sites
+
+services:
+  db:
+    image: mariadb:11.8.9@sha256:c4124d1afa875e47f2892edf26b482fa54f796e2f342d3717a04ca091a22a9bd
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --innodb-snapshot-isolation=OFF
+    environment:
+      MARIADB_ROOT_PASSWORD: e2e-root
+    healthcheck:
+      test: [CMD, healthcheck.sh, --connect, --innodb_initialized]
+      interval: 2s
+      retries: 60
+
+  valkey:
+    image: valkey/valkey:8.1.10-alpine@sha256:081c2f5cb575efc901aa80ff9cdbd1ec6a301682fd35e1ebb4b0990a4a4a8507
+    command: [valkey-server, --save, "", --appendonly, "no"]
+
+  # One run: the bench's settings, then the site with ERPNext installed. A site kept
+  # from an earlier start is migrated when the image brings other versions, and one
+  # whose creation didn't finish is refused: remove it with `down`.
+  site:
+    image: frappe/erpnext:v16.52.1@sha256:88654c9f5fb8e47266b492932270239d4d7c3edd4af3966d0768616c0cd20a42
+    volumes: *sites
+    depends_on:
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_started
+    entrypoint: [bash, -c]
+    command:
+      - |
+        set -euo pipefail
+        ls -1 apps > sites/apps.txt
+        bench set-config -g db_host db
+        bench set-config -gp db_port 3306
+        bench set-config -g redis_cache redis://valkey:6379
+        bench set-config -g redis_queue redis://valkey:6379
+        bench set-config -g redis_socketio redis://valkey:6379
+        bench set-config -gp socketio_port 9000
+        versions=$$(env/bin/python -c 'import frappe, erpnext; print(frappe.__version__, erpnext.__version__)')
+        stamp=sites/e2e.localhost/e2e-versions
+        if [ ! -d sites/e2e.localhost ]; then
+          bench new-site e2e.localhost --mariadb-user-host-login-scope=% \
+            --db-root-username root --db-root-password e2e-root \
+            --admin-password e2e-admin --install-app erpnext --set-default
+        elif [ ! -f "$$stamp" ]; then
+          echo "sites/e2e.localhost is incomplete: scripts/erpnext-site.sh down, then up" >&2
+          exit 1
+        elif [ "$$(cat "$$stamp")" != "$$versions" ]; then
+          bench --site e2e.localhost migrate
+        fi
+        # The encryption key before any other process starts: made lazily, two processes
+        # can each make one, and secrets encrypted with the one overwritten can't be
+        # decrypted (the agent's API secret, about one fresh site in seven).
+        bench --site e2e.localhost execute frappe.utils.password.get_encryption_key > /dev/null
+        echo "$$versions" > "$$stamp"
+
+  backend:
+    image: frappe/erpnext:v16.52.1@sha256:88654c9f5fb8e47266b492932270239d4d7c3edd4af3966d0768616c0cd20a42
+    volumes: *sites
+    depends_on:
+      site:
+        condition: service_completed_successfully
+    ports:
+      - 127.0.0.1:8080:8000
+    healthcheck:
+      test: [CMD, curl, -fsS, -H, "Host: e2e.localhost", http://localhost:8000/api/method/ping]
+      interval: 2s
+      retries: 60
+
+  # Background jobs, such as the setup wizard's.
+  worker:
+    image: frappe/erpnext:v16.52.1@sha256:88654c9f5fb8e47266b492932270239d4d7c3edd4af3966d0768616c0cd20a42
+    volumes: *sites
+    depends_on:
+      site:
+        condition: service_completed_successfully
+    command: [bench, worker, --queue, "long,default,short"]
+
+volumes:
+  sites:

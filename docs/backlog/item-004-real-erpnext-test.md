@@ -28,15 +28,15 @@ Where the real site answers differently from `FakeErpnext`, the fake is correcte
 ## Proposal
 
 - **Enterich** runs in-process as in `tests/integration` (`create_app`), with its real HTTP client to the site instead of `FakeErpnext`'s transport. Tokens stay faked (`FakeJwks`): the authorization server isn't under test, and the token check has its own tests.
-- **ERPNext** is the official `frappe/erpnext` v16 image, pinned by digest, with MariaDB and Valkey in containers: a new site, ERPNext installed, no scheduler. Only ERPNext, no regional apps: Enterich promises nothing beyond it.
+- **ERPNext** is the official `frappe/erpnext` v16 image, pinned by digest, with MariaDB and Valkey in containers (`tests/e2e/compose.yml`): a new site, ERPNext installed, no scheduler. Only ERPNext, no regional apps: Enterich promises nothing beyond it.
 - **Seed data**, made as Administrator through the REST API from the test code, so the data and the names the tests use live in one place, in Python: the setup wizard for the placeholder company the other tests use (`Example GmbH`) with its chart of accounts and fiscal year; items, a customer and a supplier with addresses, tax templates, a bank account; submitted sales and purchase invoices, journal entries, payment entries and bank transactions for the reads and reports; drafts made by Administrator for the duplicate check. `bench` only creates the site and installs ERPNext; a seeding step the API can't reach goes there as an exception.
-- **The agent user** gets one role holding exactly the rights of the Rights sections (DocType permissions and the report roles), and an API key. The test reads the rights from a table in the test code that mirrors the Rights sections, and a check compares the two.
-- **Tests** in `tests/e2e/`, the end-to-end level of the [development guide](../guides/development.md), skipped unless the site's URL is set, so the default run, the runner's check and the image's test stage stay as they are. A script starts and seeds the site locally (`scripts/erpnext-site.sh`) and keeps it running, so the tests can run again in seconds, until the script removes it; the tests' drafts get fresh names, so runs don't interfere.
-- **CI:** a workflow of its own, weekly and started by hand, not on pull requests and not a required check. Each run builds a fresh site, about 10 to 15 minutes in all. A failure shows on the Actions page.
+- **The agent user** gets one role holding exactly the rights of the Rights sections (DocType permissions and the report roles), and an API key. The rights come from `RIGHTS` in `tests/e2e/seed.py`, one entry per row of the Rights sections, and a repository check (`tests/repo/test_e2e.py`) fails when the two differ.
+- **Tests** in `tests/e2e/`, the end-to-end level of the [development guide](../guides/development.md), skipped unless the site's URL is set, so the default run, the runner's check and the image's test stage stay as they are. A script starts the site locally (`scripts/erpnext-site.sh`) and keeps it running until it removes it; the tests seed it once, so they can run again in seconds, and their drafts get fresh names, so runs don't interfere.
+- **CI:** a workflow of its own, weekly and started by hand, not on pull requests and not a required check. Each run builds a fresh site: about a minute, plus the image's download. A failure shows on the Actions page.
 
 ## Steps
 
-- [ ] The site: script, pinned image, seeding; locally and in the workflow.
+- [ ] The site: script, pinned image, the company and the agent user with the rights of RIGHTS (`tests/e2e/seed.py`); locally and in the workflow (`e2e.yml`). Built and run locally: about 70 seconds on a fresh site, a few seconds on a kept one. Open until the workflow's first run, which needs `e2e.yml` on `main`.
 - [ ] The reads and reports of each area against the seed, with the catalogues' filters and columns.
 - [ ] The drafts: create, update, warnings as comments, the duplicate check with people's drafts.
 - [ ] The ceiling: submit, cancel, delete, amend and discard refused for the agent's key.
