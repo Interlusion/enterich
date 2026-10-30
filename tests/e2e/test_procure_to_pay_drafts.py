@@ -1,6 +1,7 @@
-"""Purchase invoice drafts end to end (REQ-005-PRS-F005 to REQ-005-PRS-F007). REQ-001's
-draft rules are tested through the sales drafts; these tests show the buying side's
-bodies, its duplicate match by supplier invoice number, and its warnings."""
+"""Purchase invoice drafts end to end (REQ-005-PRS-F005, REQ-005-PRS-F006,
+REQ-005-PRS-F007). REQ-001's draft rules are tested through the sales drafts; these tests
+show the buying side's bodies, its duplicate match by supplier invoice number, and its
+warnings."""
 
 from datetime import date, timedelta
 from typing import Any

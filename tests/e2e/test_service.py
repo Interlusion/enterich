@@ -1,5 +1,6 @@
-"""The service end to end, against a fake JWKS: REQ-002-PRS-NF001 to
-REQ-002-PRS-NF003, REQ-002-PRS-NF008 to REQ-002-PRS-NF012."""
+"""The service end to end, against a fake JWKS: REQ-002-PRS-NF001, REQ-002-PRS-NF002,
+REQ-002-PRS-NF003, REQ-002-PRS-NF008, REQ-002-PRS-NF009, REQ-002-PRS-NF010,
+REQ-002-PRS-NF011, REQ-002-PRS-NF012."""
 
 import json
 from typing import Any

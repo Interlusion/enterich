@@ -1,5 +1,5 @@
-"""Bank and cash end to end (REQ-007-PRS-F001 to REQ-007-PRS-F003): the company's bank
-accounts, its bank transactions and its payment entries."""
+"""Bank and cash end to end (REQ-007-PRS-F001, REQ-007-PRS-F002, REQ-007-PRS-F003): the
+company's bank accounts, its bank transactions and its payment entries."""
 
 from typing import Any
 

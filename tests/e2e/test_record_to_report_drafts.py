@@ -1,6 +1,7 @@
-"""Journal entry drafts end to end (REQ-006-PRS-F005 to REQ-006-PRS-F008). REQ-001's draft
-rules are tested through the sales drafts; these tests show the journal entry's bodies,
-its rules before ERPNext, its duplicate match and its rounding warning."""
+"""Journal entry drafts end to end (REQ-006-PRS-F005, REQ-006-PRS-F006, REQ-006-PRS-F007,
+REQ-006-PRS-F008). REQ-001's draft rules are tested through the sales drafts; these tests
+show the journal entry's bodies, its rules before ERPNext, its duplicate match and its
+rounding warning."""
 
 from typing import Any
 

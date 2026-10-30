@@ -1,7 +1,7 @@
-"""Master data end to end (REQ-003-PRS-F001), and through it REQ-001's
-conventions: REQ-001-PRS-F001, REQ-001-PRS-F008 to REQ-001-PRS-F011,
-REQ-001-PRS-F014, REQ-001-PRS-NF001 to REQ-001-PRS-NF003, and the operation
-line of REQ-002-PRS-NF008."""
+"""Master data end to end (REQ-003-PRS-F001), and through it REQ-001's conventions:
+REQ-001-PRS-F001, REQ-001-PRS-F008, REQ-001-PRS-F009, REQ-001-PRS-F010, REQ-001-PRS-F011,
+REQ-001-PRS-F014, REQ-001-PRS-NF001, REQ-001-PRS-NF002, REQ-001-PRS-NF003, and the
+operation line of REQ-002-PRS-NF008."""
 
 from typing import Any, cast
 

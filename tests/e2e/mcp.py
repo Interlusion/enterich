@@ -44,7 +44,8 @@ class Result:
 
 
 class Session:
-    """Stateless MCP calls with one token; the client never confirms anything."""
+    """Stateless MCP calls with one token; the client never confirms anything
+    (REQ-001-PRS-F013)."""
 
     def __init__(self, c: TestClient, token: str) -> None:
         self._c = c

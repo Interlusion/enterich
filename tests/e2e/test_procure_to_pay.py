@@ -1,6 +1,7 @@
-"""Procure to pay end to end, the reads (REQ-005-PRS-F001 to REQ-005-PRS-F004). The code
-both sides share is tested through order to cash; these tests show the buying side's
-calls, fields and outside text, and that it stays apart from the selling side."""
+"""Procure to pay end to end, the reads (REQ-005-PRS-F001, REQ-005-PRS-F002,
+REQ-005-PRS-F003, REQ-005-PRS-F004). The code both sides share is tested through order to
+cash; these tests show the buying side's calls, fields and outside text, and that it
+stays apart from the selling side."""
 
 from typing import Any
 
