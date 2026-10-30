@@ -2,27 +2,23 @@
 draft rules are tested through the sales drafts; these tests show the buying side's
 bodies, its duplicate match by supplier invoice number, and its warnings."""
 
-from collections.abc import Iterator
 from datetime import date, timedelta
 from typing import Any
 
 import pytest
 
-from tests.e2e.clock import TIMEZONE, TODAY, freeze
-from tests.e2e.mcp import Result, Session, client
+from tests.e2e.clock import TODAY
+from tests.e2e.mcp import Result, Session
 from tests.fakes.erpnext import (
     COMPANY,
     STOCK_NOT_BILLED,
     TAXES_METHOD,
     FakeErpnext,
-    Received,
     purchase_invoice,
     purchase_tax_template,
     supplier,
     tax_template,
 )
-from tests.fakes.jwks import FakeJwks, Signer, token
-from tests.fakes.settings import settings
 
 PATH = "/api/resource/Purchase Invoice"
 DRAFT = "ACC-PINV-2026-00010"
@@ -42,11 +38,6 @@ VAT_ROWS = [
 ONE_ITEM = [{"item_code": "PAPER", "qty": 10, "rate": 20}]
 DRAFT_ITEMS = [{"item_code": "PAPER", "qty": 5, "rate": 20}]  # the fixture draft's rows
 COST = "5000 - Cost - EX"
-
-
-@pytest.fixture(autouse=True)
-def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
-    freeze(monkeypatch)
 
 
 @pytest.fixture
@@ -79,12 +70,6 @@ def erp(erpnext: FakeErpnext) -> FakeErpnext:
     return erpnext
 
 
-@pytest.fixture
-def mcp(jwks: FakeJwks, signer: Signer, erp: FakeErpnext) -> Iterator[Session]:
-    with client(jwks, settings(timezone=TIMEZONE), erp) as c:
-        yield Session(c, token(signer))
-
-
 def create(mcp: Session, **arguments: Any) -> Result:
     return mcp.call(
         "create_draft_purchase_invoice", {"supplier": "SUPP-0001", "items": ONE_ITEM, **arguments}
@@ -95,18 +80,6 @@ def update(mcp: Session, name: str = DRAFT, modified: str = MODIFIED, **argument
     return mcp.call(
         "update_draft_purchase_invoice", {"name": name, "modified": modified, **arguments}
     )
-
-
-def writes(erp: FakeErpnext) -> list[Received]:
-    return [r for r in erp.received if r.method in ("POST", "PUT")]
-
-
-def saves(erp: FakeErpnext) -> list[Received]:
-    return [r for r in writes(erp) if r.path.startswith(PATH)]
-
-
-def lists(erp: FakeErpnext) -> list[Received]:
-    return [r for r in erp.received if r.method == "GET" and r.path == PATH]
 
 
 # create_draft_purchase_invoice
@@ -132,7 +105,7 @@ def test_a_create_sends_exactly_the_catalogued_body(mcp: Session, erp: FakeErpne
         remarks="Office supplies",
     )
     assert not result.error, result.text
-    [post] = saves(erp)
+    [post] = erp.writes(PATH)
     assert (post.method, post.path) == ("POST", PATH)
     assert post.body == {
         "supplier": "SUPP-0001",
@@ -157,7 +130,7 @@ def test_a_create_without_optional_inputs_still_never_updates_stock(
 ) -> None:
     result = create(mcp)
     assert not result.error, result.text
-    [post] = saves(erp)
+    [post] = erp.writes(PATH)
     assert post.body == {
         "supplier": "SUPP-0001",
         "items": ONE_ITEM,
@@ -180,7 +153,7 @@ def test_a_sales_template_answers_as_unknown(mcp: Session, erp: FakeErpnext) -> 
     result = create(mcp, taxes_and_charges="VAT 19% - EX")
     assert result.error
     assert result.text.startswith("taxes_and_charges:")
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 def test_a_create_returns_the_draft(mcp: Session, erp: FakeErpnext) -> None:
@@ -255,7 +228,7 @@ def test_inputs_outside_the_schema_are_refused_before_erpnext(
 
 def test_the_bill_check_sends_exactly_the_catalogued_call(mcp: Session, erp: FakeErpnext) -> None:
     create(mcp, bill_no="R-9999")
-    [check] = lists(erp)
+    [check] = erp.lists(PATH)
     assert check.param("fields") == ["name"]
     assert check.param("filters") == [
         ["company", "=", COMPANY],
@@ -275,7 +248,7 @@ def test_a_recorded_supplier_invoice_is_refused_naming_it(
     assert result.error
     assert result.text.startswith("allow_duplicate:")
     assert found in result.text
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 @pytest.mark.parametrize(
@@ -312,7 +285,7 @@ def test_without_a_bill_the_items_match(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, items=DRAFT_ITEMS)
     assert result.error
     assert DRAFT in result.text
-    [check] = lists(erp)
+    [check] = erp.lists(PATH)
     assert check.param("fields") == ["name", "items.item_code", "items.qty", "items.is_free_item"]
     assert check.param("filters") == [
         ["company", "=", COMPANY],
@@ -379,7 +352,7 @@ def test_an_update_sends_exactly_the_catalogued_body(mcp: Session, erp: FakeErpn
         remarks="Corrected",
     )
     assert not result.error, result.text
-    [put] = saves(erp)
+    [put] = erp.writes(PATH)
     assert (put.method, put.path) == ("PUT", f"{PATH}/{DRAFT}")
     assert put.body == {
         "bill_no": "R-4801",
@@ -397,7 +370,7 @@ def test_an_update_sends_exactly_the_catalogued_body(mcp: Session, erp: FakeErpn
 
 def test_an_update_with_a_template_sends_the_purchase_rows(mcp: Session, erp: FakeErpnext) -> None:
     update(mcp, taxes_and_charges="Input VAT 19% - EX")
-    [put] = saves(erp)
+    [put] = erp.writes(PATH)
     assert put.body == {
         "taxes_and_charges": "Input VAT 19% - EX",
         "taxes": VAT_ROWS,
@@ -408,7 +381,7 @@ def test_an_update_with_a_template_sends_the_purchase_rows(mcp: Session, erp: Fa
 def test_clearing_the_bill_number(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp, bill_no="")
     assert not result.error, result.text
-    [put] = saves(erp)
+    [put] = erp.writes(PATH)
     assert put.body == {"bill_no": "", "modified": MODIFIED}
     assert erp.docs["Purchase Invoice"][DRAFT]["bill_no"] == ""
 
@@ -443,14 +416,14 @@ def test_only_drafts_can_be_updated(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp, "ACC-PINV-2026-00001", stored["modified"], remarks="Changed")
     assert result.error
     assert "submitted" in result.text
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 def test_a_stale_update_changes_nothing(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp, modified="2026-10-28 10:00:00.000000", remarks="Changed")
     assert result.error
     assert "changed" in result.text
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 def test_an_update_warns_where_an_expense_account_was_replaced(
@@ -468,7 +441,7 @@ def test_an_update_warns_where_an_expense_account_was_replaced(
 def test_an_update_of_the_bill_date_recounts_the_due_date(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp, bill_date="2026-10-25").data
     assert result["due_date"] == "2026-11-08"  # Net 14 from the bill date
-    [put] = saves(erp)
+    [put] = erp.writes(PATH)
     assert put.body == {
         "bill_date": "2026-10-25",
         "payment_schedule": [],
@@ -491,13 +464,13 @@ def test_a_supplier_with_withholding_gets_it_applied(
     assert not result.error, result.text
     read = next(r for r in erp.received if r.path == "/api/method/frappe.client.get")
     assert read.params == {"doctype": "Supplier", "name": "SUPP-0003"}
-    [post] = saves(erp)
+    [post] = erp.writes(PATH)
     assert post.body["apply_tds"] == 1
 
 
 def test_a_supplier_without_withholding_gets_none(mcp: Session, erp: FakeErpnext) -> None:
     create(mcp, bill_no="R-7000")
-    [post] = saves(erp)
+    [post] = erp.writes(PATH)
     assert "apply_tds" not in post.body
 
 
@@ -505,7 +478,7 @@ def test_an_unknown_supplier_names_the_input(mcp: Session, erp: FakeErpnext) -> 
     result = create(mcp, supplier="NOBODY")
     assert result.error
     assert result.text.startswith("supplier: ")
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 # The bill check on update (REQ-005-PRS-F006)
@@ -515,7 +488,7 @@ def test_an_update_to_a_recorded_bill_warns(mcp: Session, erp: FakeErpnext) -> N
     result = update(mcp, bill_no="R-4711").data
     [warning] = result["warnings"]
     assert "ACC-PINV-2026-00001" in warning
-    [check] = lists(erp)
+    [check] = erp.lists(PATH)
     assert check.param("filters") == [
         ["company", "=", COMPANY],
         ["docstatus", "in", [0, 1]],
@@ -532,7 +505,7 @@ def test_the_drafts_own_bill_doesnt_warn(mcp: Session, erp: FakeErpnext) -> None
     assert result["warnings"] == []
     cleared = update(mcp, modified=result["modified"], bill_no="").data
     assert cleared["warnings"] == []
-    assert len(lists(erp)) == 1  # a cleared bill_no isn't checked
+    assert len(erp.lists(PATH)) == 1  # a cleared bill_no isn't checked
 
 
 # Row warnings: per row, and accounts without regard to case

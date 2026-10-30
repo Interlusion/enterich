@@ -3,26 +3,22 @@ them REQ-001's draft rules: bodies, duplicates, stale updates, clearing, warning
 their comment (REQ-001-PRS-F002 to REQ-001-PRS-F005, REQ-001-PRS-F012,
 REQ-001-PRS-F015, REQ-001-PRS-F016)."""
 
-from collections.abc import Iterator
 from typing import Any
 
 import pytest
 
-from tests.e2e.clock import TIMEZONE, TODAY, freeze
-from tests.e2e.mcp import Result, Session, client
+from tests.e2e.clock import TODAY
+from tests.e2e.mcp import Result, Session
 from tests.fakes.erpnext import (
     COMMENT_METHOD,
     COMPANY,
     TAXES_METHOD,
     FakeErpnext,
-    Received,
     customer,
     error,
     sales_invoice,
     tax_template,
 )
-from tests.fakes.jwks import FakeJwks, Signer, token
-from tests.fakes.settings import settings
 
 PATH = "/api/resource/Sales Invoice"
 DRAFT = "ACC-SINV-2026-00010"
@@ -38,11 +34,6 @@ VAT_ROWS = [
     }
 ]
 ONE_ITEM = [{"item_code": "SKU-1", "qty": 2}]
-
-
-@pytest.fixture(autouse=True)
-def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
-    freeze(monkeypatch)
 
 
 def invoice_row(code: str, qty: float, rate: float) -> dict[str, Any]:
@@ -96,12 +87,6 @@ def erp(erpnext: FakeErpnext) -> FakeErpnext:
     return erpnext
 
 
-@pytest.fixture
-def mcp(jwks: FakeJwks, signer: Signer, erp: FakeErpnext) -> Iterator[Session]:
-    with client(jwks, settings(timezone=TIMEZONE), erp) as c:
-        yield Session(c, token(signer))
-
-
 def create(mcp: Session, **arguments: Any) -> Result:
     return mcp.call(
         "create_draft_sales_invoice", {"customer": "CUST-0001", "items": ONE_ITEM, **arguments}
@@ -110,18 +95,6 @@ def create(mcp: Session, **arguments: Any) -> Result:
 
 def update(mcp: Session, name: str = DRAFT, modified: str = MODIFIED, **arguments: Any) -> Result:
     return mcp.call("update_draft_sales_invoice", {"name": name, "modified": modified, **arguments})
-
-
-def writes(erp: FakeErpnext) -> list[Received]:
-    return [r for r in erp.received if r.method in ("POST", "PUT")]
-
-
-def saves(erp: FakeErpnext) -> list[Received]:
-    return [r for r in writes(erp) if r.path.startswith(PATH)]
-
-
-def comments(erp: FakeErpnext) -> list[dict[str, Any]]:
-    return erp.comments
 
 
 # create_draft_sales_invoice
@@ -145,7 +118,7 @@ def test_a_create_sends_exactly_the_catalogued_body(mcp: Session, erp: FakeErpne
         remarks="Order 4711",
     )
     assert not result.error, result.text
-    [post] = saves(erp)
+    [post] = erp.writes(PATH)
     assert (post.method, post.path) == ("POST", PATH)
     assert post.body == {
         "customer": "CUST-0001",
@@ -177,7 +150,7 @@ def test_a_create_without_optional_inputs_sends_no_date_and_no_rate(
 ) -> None:
     result = create(mcp)
     assert not result.error, result.text
-    [post] = saves(erp)
+    [post] = erp.writes(PATH)
     assert post.body == {
         "customer": "CUST-0001",
         "items": [{"item_code": "SKU-1", "qty": 2}],
@@ -236,7 +209,7 @@ def test_a_create_returns_the_draft_with_the_rates_erpnext_set(
         "truncated": [],
         "outside_text": {},
     }
-    assert comments(erp) == []
+    assert erp.comments == []
 
 
 def test_the_draft_tools_carry_their_annotations_and_say_how_to_retry(mcp: Session) -> None:
@@ -282,7 +255,7 @@ def test_a_template_of_another_company_answers_as_unknown(mcp: Session, erp: Fak
     assert result.error
     assert result.text.startswith("taxes_and_charges:")
     assert "doesn't exist" in result.text
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 @pytest.mark.parametrize(
@@ -297,7 +270,7 @@ def test_an_unknown_or_unpermitted_template_names_the_input(
     assert "taxes_and_charges" in result.text
     assert "doesn't exist" in result.text
     assert "isn't permitted" in result.text
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 def test_an_erpnext_refusal_reaches_the_agent(mcp: Session) -> None:
@@ -338,7 +311,7 @@ def test_a_create_sent_again_is_refused_naming_the_first_draft(
     assert again.error
     assert first["name"] in again.text
     assert "allow_duplicate" in again.text
-    assert len(saves(erp)) == 1
+    assert len(erp.writes(PATH)) == 1
 
 
 @pytest.mark.parametrize(
@@ -357,7 +330,7 @@ def test_a_create_differing_in_its_match_goes_through_without_warning(
     create(mcp)
     result = create(mcp, **changed).data
     assert result["warnings"] == []
-    assert len(saves(erp)) == 2
+    assert len(erp.writes(PATH)) == 2
 
 
 def test_a_draft_with_an_added_free_item_still_matches(mcp: Session, erp: FakeErpnext) -> None:
@@ -375,7 +348,7 @@ def test_allow_duplicate_creates_and_leaves_the_warning_on_the_draft(
     second = create(mcp, allow_duplicate=True).data
     [warning] = second["warnings"]
     assert first["name"] in warning
-    [comment] = comments(erp)
+    [comment] = erp.comments
     assert comment == {
         "reference_doctype": "Sales Invoice",
         "reference_name": second["name"],
@@ -394,7 +367,7 @@ def test_a_template_without_tax_warns_on_the_draft(mcp: Session, erp: FakeErpnex
     result = create(mcp, taxes_and_charges="VAT 0% - EX").data
     [warning] = result["warnings"]
     assert "VAT 0% - EX" in warning
-    [comment] = comments(erp)
+    [comment] = erp.comments
     assert comment["content"] == f"Enterich: {warning}"
 
 
@@ -407,7 +380,7 @@ def test_a_rate_a_pricing_rule_replaced_warns(mcp: Session, erp: FakeErpnext) ->
     assert "SKU-1" in warning
     assert "48" in warning
     assert "45" in warning
-    assert len(comments(erp)) == 1
+    assert len(erp.comments) == 1
 
 
 def test_a_row_without_a_price_warns(mcp: Session) -> None:
@@ -426,21 +399,21 @@ def test_kept_rates_and_free_items_dont_warn(mcp: Session, erp: FakeErpnext) -> 
         ("GIFT", 0, True),
     ]
     assert result["warnings"] == []
-    assert comments(erp) == []
+    assert erp.comments == []
 
 
 def test_a_rate_erpnext_only_rounded_doesnt_warn(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, items=[{"item_code": "SKU-1", "qty": 2, "rate": 12.346}]).data
     assert result["items"][0]["rate"] == 12.35
     assert result["warnings"] == []
-    assert comments(erp) == []
+    assert erp.comments == []
 
 
 def test_the_warnings_go_on_the_draft_as_one_comment(mcp: Session, erp: FakeErpnext) -> None:
     items = [*ONE_ITEM, {"item_code": "SKU-9", "qty": 1}]
     result = create(mcp, items=items, taxes_and_charges="VAT 0% - EX").data
     tax, rate = result["warnings"]
-    [comment] = comments(erp)
+    [comment] = erp.comments
     assert comment["content"] == f"Enterich: {tax}<br>{rate}"
 
 
@@ -448,7 +421,7 @@ def test_markup_in_a_warning_reaches_erpnext_as_text(mcp: Session, erp: FakeErpn
     result = create(mcp, items=[{"item_code": "<img src=x onerror=alert(1)>", "qty": 1}]).data
     [warning] = result["warnings"]
     assert "<img src=x onerror=alert(1)>" in warning
-    [comment] = comments(erp)
+    [comment] = erp.comments
     assert "<" not in comment["content"]
     assert "&lt;img src=x onerror=alert(1)&gt;" in comment["content"]
 
@@ -462,7 +435,7 @@ def test_a_failing_comment_still_returns_the_draft_and_says_so(
     tax, missing = result["warnings"]
     assert "VAT 0% - EX" in tax
     assert "comment" in missing
-    assert comments(erp) == []
+    assert erp.comments == []
 
 
 # update_draft_sales_invoice
@@ -478,7 +451,7 @@ def test_an_update_sends_exactly_the_catalogued_body(mcp: Session, erp: FakeErpn
         remarks="Order 4712",
     )
     assert not result.error, result.text
-    [put] = saves(erp)
+    [put] = erp.writes(PATH)
     assert (put.method, put.path) == ("PUT", f"{PATH}/{DRAFT}")
     assert put.body == {
         "posting_date": "2026-11-02",
@@ -494,7 +467,7 @@ def test_an_update_sends_exactly_the_catalogued_body(mcp: Session, erp: FakeErpn
 
 def test_an_update_with_a_template_sends_its_rows(mcp: Session, erp: FakeErpnext) -> None:
     update(mcp, taxes_and_charges="VAT 19% - EX")
-    [put] = saves(erp)
+    [put] = erp.writes(PATH)
     assert put.body == {
         "taxes_and_charges": "VAT 19% - EX",
         "taxes": VAT_ROWS,
@@ -504,7 +477,7 @@ def test_an_update_with_a_template_sends_its_rows(mcp: Session, erp: FakeErpnext
 
 def test_clearing_the_template_clears_its_rows(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp, taxes_and_charges="", remarks="").data
-    [put] = saves(erp)
+    [put] = erp.writes(PATH)
     assert put.body == {"taxes_and_charges": "", "taxes": [], "remarks": "", "modified": MODIFIED}
     assert result["taxes"] == []
     assert not [r for r in erp.received if r.path == TAXES_METHOD]
@@ -575,7 +548,7 @@ def test_only_the_companys_drafts_can_be_updated(
     assert result.error
     assert result.text.startswith("name:")
     assert says in result.text
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 @pytest.mark.parametrize("sent", ["2026-10-28 11:00:00", "2026-10-28 11:00:00.000000"])
@@ -585,7 +558,7 @@ def test_a_modified_on_a_whole_second_is_taken_as_erpnext_gives_it(
     erp.docs["Sales Invoice"][DRAFT]["modified"] = "2026-10-28 11:00:00"
     result = update(mcp, modified=sent, remarks="Checked")
     assert not result.error, result.text
-    [put] = saves(erp)
+    [put] = erp.writes(PATH)
     assert put.body["modified"] == sent
 
 
@@ -594,7 +567,7 @@ def test_a_stale_update_changes_nothing(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp, modified="2026-10-28 10:00:00.000000", remarks="Changed")
     assert result.error
     assert "changed" in result.text
-    assert writes(erp) == []
+    assert erp.writes() == []
     assert erp.docs["Sales Invoice"][DRAFT] == before
 
 
@@ -606,7 +579,7 @@ def test_a_draft_without_a_usable_modified_is_taken_as_changed(
     result = update(mcp, remarks="Changed")
     assert result.error
     assert "changed" in result.text
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 def test_a_draft_changed_during_the_update_is_reported_the_same_way(
@@ -637,7 +610,7 @@ def test_a_name_with_url_characters_reaches_erpnext_as_one_segment(
     result = update(mcp, name, remarks="Changed")
     assert not result.error, result.text
     assert erp.docs["Sales Invoice"][name]["remarks"] == "Changed"
-    [put] = saves(erp)
+    [put] = erp.writes(PATH)
     assert put.path == f"{PATH}/{name}"
 
 
@@ -653,7 +626,7 @@ def test_an_update_warns_where_a_pricing_rule_replaced_a_rate(
     [warning] = result["warnings"]
     assert "row 2" in warning.lower()
     assert "SKU-2" in warning
-    [comment] = comments(erp)
+    [comment] = erp.comments
     assert comment["reference_name"] == DRAFT
 
 
@@ -680,7 +653,7 @@ def test_rows_at_rate_0_are_named_up_to_20(mcp: Session, erp: FakeErpnext) -> No
     assert len(named) == 20
     assert "NP-19" in named[-1]
     assert "10 more rows" in more
-    [comment] = comments(erp)
+    [comment] = erp.comments
     assert comment["content"].endswith(more)
 
 
@@ -707,7 +680,7 @@ def test_an_update_of_the_posting_date_recounts_the_due_date(
     created = create(mcp).data
     result = update(mcp, created["name"], created["modified"], posting_date="2026-11-02").data
     assert result["due_date"] == "2026-12-02"
-    put = saves(erp)[-1]
+    put = erp.writes(PATH)[-1]
     assert put.body == {
         "posting_date": "2026-11-02",
         "set_posting_time": 1,
@@ -742,5 +715,5 @@ def test_an_update_without_a_date_keeps_the_due_date(mcp: Session, erp: FakeErpn
     created = create(mcp, due_date="2026-12-20").data
     result = update(mcp, created["name"], created["modified"], remarks="Checked").data
     assert result["due_date"] == "2026-12-20"
-    put = saves(erp)[-1]
+    put = erp.writes(PATH)[-1]
     assert put.body == {"remarks": "Checked", "modified": created["modified"]}

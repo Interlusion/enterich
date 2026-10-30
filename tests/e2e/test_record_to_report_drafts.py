@@ -2,23 +2,19 @@
 rules are tested through the sales drafts; these tests show the journal entry's bodies,
 its rules before ERPNext, its duplicate match and its rounding warning."""
 
-from collections.abc import Iterator
 from typing import Any
 
 import pytest
 
-from tests.e2e.clock import TIMEZONE, TODAY, freeze
-from tests.e2e.mcp import Result, Session, client
+from tests.e2e.clock import TODAY
+from tests.e2e.mcp import Result, Session
 from tests.fakes.erpnext import (
     COMPANY,
     FakeErpnext,
-    Received,
     account,
     customer,
     journal_entry,
 )
-from tests.fakes.jwks import FakeJwks, Signer, token
-from tests.fakes.settings import settings
 
 PATH = "/api/resource/Journal Entry"
 DRAFT = "ACC-JV-2026-00010"
@@ -27,11 +23,6 @@ RENT = "6310 - Rent - EX"
 BANK = "1200 - Bank - EX"
 DEBTORS = "1400 - Debtors - EX"
 PAY_RENT = [{"account": RENT, "debit": 800}, {"account": BANK, "credit": 800}]
-
-
-@pytest.fixture(autouse=True)
-def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
-    freeze(monkeypatch)
 
 
 @pytest.fixture
@@ -56,30 +47,12 @@ def erp(erpnext: FakeErpnext) -> FakeErpnext:
     return erpnext
 
 
-@pytest.fixture
-def mcp(jwks: FakeJwks, signer: Signer, erp: FakeErpnext) -> Iterator[Session]:
-    with client(jwks, settings(timezone=TIMEZONE), erp) as c:
-        yield Session(c, token(signer))
-
-
 def create(mcp: Session, **arguments: Any) -> Result:
     return mcp.call("create_draft_journal_entry", {"accounts": PAY_RENT, **arguments})
 
 
 def update(mcp: Session, name: str = DRAFT, modified: str = MODIFIED, **arguments: Any) -> Result:
     return mcp.call("update_draft_journal_entry", {"name": name, "modified": modified, **arguments})
-
-
-def writes(erp: FakeErpnext) -> list[Received]:
-    return [r for r in erp.received if r.method in ("POST", "PUT")]
-
-
-def saves(erp: FakeErpnext) -> list[Received]:
-    return [r for r in writes(erp) if r.path.startswith(PATH)]
-
-
-def lists(erp: FakeErpnext) -> list[Received]:
-    return [r for r in erp.received if r.method == "GET" and r.path == PATH]
 
 
 # create_draft_journal_entry (REQ-006-PRS-F005)
@@ -111,7 +84,7 @@ def test_a_create_sends_exactly_the_catalogued_body(mcp: Session, erp: FakeErpne
         accounts=rows,
     )
     assert not result.error, result.text
-    [post] = saves(erp)
+    [post] = erp.writes(PATH)
     assert (post.method, post.path) == ("POST", PATH)
     assert post.body == {
         "posting_date": "2026-11-02",
@@ -144,7 +117,7 @@ def test_a_create_sends_exactly_the_catalogued_body(mcp: Session, erp: FakeErpne
 def test_a_create_without_a_posting_date_sends_today(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp)
     assert not result.error, result.text
-    [post] = saves(erp)
+    [post] = erp.writes(PATH)
     assert post.body == {
         "posting_date": TODAY,
         "accounts": [
@@ -273,7 +246,7 @@ def test_the_duplicate_check_sends_exactly_the_catalogued_call(
     mcp: Session, erp: FakeErpnext
 ) -> None:
     create(mcp, posting_date="2026-11-02")
-    [check] = lists(erp)
+    [check] = erp.lists(PATH)
     assert check.param("fields") == [
         "name",
         "accounts.account",
@@ -294,7 +267,7 @@ def test_a_create_with_the_drafts_rows_is_refused_naming_it(mcp: Session, erp: F
     assert result.error
     assert result.text.startswith("allow_duplicate:")
     assert DRAFT in result.text
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 @pytest.mark.parametrize(
@@ -325,7 +298,7 @@ def test_a_repeated_create_matches_the_amounts_erpnext_rounded(
     assert again.error
     assert again.text.startswith("allow_duplicate:")
     assert first["name"] in again.text
-    assert len(saves(erp)) == 1
+    assert len(erp.writes(PATH)) == 1
 
 
 def test_allow_duplicate_creates_and_says_so(mcp: Session, erp: FakeErpnext) -> None:
@@ -373,7 +346,7 @@ def test_an_update_sends_exactly_the_catalogued_body(mcp: Session, erp: FakeErpn
         accounts=rows,
     )
     assert not result.error, result.text
-    [put] = saves(erp)
+    [put] = erp.writes(PATH)
     assert (put.method, put.path) == ("PUT", f"{PATH}/{DRAFT}")
     assert put.body == {
         "posting_date": "2026-11-02",
@@ -392,7 +365,7 @@ def test_clearing_the_reference_clears_its_date(mcp: Session, erp: FakeErpnext) 
     dated = update(mcp, cheque_no="TX-1", cheque_date="2026-10-28").data
     result = update(mcp, modified=dated["modified"], cheque_no="", user_remark="")
     assert not result.error, result.text
-    put = saves(erp)[-1]
+    put = erp.writes(PATH)[-1]
     assert put.body == {
         "cheque_no": "",
         "cheque_date": None,
@@ -427,7 +400,7 @@ def test_an_update_breaking_a_rule_is_refused_before_a_write(
     result = update(mcp, **arguments)
     assert result.error
     assert says in result.text
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 def test_an_update_without_rows_needs_the_drafts_rows_to_balance(
@@ -441,7 +414,7 @@ def test_an_update_without_rows_needs_the_drafts_rows_to_balance(
         "accounts: the draft's rows don't balance (total debit 500 against total credit "
         "499.5); give the rows."
     )
-    assert writes(erp) == []
+    assert erp.writes() == []
     rows = [{"account": RENT, "debit": 500}, {"account": BANK, "credit": 500}]
     assert not update(mcp, accounts=rows).error
 
@@ -456,7 +429,7 @@ def test_a_drafts_date_without_a_number_says_how_to_clear_it(
         "cheque_no: the draft has a reference date (2026-10-20) without a reference number; "
         "give cheque_no, or an empty cheque_no to clear the date."
     )
-    assert writes(erp) == []
+    assert erp.writes() == []
     assert not update(mcp, cheque_no="").error
 
 
@@ -481,7 +454,7 @@ def test_what_enterich_doesnt_change_answers_as_unknown(
     assert result.error
     assert result.text.startswith("name: ")
     assert result.text.replace("00012", "") == unknown.text.replace("09999", "")
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 def test_a_multi_currency_draft_isnt_changed(mcp: Session, erp: FakeErpnext) -> None:
@@ -492,7 +465,7 @@ def test_a_multi_currency_draft_isnt_changed(mcp: Session, erp: FakeErpnext) -> 
         f"name: {DRAFT} has accounts in several currencies; Enterich changes only journal "
         "entries in the company's currency."
     )
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 def test_only_drafts_can_be_updated(mcp: Session, erp: FakeErpnext) -> None:
@@ -500,14 +473,14 @@ def test_only_drafts_can_be_updated(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp, "ACC-JV-2026-00001", stored["modified"], user_remark="Changed")
     assert result.error
     assert "submitted" in result.text
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 def test_a_stale_update_changes_nothing(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp, modified="2026-10-28 10:00:00.000000", user_remark="Changed")
     assert result.error
     assert "changed" in result.text
-    assert writes(erp) == []
+    assert erp.writes() == []
 
 
 def test_an_update_warns_where_totals_were_rounded_apart(mcp: Session, erp: FakeErpnext) -> None:
