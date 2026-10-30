@@ -17,6 +17,9 @@ from enterich.config import LogLevel
 LOGGER = "enterich"
 LIBRARY_EVENT = "library"
 MAX_MESSAGE = 300
+# Line breaks to readers that split on Unicode line boundaries; json.dumps escapes
+# the other control characters, but with ensure_ascii=False not these.
+LINE_SEPARATORS = str.maketrans({c: f"\\u{ord(c):04x}" for c in "\x85\u2028\u2029"})
 
 
 class JsonFormatter(logging.Formatter):
@@ -34,7 +37,7 @@ class JsonFormatter(logging.Formatter):
         if record.exc_info and record.exc_info[1] is not None:
             line.setdefault("exception", type(record.exc_info[1]).__name__)
             line.setdefault("traceback", self.formatException(record.exc_info))
-        return json.dumps(line, ensure_ascii=False, default=str)
+        return json.dumps(line, ensure_ascii=False, default=str).translate(LINE_SEPARATORS)
 
 
 def configure(level: LogLevel, stream: TextIO | None = None) -> None:
