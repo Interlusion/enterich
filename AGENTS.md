@@ -6,7 +6,7 @@ Instructions for coding agents working on Enterich. `CLAUDE.md` imports this fil
 
 Enterich: an MCP server for ERPNext with a fixed tool list, tokens from an external OAuth authorization server, and only the rights of one ERPNext agent user. See `README.md`.
 
-The repository is `Interlusion/enterich`, private until it goes public. Write everything as if it were public already.
+The repository is public: `Interlusion/enterich`.
 
 ## Rules
 
@@ -16,7 +16,7 @@ The repository is `Interlusion/enterich`, private until it goes public. Write ev
 - **No limit may depend on the MCP client asking for approval.**
 - The project is **Enterich** in prose, `enterich` as an identifier (package, command, repository, image), `ENTERICH_` for variables.
 - The names "ERPNext" and "Frappe" don't go into the project or package name (Frappe's trademark policy); descriptions may say "for ERPNext".
-- Don't publish container images until the repository has moved to the Interlusion organisation (GHCR packages don't move with a repository).
+- Container images are pushed only by the release workflow, from a version tag (`docs/arc42/adr/ADR-004-releases-and-image.md`).
 
 ## Docs
 

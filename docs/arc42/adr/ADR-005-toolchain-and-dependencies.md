@@ -47,13 +47,13 @@ On every pull request and push to `main`, without secrets:
 
 - `uv lock --check` (lock matches `pyproject.toml`), then `uv sync --locked`;
 - ruff (check and format), mdformat (`--check`), the Markdown link check, basedpyright;
-- pytest, including the token cases and the tool-list snapshot, with branch coverage reported (not yet a gate);
+- pytest, including the token cases and the tool-list snapshot, with branch coverage reported (not a gate) in the run's summary and, for pull requests from this repository's branches, as a comment;
 - a vulnerability audit of the locked dependencies (`pip-audit` over `uv export`), because Dependabot alerts may only be switched on later;
 - actionlint, with shellcheck for their `run:` scripts, and zizmor for the workflows;
 - gitleaks over the diff;
-- the image built for `linux/amd64` and `linux/arm64`, with the tests run in its `test` stage on each architecture.
+- the image built for `linux/amd64` and `linux/arm64`, each on a runner of its own architecture, with the tests run in its `test` stage.
 
-Workflows get `contents: read` and nothing else until publishing exists.
+Workflows get `contents: read`. A job that needs more gets it alone and runs no code from the pull request: the coverage comment (`pull-requests: write`), and the release's publish job (releasing guide).
 
 ## Alternatives Considered
 

@@ -60,7 +60,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
-          # Images are published only after the move (ADR-004).
+          # Images are published only from the organisation's repository, not a fork (ADR-004).
           # GitHub reports the owner in its own case (Interlusion).
           if [ "${REPOSITORY,,}" != interlusion/enterich ]; then
             echo "::error::Enterich is released only from interlusion/enterich, not $REPOSITORY"
@@ -94,7 +94,7 @@ jobs:
   publish:
     needs: check
     if: github.event_name == 'push'
-    # After the move, this job alone gets packages: write, id-token: write,
+    # Before the first release, this job alone gets packages: write, id-token: write,
     # attestations: write and contents: write (ITEM-001); until then it can't publish.
     permissions:
       contents: read

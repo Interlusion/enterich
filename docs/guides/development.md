@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-24 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: everything below is built except `python -m tests.fakes` (the fakes run in tests only) |
+| **Status** | Draft: matches what is built |
 
 ## Repository layout
 
@@ -62,12 +62,6 @@ scripts/check-links.sh     # no wiki-links; local links and #anchors resolve (Do
 scripts/check-workflows.sh # actionlint with shellcheck (Docker), zizmor
 uv run basedpyright
 uv run enterich            # starts Enterich; needs the ENTERICH_* variables
-```
-
-Run Enterich locally against the fakes:
-
-```sh
-uv run python -m tests.fakes   # fake JWKS and ERPNext; prints the env to use
 ```
 
 ## Container
