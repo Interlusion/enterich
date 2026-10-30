@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-26 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: no release yet; the first follows [ITEM-001](../backlog/item-001-going-public.md) |
+| **Status** | Draft: every step run for v0.1.0, the first release |
 
 Why it works this way: [ADR-004](../arc42/adr/ADR-004-releases-and-image.md).
 
@@ -36,9 +36,9 @@ The version lives in one place: `version` in `pyproject.toml`, set with `uv vers
 
 ## Dry run
 
-`release.yml` can also be started by hand (`workflow_dispatch`) with a version: in GitHub under Actions, Release, Run workflow, or `gh workflow run release.yml -f version=X.Y.Z`. It runs the same `image.yml` as a release, with read rights only: the version check, the build for both architectures, the tests in both, and the same build step for the runtime image, which it writes as an OCI image layout instead of pushing it. `scripts/image_index.py` then checks that the layout holds the image under its release name for both architectures, each with SBOM and provenance, and that no provenance carries GitHub's event payload, which for a tag push names people with their email addresses. The run's artefact `dry-run-X.Y.Z` holds the release notes, the tools file, and the SBOM and provenance per architecture. The version must equal `pyproject.toml`'s, so a dry run checks the version about to be released; where `CHANGELOG.md` has no section for it yet, as before the first release, the notes are the `Unreleased` section.
+`release.yml` can also be started by hand (`workflow_dispatch`) with a version: in GitHub under Actions, Release, Run workflow, or `gh workflow run release.yml -f version=X.Y.Z`. It runs the same `image.yml` as a release, with read rights only: the version check, the build for both architectures, the tests in both, and the same build step for the runtime image, which it writes as an OCI image layout instead of pushing it. `scripts/image_index.py` then checks that the layout holds the image under its release name for both architectures, each with SBOM and provenance, and that no provenance carries GitHub's event payload, which for a tag push names people with their email addresses. The run's artefact `dry-run-X.Y.Z` holds the release notes, the tools file, and the SBOM and provenance per architecture. The version must equal `pyproject.toml`'s, so a dry run checks the version about to be released; where `CHANGELOG.md` has no section for it yet, the notes are the `Unreleased` section.
 
-Only a tag run signs in to GHCR, pushes, attests and creates the release; those steps are first run for real. Run the dry run before the first release and after every change to `release.yml`, `image.yml`, the scripts they run or the `Dockerfile`.
+Only a tag run signs in to GHCR, pushes, attests and creates the release. Run the dry run after every change to `release.yml`, `image.yml`, the scripts they run or the `Dockerfile`.
 
 ## When it fails
 
