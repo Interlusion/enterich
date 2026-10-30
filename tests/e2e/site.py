@@ -51,8 +51,12 @@ class Site:
     def update(self, doctype: str, name: str, fields: dict[str, Any]) -> dict[str, Any]:
         return self._answer(self._client.put(f"/api/resource/{doctype}/{name}", json=fields))
 
-    def _answer(self, response: httpx2.Response) -> Any:
-        if response.status_code != 200:
+    def delete(self, doctype: str, name: str) -> None:
+        self._answer(self._client.delete(f"/api/resource/{doctype}/{name}"), accepted=202)
+
+    def _answer(self, response: httpx2.Response, accepted: int = 200) -> Any:
+        """The answer's message or data; `accepted`: the status of success, 202 for a DELETE."""
+        if response.status_code != accepted:
             raise SiteError(
                 f"{response.request.method} {response.request.url.path}: {response.text}"
             )

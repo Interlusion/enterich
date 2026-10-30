@@ -1,9 +1,11 @@
 """The seeded company and the agent user, made through the REST API as Administrator.
 
 Seeding is idempotent: a site kept running by scripts/erpnext-site.sh is seeded once,
-and later runs find what is there. Only the agent's API secret is new for each run.
+and later runs find what is there. New for each run are the agent's API secret and a
+site without drafts: those of earlier runs are removed, so none is taken for a duplicate.
 """
 
+import time
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
@@ -149,6 +151,8 @@ class Seed:
     api_key: str
     api_secret: str
     item: str
+    # Without a price, for the rate-0 warning; see unpriced().
+    unpriced_item: str
     customer: str
     supplier: str
     customer_address: str
@@ -181,12 +185,14 @@ def seed(site: Site) -> Seed:
         item_group="Products",
         stock_uom="Nos",
     )
+    unpriced_item = unpriced(site)
     customer = ensure(
         site, "Customer", {"customer_name": "Example Customer"}, customer_type="Company"
     )
     supplier = ensure(
         site, "Supplier", {"supplier_name": "Example Supplier"}, supplier_type="Company"
     )
+    remove_drafts(site)
     customer_address = address(site, "Customer", customer)
     supplier_address = address(site, "Supplier", supplier)
     sales_template = tax_template(site, "Sales Taxes and Charges Template", SALES_VAT)
@@ -203,6 +209,7 @@ def seed(site: Site) -> Seed:
         api_key=keys["api_key"],
         api_secret=keys["api_secret"],
         item=item,
+        unpriced_item=unpriced_item,
         customer=customer,
         supplier=supplier,
         customer_address=customer_address,
@@ -426,7 +433,10 @@ class Vouchers:
             self.sales_due = self.posted + SALES_TERMS
 
     def submitted(self, doctype: str, identity: dict[str, str], **fields: Any) -> str:
-        return ensure(self.site, doctype, identity, company=COMPANY, docstatus=1, **fields)
+        # The tests make drafts with the seed's references too, the purchase invoice's
+        # bill_no among them.
+        submitted = {**identity, "docstatus": 1}
+        return ensure(self.site, doctype, submitted, company=COMPANY, **fields)
 
     def sales_invoice(self, customer: str, template: str) -> str:
         return self.submitted(
@@ -511,7 +521,57 @@ class Vouchers:
         )
 
 
-def ensure(site: Site, doctype: str, identity: dict[str, str], **fields: Any) -> str:
+def unpriced(site: Site) -> str:
+    """An item without a price. ERPNext adds price-list rates from an invoice with a rate
+    (Stock Settings' auto_insert_price_list_rate_if_missing), as it did for SKU-1 from the
+    seeded ones, but only for a user who may write Item Price, which the agent user may
+    not; one added on a kept site by hand is removed."""
+    item = ensure(
+        site,
+        "Item",
+        {"item_code": "SKU-2"},
+        item_name="Widget SKU-2",
+        item_group="Products",
+        stock_uom="Nos",
+    )
+    for price in site.get_list("Item Price", {"item_code": item}):
+        site.delete("Item Price", price["name"])
+    return item
+
+
+# What the draft operations make; earlier runs' drafts of these are removed.
+DRAFTED = ("Sales Invoice", "Purchase Invoice", "Journal Entry")
+MARKER = "Removed by the end-to-end seed"
+REMOVAL_TIMEOUT = 60.0
+
+
+def remove_drafts(site: Site) -> None:
+    """Earlier runs' drafts, so none is taken for a duplicate. Frappe removes a deleted
+    document's comments by its name in a background job, and gives the last name of a
+    series out again; such a late job would remove a comment of this run's draft of that
+    name. So each draft gets a marker comment before it goes, and the seed waits until
+    the jobs have removed every marker."""
+    removed: list[str] = []
+    for doctype in DRAFTED:
+        for draft in site.get_list(doctype, {"docstatus": 0}):
+            site.call(
+                "frappe.desk.form.utils.add_comment",
+                reference_doctype=doctype,
+                reference_name=draft["name"],
+                content=MARKER,
+                comment_email="",
+                comment_by="",
+            )
+            site.delete(doctype, draft["name"])
+            removed.append(draft["name"])
+    deadline = time.monotonic() + REMOVAL_TIMEOUT
+    while removed and site.exists("Comment", {"reference_name": ["in", removed]}):
+        if time.monotonic() > deadline:
+            raise TimeoutError(f"Frappe's worker didn't remove the comments of {removed}.")
+        time.sleep(0.2)
+
+
+def ensure(site: Site, doctype: str, identity: dict[str, Any], **fields: Any) -> str:
     """The record matching `identity`, inserted with `fields` if missing; returns its name."""
     found = site.get_list(doctype, identity)
     if found:

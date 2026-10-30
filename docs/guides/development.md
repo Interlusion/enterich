@@ -46,7 +46,7 @@ The tests have three levels:
 
 - **Unit:** one module, its collaborators replaced where they reach outside.
 - **Integration:** Enterich as a whole, from the MCP request to its ERPNext calls, with its neighbours faked: the authorization server's keys (`FakeJwks`) and ERPNext (`FakeErpnext`).
-- **End-to-end:** from the MCP request to a real ERPNext site; only the token issuer is faked. Being built ([ITEM-004](../backlog/item-004-real-erpnext-test.md)): the site, its seeding, the agent user, and the reads and reports of every area so far.
+- **End-to-end:** from the MCP request to a real ERPNext site; only the token issuer is faked. Being built ([ITEM-004](../backlog/item-004-real-erpnext-test.md)): the site, its seeding, the agent user, the reads and reports of every area, and the drafts so far.
 
 Why this toolchain: [ADR-005](../arc42/adr/ADR-005-toolchain-and-dependencies.md).
 
