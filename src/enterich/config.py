@@ -7,7 +7,7 @@ rule, never with the value of a secret.
 import re
 from collections.abc import Collection, Mapping
 from ipaddress import ip_address
-from typing import Literal
+from typing import Literal, get_args
 from urllib.parse import SplitResult, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -20,10 +20,10 @@ PREFIX = "ENTERICH_"
 ALLOWED_ALGORITHMS = frozenset(
     {"RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA"}
 )
-LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
 MAX_CLOCK_LEEWAY = 60
 
 type LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+LOG_LEVELS: tuple[LogLevel, ...] = get_args(LogLevel.__value__)
 
 # Unreserved characters only, no empty, "." or ".." segments, so the path the
 # client sends is the path the wrapper and the SDK compare.
@@ -126,7 +126,7 @@ def load(env: Mapping[str, str], operations: Collection[str]) -> Settings:
         "timezone": reader.timezone(),
         "host": reader.optional("HOST", "0.0.0.0"),  # noqa: S104 - a container listens on all addresses
         "port": reader.integer("PORT", "8000", 1, 65535),
-        "log_level": reader.choice("LOG_LEVEL", "INFO", LOG_LEVELS),
+        "log_level": reader.log_level(),
     }
     if resource and issuer:
         reader.as_published(resource.geturl(), issuer.geturl())
@@ -166,7 +166,7 @@ class _Reader:
         """A Host header value: a host name or IP address, optionally with a port."""
         if name not in self.env:
             return default  # checked as part of its URL
-        value = self.optional(name, default)
+        value = self.env[name].strip()
         try:
             parsed = urlsplit(f"//{value}")
             parsed.port  # noqa: B018 - raises for a port that isn't a number
@@ -193,12 +193,13 @@ class _Reader:
             self.fail(name, f"must be from {low} to {high}")
         return value
 
-    def choice(self, name: str, default: str, choices: tuple[str, ...]) -> LogLevel:
-        value = self.optional(name, default).upper()
-        if value not in choices:
-            self.fail(name, "must be one of " + ", ".join(choices))
-            return "INFO"
-        return value  # pyright: ignore[reportReturnType] - checked against LOG_LEVELS
+    def log_level(self) -> LogLevel:
+        value = self.optional("LOG_LEVEL", "INFO").upper()
+        for level in LOG_LEVELS:
+            if value == level:
+                return level
+        self.fail("LOG_LEVEL", "must be one of " + ", ".join(LOG_LEVELS))
+        return "INFO"
 
     def scopes(self) -> tuple[str, ...]:
         scopes = tuple(self.optional("REQUIRED_SCOPES", "openid").split())

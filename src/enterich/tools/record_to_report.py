@@ -10,6 +10,7 @@ from pydantic import AfterValidator, Field, model_validator
 
 from enterich.erpnext import ErpnextError
 from enterich.shapes import (
+    DOCSTATUS,
     Amount,
     Day,
     Flag,
@@ -84,7 +85,6 @@ JOURNAL_ROW_FIELDS = (
     "user_remark",
 )
 JOURNAL_ROW_OUTSIDE = {"user_remark"}
-JOURNAL_STATES = {"draft": 0, "submitted": 1, "cancelled": 2}
 LEDGER_FIELDS = (
     "posting_date",
     "account",
@@ -323,7 +323,7 @@ async def list_cost_centers(inputs: ListCostCenters, context: Context) -> dict[s
 async def list_journal_entries(inputs: ListJournalEntries, context: Context) -> dict[str, Any]:
     filters: list[list[Any]] = [["company", "=", context.settings.company]]
     if inputs.state is not None:
-        filters.append(["docstatus", "=", JOURNAL_STATES[inputs.state]])
+        filters.append(["docstatus", "=", DOCSTATUS[inputs.state]])
     if inputs.voucher_type is not None:
         filters.append(["voucher_type", "=", inputs.voucher_type])
     if inputs.from_date is not None:

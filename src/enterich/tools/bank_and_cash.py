@@ -6,6 +6,7 @@ from typing import Any, Literal, Self
 from pydantic import model_validator
 
 from enterich.shapes import (
+    DOCSTATUS,
     Day,
     Flag,
     Inputs,
@@ -89,7 +90,6 @@ PAYMENT_FIELDS = (
 PAYMENT_DETAIL_FIELDS = ("paid_from", "paid_to", "remarks")
 PAYMENT_OUTSIDE = frozenset({"party_name", "reference_no", "remarks"})
 REFERENCE_FIELDS = ("reference_doctype", "reference_name", "allocated_amount")
-PAYMENT_STATES = {"draft": 0, "submitted": 1, "cancelled": 2}
 
 
 class ListBankAccounts(Inputs):
@@ -202,7 +202,7 @@ async def list_payment_entries(inputs: ListPaymentEntries, context: Context) -> 
     if inputs.party is not None:
         filters.append(["party", "=", inputs.party])
     if inputs.state is not None:
-        filters.append(["docstatus", "=", PAYMENT_STATES[inputs.state]])
+        filters.append(["docstatus", "=", DOCSTATUS[inputs.state]])
     if inputs.from_date is not None:
         filters.append(["posting_date", ">=", inputs.from_date.isoformat()])
     if inputs.to_date is not None:

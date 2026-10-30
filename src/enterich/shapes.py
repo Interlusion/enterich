@@ -97,6 +97,8 @@ def today(timezone: ZoneInfo) -> date:
 
 
 type InvoiceState = Literal["draft", "unpaid", "overdue", "paid", "return", "cancelled"]
+# ERPNext's docstatus for the states of documents without an invoice's states
+DOCSTATUS = {"draft": 0, "submitted": 1, "cancelled": 2}
 
 
 def invoice_state(state: InvoiceState, day: date) -> list[list[Any]]:
