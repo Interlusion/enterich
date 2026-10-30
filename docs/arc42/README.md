@@ -227,7 +227,7 @@ Variables: [configuration guide](../guides/configuration.md).
 
   Enterich exports no traces or metrics of its own. The MCP SDK brings `opentelemetry-api`, which stays inert because no OpenTelemetry SDK or exporter is installed. Opt-in traces are [ITEM-002](../backlog/item-002-opentelemetry.md).
 
-- **Limits:** 1 MiB request body, 100 records per call, 100 rows per child table, 100,000 characters per result, 10 MiB per ERPNext response, 30 s per ERPNext call, 60 s per operation. They stay below what hosted clients enforce, so Enterich's own message arrives rather than a client's cut-off: Claude's hosted apps, for example, allowed about 150,000 characters per tool result and 240 s per tool call (October 2026).
+- **Limits** ([REQ-001-PRS-NF003](../specs/req-001-core.md#req-001-prs-nf003-result-limits), [REQ-002-PRS-NF011](../specs/req-002-service.md#req-002-prs-nf011-limits)) stay below what hosted clients enforce, so Enterich's own message arrives rather than a client's cut-off: Claude's hosted apps, for example, allowed about 150,000 characters per tool result and 240 s per tool call (October 2026).
 
 - **Testing:** unit tests per block; end-to-end tests run Enterich against a fake JWKS and a fake ERPNext that records every request, so each test can assert exactly what ERPNext received. A snapshot of `tools/list` pins the public tool contract.
 

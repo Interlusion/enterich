@@ -10,7 +10,7 @@ The repository is public: `Interlusion/enterich`.
 
 ## Rules
 
-- **Nothing specific to one deployment goes into this repository**: no hostnames, realm or client names, user IDs, credentials, or a site's tool selection. Configuration comes from environment variables; examples use placeholders such as `erp.example.com`.
+- **Nothing specific to one deployment goes into this repository**: no hostnames, realm or client names, user IDs, company names, credentials, or a site's tool selection. Configuration comes from environment variables; examples use placeholders such as `erp.example.com`.
 - **Secrets never in Git**, and never in logs: API keys, secrets, access and refresh tokens.
 - **Tools have a fixed purpose and input schema.** No tool takes a DocType, method name, field list or file path as input.
 - **No limit may depend on the MCP client asking for approval.**
@@ -20,7 +20,7 @@ The repository is public: `Interlusion/enterich`.
 
 ## Docs
 
-Start at `docs/README.md`. The specs in `docs/specs/` are the contract: a new operation or a changed input starts there, then tests, then code.
+Start at `docs/README.md`. The specs in `docs/specs/` are the contract: a new operation or a changed input starts there, then tests, then code. The development guide's rules for changes (`docs/guides/development.md`) say each step in full; the rules here are the ones never to miss.
 
 - **Tests first** where a spec's Definition of Done describes the behaviour: write the failing test from it, run it red, then write the code. Commit the tests before the code (`test:` then `feat:`). Infrastructure (image, CI) and trying out a library's behaviour are exceptions; turn what you learn into a test afterwards.
 - For any operation, read REQ-001 (`docs/specs/req-001-core.md`) and the operation's area spec; REQ-001's Requirement Rules say how they relate. For access, configuration, logging or limits, read REQ-002 (`docs/specs/req-002-service.md`).
@@ -30,6 +30,6 @@ Start at `docs/README.md`. The specs in `docs/specs/` are the contract: a new op
 ## Conventions
 
 - Conventional Commits: `feat`, `fix`, `docs`, `ci`, `chore`, `refactor`, `test`.
-- Keep scripts and agents off `api.github.com` (60 requests/h unauthenticated): use `git ls-remote`, `raw.githubusercontent.com`, `releases.atom`.
+- Keep scripts and agents off `api.github.com` (60 requests/h unauthenticated): use `git ls-remote`, `raw.githubusercontent.com`, `releases.atom`. The workflows' two authenticated exceptions are in the development guide.
 - Markdown: one line per paragraph, no hard wrapping. `mdformat` formats it (config in `.mdformat.toml`).
 - Commit or push only when the operator asks.
