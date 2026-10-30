@@ -90,10 +90,16 @@ jobs:
   publish:
     needs: check
     if: github.event_name == 'push'
-    # Before the first release, this job alone gets packages: write, id-token: write,
-    # attestations: write and contents: write (ITEM-001); until then it can't publish.
+    # This job alone may write: the image and its attestations to GHCR (packages,
+    # id-token, attestations, artifact-metadata for the attestation's storage record in
+    # an organisation) and the GitHub release (contents). image.yml's test jobs narrow it
+    # to read.
     permissions:
-      contents: read
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     uses: ./.github/workflows/image.yml # zizmor: ignore[self-repository]
     with:
       version: ${{ needs.check.outputs.version }}

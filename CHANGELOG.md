@@ -4,6 +4,8 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-30
+
 The first release.
 
 ### Added
@@ -28,3 +30,6 @@ The first release.
 ### Rights
 
 - The agent user needs read rights for the reads, report rights for the reports, and create and write for the drafts' DocTypes, never submit, cancel, amend or delete. Each area spec's Rights section lists them; the configuration guide says how to grant them.
+
+[0.1.0]: https://github.com/Interlusion/enterich/releases/tag/v0.1.0
+[unreleased]: https://github.com/Interlusion/enterich/compare/v0.1.0...HEAD
