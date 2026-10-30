@@ -8,19 +8,17 @@ from typing import Any, Literal
 
 from enterich.shapes import (
     InvoiceState,
-    cut_rows,
     cut_texts,
     decimal,
     form_url,
     invoice_state,
     like_pattern,
     page,
-    rows_of,
     shape,
     split_outside,
     today,
 )
-from enterich.tools import Context, get_named, report_rows
+from enterich.tools import Context, Table, get_document, get_named, report_rows
 
 ADDRESS_FIELDS = (
     "name",
@@ -173,29 +171,18 @@ async def list_invoices(
 
 
 async def get_invoice(side: Side, context: Context, name: str) -> dict[str, Any]:
-    doc = await get_named(
-        context, side.invoice, name, field="name", what=side.what_invoice, company=True
-    )
-    items, items_cut = cut_rows(rows_of(doc, "items"))
-    taxes, taxes_cut = cut_rows(rows_of(doc, "taxes"))
-    record = shape(
-        doc,
-        (*side.invoice_fields, *INVOICE_DETAIL_FIELDS),
+    return await get_document(
+        context,
+        side.invoice,
+        name,
+        what=side.what_invoice,
+        fields=(*side.invoice_fields, *INVOICE_DETAIL_FIELDS),
         outside=side.invoice_outside,
         flags={"is_return"},
-    )
-    outside = record.pop("outside_text")
-    return cut_texts(
-        {
-            **record,
-            "items": [shape(r, side.item_fields, outside=side.item_outside) for r in items],
-            "taxes": [shape(r, side.tax_fields) for r in taxes],
-            "url": form_url(
-                context.settings.erpnext_public_url, side.invoice, str(doc.get("name", name))
-            ),
-            "truncated": [t for t, cut in (("items", items_cut), ("taxes", taxes_cut)) if cut],
-            "outside_text": outside,
-        }
+        tables={
+            "items": Table(side.item_fields, side.item_outside),
+            "taxes": Table(side.tax_fields),
+        },
     )
 
 

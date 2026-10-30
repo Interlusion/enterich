@@ -19,8 +19,6 @@ from enterich.shapes import (
     Offset,
     Remarks,
     Search,
-    cut_rows,
-    cut_texts,
     decimal,
     form_url,
     in_order,
@@ -35,7 +33,9 @@ from enterich.tools import (
     Context,
     Operation,
     Refusal,
+    Table,
     drafts,
+    get_document,
     get_named,
     report_rows,
 )
@@ -343,21 +343,14 @@ async def list_journal_entries(inputs: ListJournalEntries, context: Context) -> 
 
 
 async def get_journal_entry(inputs: GetJournalEntry, context: Context) -> dict[str, Any]:
-    doc = await get_named(
-        context, "Journal Entry", inputs.name, field="name", what="the journal entry", company=True
-    )
-    rows, cut = cut_rows(rows_of(doc, "accounts"))
-    record = shape(doc, (*JOURNAL_FIELDS, *JOURNAL_DETAIL_FIELDS), outside=JOURNAL_OUTSIDE)
-    outside = record.pop("outside_text")
-    name = str(doc.get("name", inputs.name))
-    return cut_texts(
-        {
-            **record,
-            "accounts": [shape(r, JOURNAL_ROW_FIELDS, outside=JOURNAL_ROW_OUTSIDE) for r in rows],
-            "url": form_url(context.settings.erpnext_public_url, "Journal Entry", name),
-            "truncated": ["accounts"] if cut else [],
-            "outside_text": outside,
-        }
+    return await get_document(
+        context,
+        "Journal Entry",
+        inputs.name,
+        what="the journal entry",
+        fields=(*JOURNAL_FIELDS, *JOURNAL_DETAIL_FIELDS),
+        outside=JOURNAL_OUTSIDE,
+        tables={"accounts": Table(JOURNAL_ROW_FIELDS, JOURNAL_ROW_OUTSIDE)},
     )
 
 
