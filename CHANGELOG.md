@@ -4,6 +4,14 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed
+
+- `report_general_ledger`'s description said `currency` names only an account's or party's currency, and REQ-006 that it is null otherwise. ERPNext always names the amounts' currency, so Enterich returns the company's currency there, as it did from the start; both now say so.
+
+### Rights
+
+- Fewer rights: the drafts need none on what they only link to (company, currency, units, price list, payment terms, project, cost centres, and a journal entry's accounts, parties and invoices), a sales draft needs only select on Customer, and Trial Balance needs no read on Account. ERPNext's roles All and Desk User add their own rights to every desk user (configuration guide).
+
 ## [0.1.0] - 2026-10-30
 
 The first release.
