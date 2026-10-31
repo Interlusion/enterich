@@ -537,9 +537,12 @@ Checked against Frappe and ERPNext v16.52 source:
 - ERPNext fills tax rows from a template on insert only when a site setting says so (`add_taxes_from_taxes_and_charges_template`); Enterich therefore fills them itself.
 - With only the select right on a DocType, lists return only its standard fields (such as `name` and `modified`) and its search fields; the operations need read (configuration guide).
 
+Checked on a real ERPNext v16 site by the end-to-end test:
+
+- ERPNext v16's REST API: `/api/resource` for lists, inserts and updates; `frappe.client.get` for a document with its rows; `frappe.desk.query_report.run` for reports; ERPNext's `get_taxes_and_charges` for a template's rows. Enterich calls these only with fixed DocTypes, reports and methods. Report filters and columns are the ones the area specs' catalogues name, as checked against ERPNext v16.52's source too (area specs).
+
 Not checked yet:
 
-- ERPNext v16's REST API: `/api/resource` for lists, inserts and updates; `frappe.client.get` for a document with its rows; `frappe.desk.query_report.run` for reports; ERPNext's `get_taxes_and_charges` for a template's rows. Enterich calls these only with fixed DocTypes, reports and methods. Report filters and columns are checked against ERPNext v16.52's source (area specs); an end-to-end test against a real site is in the backlog.
 - The deployment gives the agent user a role without submit, cancel, amend, delete, share, import or export, and a User Permission on the assigned company. Enterich neither creates nor checks the role.
 - A draft takes the next number of its naming series when created, and an abandoned draft keeps it. Whether that's acceptable is the deployment's decision.
 - Two identical creates at the same instant can both pass the duplicate check. One agent works through one conversation in sequence, and a person reviews every draft, so this is accepted.

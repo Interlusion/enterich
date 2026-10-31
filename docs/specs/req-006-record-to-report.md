@@ -83,7 +83,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - An answer whose first row or last two rows aren't summary rows (with a posting date) is refused as a faulty answer.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
-- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site (backlog).
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
 
 #### REQ-006-PRS-F004: Trial Balance
 
@@ -98,7 +98,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - ERPNext's total row isn't among the rows; `totals` are Enterich's sums over the root accounts' rows, as decimals.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
-- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site (backlog).
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
 
 #### REQ-006-PRS-F005: Journal entry drafts
 
@@ -247,9 +247,9 @@ Checked against ERPNext v16.52 source:
 - ERPNext finds a fiscal year among enabled ones, those assigned to the company first, then those assigned to none (`get_fiscal_years`).
 - With select only, a list leaves out a child table's fields and those that are neither standard nor search fields, so a Fiscal Year row without its end date is a faulty answer.
 
-Not checked yet:
+Checked on a real ERPNext v16 site by the end-to-end test:
 
-- The rights in the Rights section are the minimum; the end-to-end test proves them (REQ-002-PRS-NF013).
+- The rights in the Rights section suffice, and each is needed (REQ-002-PRS-NF013).
 
 ## Open Questions
 

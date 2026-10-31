@@ -82,9 +82,9 @@ Checked against ERPNext v16.52 source:
 
 - Item Default rows hold an item's defaults per company (`company`, `income_account`, `expense_account`, `selling_cost_center`, `buying_cost_center`).
 
-Not checked yet:
+Checked on a real ERPNext v16 site by the end-to-end test:
 
-- The rights in the Rights section are the minimum; the end-to-end test proves them (REQ-002-PRS-NF013).
+- The rights in the Rights section suffice, and each is needed (REQ-002-PRS-NF013).
 
 ## Open Questions
 
