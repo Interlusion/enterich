@@ -235,6 +235,20 @@ FIELDS: dict[str, set[str]] = {
     "Fiscal Year Company": {"company"},
     "Dynamic Link": {"link_doctype", "link_name"},
 }
+# The search fields among FIELDS, from v16's DocTypes: with select only, a list returns
+# these and the standard fields (get_permitted_fields)
+SEARCH_FIELDS: dict[str, set[str]] = {
+    "Item": {"item_name", "description", "item_group"},
+    "Customer": {"customer_group"},
+    "Address": {"country"},
+    "Sales Invoice": {"posting_date", "due_date", "customer", "outstanding_amount"},
+    "Supplier": {"supplier_group"},
+    "Purchase Invoice": {"posting_date", "supplier", "bill_no", "outstanding_amount"},
+    "Account": {"account_number"},
+    "Cost Center": {"parent_cost_center", "is_group"},
+    "Journal Entry": {"voucher_type", "posting_date", "cheque_no"},
+    "Bank Account": {"bank", "account"},
+}
 # DocType -> {table field: child DocType}
 TABLES: dict[str, dict[str, str]] = {
     "Item": {"item_defaults": "Item Default", "taxes": "Item Tax"},
@@ -300,7 +314,7 @@ class FakeErpnext:
     )
     prepared: set[str] = field(default_factory=set[str])
     # DocTypes the agent user may only select: lists filter on every field but return only
-    # `name` here (v16 returns the search fields), never a child table's fields
+    # the standard and search fields asked for, never a child table's fields
     select_only: set[str] = field(default_factory=set[str])
     # reports set as snapshot reports, answered from the last DuckDB sync
     snapshots: set[str] = field(default_factory=set[str])
@@ -375,7 +389,7 @@ class FakeErpnext:
         if request.url.path == TAXES_METHOD and request.method == "GET":
             template = self.docs.get(params["master_doctype"], {}).get(params["master_name"])
             if template is None:
-                return httpx2.Response(404, json=error(404, "DoesNotExistError", "Not found"))
+                return _missing(params["master_doctype"], params["master_name"])
             rows = [{k: v for k, v in r.items() if k != "doctype"} for r in template["taxes"]]
             return httpx2.Response(200, json={"message": rows})
         if request.url.path == COMMENT_METHOD and request.method in ("POST", "PUT"):
@@ -387,7 +401,7 @@ class FakeErpnext:
         if request.url.path == "/api/method/frappe.client.get":
             doc = self.docs.get(params.get("doctype", ""), {}).get(params.get("name", ""))
             if doc is None:
-                return httpx2.Response(404, json=error(404, "DoesNotExistError", "Not found"))
+                return _missing(params.get("doctype", ""), params.get("name", ""))
             return httpx2.Response(200, json={"message": doc}, headers=headers)
         return httpx2.Response(404, json=error(404, "DoesNotExistError", "No such route"))
 
@@ -400,16 +414,31 @@ class FakeErpnext:
     def _update(self, doctype: str, name: str, body: dict[str, Any]) -> httpx2.Response:
         stored = self.docs.get(doctype, {}).get(name)
         if stored is None:
-            return httpx2.Response(404, json=error(404, "DoesNotExistError", "Not found"))
+            return _missing(doctype, name)
         if _timestamp(body.get("modified")) != _timestamp(stored["modified"]):
             message = (
-                f"Error: Document has been modified after you have opened it "
+                f"Error: {name} ({doctype}) has been modified after you have opened it "
                 f"({stored['modified']}, {body.get('modified')}). "
                 "Please refresh to get the latest document."
             )
             return httpx2.Response(417, json=error(417, "TimestampMismatchError", message))
-        if stored["docstatus"] != 0:
-            message = "Not allowed to change fields after submission"
+        if stored["docstatus"] == 2:  # check_docstatus_transition: no server message
+            body = {
+                "exc_type": "ValidationError",
+                "exception": "frappe.exceptions.ValidationError: Cannot edit cancelled document",
+                "exc": json.dumps(["Traceback (most recent call last):\n  ... ValidationError"]),
+            }
+            return httpx2.Response(417, json=body)
+        if stored["docstatus"] == 1:
+            # The first field changed, by its name where v16 gives its label; v16 lets a
+            # field marked allow_on_submit change, and saves a body that changes nothing
+            changed = next((k for k in body if k != "modified" and body[k] != stored.get(k)), None)
+            if changed is None:
+                return httpx2.Response(200, json={"data": stored})
+            message = (
+                f" Not allowed to change <strong>{changed}</strong> after submission from "
+                f"<strong>{stored.get(changed)}</strong> to <strong>{body[changed]}</strong>"
+            )
             return httpx2.Response(417, json=error(417, "UpdateAfterSubmitError", message))
         doc = copy.deepcopy(stored)
         doc.update({k: copy.deepcopy(v) for k, v in body.items() if k != "modified"})
@@ -438,25 +467,27 @@ class FakeErpnext:
             code = row["item_code"]
             rate = self.rules.get(code, row.get("rate") or self.prices.get(code, 0.0))
             # Rounded to the field's precision: the site's float precision, the currency's
-            row.update(qty=round(row["qty"], 3), rate=round(rate, 2), is_free_item=0)
-            row["pricing_rules"] = '[\n "PRLE-0001"\n]' if code in self.rules else ""
+            row.update(qty=float(round(row["qty"], 3)), rate=float(round(rate, 2)), is_free_item=0)
+            row.pop("pricing_rules", None)
+            if code in self.rules:
+                row["pricing_rules"] = '[\n "PRLE-0001"\n]'
         for code in [r["item_code"] for r in rows if r["item_code"] in self.free_items]:
             rows.append(
-                {"item_code": self.free_items[code], "qty": 1, "rate": 0.0, "is_free_item": 1}
+                {"item_code": self.free_items[code], "qty": 1.0, "rate": 0.0, "is_free_item": 1}
             )
         for row in rows:
-            row.update(doctype=f"{doctype} Item", amount=round(row["qty"] * row["rate"], 2))
+            row.update(doctype=f"{doctype} Item", amount=float(round(row["qty"] * row["rate"], 2)))
             row.setdefault("uom", "Nos")
             if doctype == "Purchase Invoice":
                 account = row.get("expense_account") or "5000 - Cost - EX"
                 row["expense_account"] = ACCOUNTS.get(account.lower(), account)
                 if row["item_code"] in self.stock_items and not doc.get("update_stock"):
                     row["expense_account"] = STOCK_NOT_BILLED
-        net_total = round(sum(r["amount"] for r in rows), 2)
+        net_total = float(round(sum(r["amount"] for r in rows), 2))
         taxes = _rows(doc, "taxes")
         for tax in taxes:
-            tax["tax_amount"] = round(net_total * tax["rate"] / 100, 2)
-        total_taxes = round(sum(t["tax_amount"] for t in taxes), 2)
+            tax["tax_amount"] = float(round(net_total * tax["rate"] / 100, 2))
+        total_taxes = float(round(sum(t["tax_amount"] for t in taxes), 2))
         self.saves += 1
         doc.update(
             items=rows,
@@ -478,7 +509,8 @@ class FakeErpnext:
         """Save a journal entry draft as v16 does at save; the balance and a Bank Entry's
         reference are checked only on submit."""
         if not doc.get("posting_date"):
-            return _refused(417, "MandatoryError", "Value missing for Journal Entry: Posting Date")
+            message = "Error: Value missing for Journal Entry: Posting Date"
+            return _refused(417, "MandatoryError", message)
         accounts = self.docs.get("Account", {})
         rows = _rows(doc, "accounts")
         for number, row in enumerate(rows, start=1):
@@ -495,8 +527,8 @@ class FakeErpnext:
                 )
                 return _refused(417, "ValidationError", message)
             # Rounded to the currency's precision before the totals are summed
-            debit = round(row.get("debit_in_account_currency") or 0.0, 2)
-            credit = round(row.get("credit_in_account_currency") or 0.0, 2)
+            debit = float(round(row.get("debit_in_account_currency") or 0.0, 2))
+            credit = float(round(row.get("credit_in_account_currency") or 0.0, 2))
             if not debit and not credit:
                 message = f"Row {number}: Both Debit and Credit values cannot be zero"
                 return _refused(417, "ValidationError", message)
@@ -510,7 +542,7 @@ class FakeErpnext:
                 debit=debit,
                 credit=credit,
                 account_currency="EUR",
-                exchange_rate=1,
+                exchange_rate=1.0,
             )
         if doc.get("cheque_no") and not doc.get("cheque_date"):  # create_remarks
             return _refused(417, "MandatoryError", "Please enter Reference date")
@@ -555,7 +587,8 @@ class FakeErpnext:
         length = int(params.get("limit_page_length", 20))
         fields: list[str] = json.loads(params.get("fields", '["name"]'))
         if doctype in self.select_only:
-            fields = ["name"]
+            permitted = STANDARD_FIELDS | SEARCH_FIELDS.get(doctype, set())
+            fields = [f for f in fields if f in permitted]
         tables = {f.partition(".")[0] for f in fields if "." in f}
         if not tables:
             return [{f: d.get(f) for f in fields} for d in docs[start : start + length]]
@@ -589,6 +622,10 @@ def _refused(status: int, exc_type: str, message: str) -> httpx2.Response:
     return httpx2.Response(status, json=error(status, exc_type, message))
 
 
+def _missing(doctype: str, name: str) -> httpx2.Response:
+    return _refused(404, "DoesNotExistError", f"{doctype} {name} not found")
+
+
 def _due_date(doctype: str, doc: dict[str, Any], party: dict[str, Any]) -> str | None:
     """The due date and payment schedule as v16 sets them at every save; the refusal of
     validate_due_date, if any. `payment_terms_template` "" stays empty (update_if_missing)."""
@@ -606,9 +643,9 @@ def _due_date(doctype: str, doc: dict[str, Any], party: dict[str, Any]) -> str |
         doc["due_date"] = max(str(row["due_date"]) for row in schedule)
     elif template:  # set_payment_schedule
         due = start + timedelta(days=TERMS[template])
-        doc["payment_schedule"] = [{"due_date": str(due), "invoice_portion": 100}]
+        doc["payment_schedule"] = [{"due_date": str(due), "invoice_portion": 100.0}]
     else:
-        doc["payment_schedule"] = [{"due_date": doc["due_date"], "invoice_portion": 100}]
+        doc["payment_schedule"] = [{"due_date": doc["due_date"], "invoice_portion": 100.0}]
     due = date.fromisoformat(doc["due_date"])
     earliest = start if doctype == "Purchase Invoice" else posting
     if due < earliest:
@@ -767,15 +804,19 @@ def _like(pattern: str) -> re.Pattern[str]:
 
 
 def error(status: int, exc_type: str, message: str, traceback: str | None = None) -> dict[str, Any]:
-    """An error body as Frappe sends it."""
-    return {
+    """An error body as Frappe sends it; a missing document's carries no traceback."""
+    body: dict[str, Any] = {
         "exc_type": exc_type,
-        "exception": f"frappe.exceptions.{exc_type}: {message}",
-        "exc": json.dumps([traceback or f"Traceback (most recent call last):\n  ... {exc_type}"]),
         "_server_messages": json.dumps(
             [json.dumps({"message": message, "title": "Message", "indicator": "red"})]
         ),
     }
+    if exc_type != "DoesNotExistError":
+        body["exception"] = f"frappe.exceptions.{exc_type}: {message}"
+        body["exc"] = json.dumps(
+            [traceback or f"Traceback (most recent call last):\n  ... {exc_type}"]
+        )
+    return body
 
 
 def item(code: str = "SKU-1", **overrides: Any) -> dict[str, Any]:
