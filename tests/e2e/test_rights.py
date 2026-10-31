@@ -68,24 +68,9 @@ def without_addresses(answer: Result) -> None:
     assert answer.data["addresses"] == []
 
 
-def search_fields_only(field: str) -> Callable[[Result], None]:
-    """With select alone ERPNext answers with the DocType's search fields only, so the
-    records arrive without `field`."""
-
-    def check(answer: Result) -> None:
-        records = answer.data["records"]
-        assert records
-        assert [r[field] for r in records] == [None] * len(records)
-
-    return check
-
-
 # The operations a removed right doesn't refuse, and what they answer instead:
 # (operation, DocType, right) -> a check of the answer
 UNREFUSED: dict[tuple[str, str | None, str], Callable[[Result], None]] = {
-    # Desk User's select on Item, and the sales drafts' select on Customer
-    ("list_items", "Item", "read"): search_fields_only("item_code"),
-    ("list_customers", "Customer", "read"): search_fields_only("customer_type"),
     ("list_customers", "Address", "read"): works,
     ("get_customer", "Address", "read"): without_addresses,
     ("list_suppliers", "Address", "read"): works,
@@ -99,11 +84,14 @@ UNREFUSED: dict[tuple[str, str | None, str], Callable[[Result], None]] = {
     ("update_draft_journal_entry", "Journal Entry", "create"): works,
 }
 
-# ERPNext's permission refusal, or Enterich's answer for a name it may not read
-# (REQ-001-PRS-F009)
+# ERPNext's permission refusal, Enterich's answer for a name it may not read
+# (REQ-001-PRS-F009), or its refusal of a list without the fields it asked for, which
+# Desk User's select on Item and the sales drafts' select on Customer bring about
+# (REQ-001-PRS-F018)
 REFUSED = re.compile(
     r"^ERPNext refused the request \(403 PermissionError\)"
     r"|doesn't exist, or the agent user isn't permitted to read it\.$"
+    r"|^ERPNext's \w[\w ]* list lacks fields Enterich asked for "
 )
 
 

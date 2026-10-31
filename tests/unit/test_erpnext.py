@@ -228,6 +228,64 @@ async def test_the_fake_refuses_fields_v16_lacks(fake: FakeErpnext) -> None:
         )
 
 
+async def test_a_list_without_a_field_asked_for_is_refused(fake: FakeErpnext) -> None:
+    # REQ-001-PRS-F018
+    fake.select_only.add("Item")
+    client = Erpnext(settings(), fake.transport())
+    with pytest.raises(ErpnextError) as caught:
+        await client.get_list(
+            "Item",
+            fields=["name", "item_code", "item_group", "stock_uom", "is_stock_item", "disabled"],
+            order_by="name asc",
+            start=0,
+            page_length=1,
+        )
+    text = str(caught.value)
+    assert text == (
+        "ERPNext's Item list lacks fields Enterich asked for (item_code, stock_uom, "
+        "is_stock_item and 1 more): the agent user needs read on Item, at the fields' "
+        "permission level too (configuration guide)."
+    )
+
+
+async def test_a_list_without_a_field_above_the_users_permission_level_is_refused(
+    fake: FakeErpnext,
+) -> None:
+    # With read on Item, ERPNext leaves out only the field of a permission level the user lacks
+    fake.fail("/api/resource/Item", 200, {"data": [{"name": "SKU-1", "item_code": "SKU-1"}]})
+    client = Erpnext(settings(), fake.transport())
+    with pytest.raises(ErpnextError, match=r"\(stock_uom\): the agent user needs read on Item"):
+        await client.get_list(
+            "Item",
+            fields=["name", "item_code", "stock_uom"],
+            order_by="name asc",
+            start=0,
+            page_length=1,
+        )
+
+
+@pytest.mark.parametrize("row", [None, 5, "name item_code"])
+async def test_a_list_row_that_isnt_a_record_is_refused(fake: FakeErpnext, row: object) -> None:
+    fake.fail("/api/resource/Item", 200, {"data": [row]})
+    client = Erpnext(settings(), fake.transport())
+    with pytest.raises(ErpnextError, match="row that isn't a record"):
+        await client.get_list(
+            "Item", fields=["name", "item_code"], order_by="name asc", start=0, page_length=1
+        )
+
+
+async def test_empty_fields_and_child_fields_without_rows_pass(fake: FakeErpnext) -> None:
+    fake.add("Sales Invoice", sales_invoice("ACC-SINV-2026-00001", items=[], return_against=None))
+    rows = await Erpnext(settings(), fake.transport()).get_list(
+        "Sales Invoice",
+        fields=["name", "return_against", "items.item_code"],
+        order_by="name asc",
+        start=0,
+        page_length=1,
+    )
+    assert rows == [{"name": "ACC-SINV-2026-00001", "return_against": None, "item_code": None}]
+
+
 async def test_refusal_texts_never_carry_the_credentials(fake: FakeErpnext) -> None:
     body = error(401, "AuthenticationError", f"token {API_KEY}:{API_SECRET} is invalid")
     text = await failure(fake, 401, body)

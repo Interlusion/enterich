@@ -341,6 +341,20 @@ def test_a_draft_with_an_added_free_item_still_matches(mcp: Session, erp: FakeEr
     assert first["name"] in again.text
 
 
+def test_a_duplicate_check_without_the_item_fields_is_refused(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    # REQ-001-PRS-F018: with select only, the drafts arrive without their items and would
+    # match nothing
+    create(mcp)
+    erp.select_only.add("Sales Invoice")
+    again = create(mcp)
+    assert again.error
+    assert "Sales Invoice" in again.text
+    assert "items.item_code" in again.text
+    assert len(erp.writes(PATH)) == 1
+
+
 def test_allow_duplicate_creates_and_leaves_the_warning_on_the_draft(
     mcp: Session, erp: FakeErpnext
 ) -> None:
