@@ -52,20 +52,9 @@ RIGHTS = (
         {
             "Sales Invoice": ("read", "create", "write"),
             **dict.fromkeys(
-                (
-                    "Customer",
-                    "Address",
-                    "Item",
-                    "Account",
-                    "Cost Center",
-                    "Sales Taxes and Charges Template",
-                ),
-                ("read",),
+                ("Address", "Item", "Account", "Sales Taxes and Charges Template"), ("read",)
             ),
-            **dict.fromkeys(
-                ("Company", "Currency", "UOM", "Price List", "Payment Terms Template", "Project"),
-                ("select",),
-            ),
+            "Customer": ("select",),
         },
     ),
     Rights(("list_suppliers", "get_supplier"), {"Supplier": ("read",), "Address": ("read",)}),
@@ -81,19 +70,8 @@ RIGHTS = (
         {
             "Purchase Invoice": ("read", "create", "write"),
             **dict.fromkeys(
-                (
-                    "Supplier",
-                    "Address",
-                    "Item",
-                    "Account",
-                    "Cost Center",
-                    "Purchase Taxes and Charges Template",
-                ),
+                ("Supplier", "Address", "Item", "Account", "Purchase Taxes and Charges Template"),
                 ("read",),
-            ),
-            **dict.fromkeys(
-                ("Company", "Currency", "UOM", "Price List", "Payment Terms Template", "Project"),
-                ("select",),
             ),
         },
     ),
@@ -102,7 +80,7 @@ RIGHTS = (
     Rights(("list_journal_entries", "get_journal_entry"), {"Journal Entry": ("read",)}),
     Rights(
         ("report_general_ledger",),
-        # Customer or Supplier: the one of the `party` given.
+        # Account: the `account` given; Customer or Supplier: the one of the `party` given.
         {
             "GL Entry": ("read", "report"),
             "Account": ("read",),
@@ -113,20 +91,12 @@ RIGHTS = (
     ),
     Rights(
         ("report_trial_balance",),
-        {"GL Entry": ("read", "report"), "Account": ("read",), "Fiscal Year": ("read",)},
+        {"GL Entry": ("read", "report"), "Fiscal Year": ("read",)},
         ("Trial Balance",),
     ),
     Rights(
         ("create_draft_journal_entry", "update_draft_journal_entry"),
-        {
-            "Journal Entry": ("read", "create", "write"),
-            "Account": ("read",),
-            "Cost Center": ("read",),
-            **dict.fromkeys(
-                ("Company", "Customer", "Supplier", "Sales Invoice", "Purchase Invoice"),
-                ("select",),
-            ),
-        },
+        {"Journal Entry": ("read", "create", "write")},
     ),
     Rights(("list_bank_accounts",), {"Bank Account": ("read",)}),
     Rights(("list_bank_transactions", "get_bank_transaction"), {"Bank Transaction": ("read",)}),

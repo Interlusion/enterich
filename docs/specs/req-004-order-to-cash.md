@@ -167,7 +167,9 @@ Customer names are not in report rows; `get_customer` gives them.
 | `list_sales_invoices`, `get_sales_invoice` | Sales Invoice: read |
 | `list_sales_tax_templates` | Sales Taxes and Charges Template: read |
 | `report_accounts_receivable` | Sales Invoice: read, report; Journal Entry: read (the report lists them for due dates; with select only, they arrive without); the role added to the Accounts Receivable report |
-| `create_draft_sales_invoice`, `update_draft_sales_invoice` | Sales Invoice: read, create, write; Customer, Address, Item, Account, Cost Center, Sales Taxes and Charges Template: read (ERPNext reads them while saving); Company, Currency, UOM, Price List, Payment Terms Template, Project: select |
+| `create_draft_sales_invoice`, `update_draft_sales_invoice` | Sales Invoice: read, create, write; Address, Item, Account, Sales Taxes and Charges Template: read (ERPNext or Enterich reads them while saving); Customer: select (ERPNext checks it for the party's details) |
+
+The DocTypes a draft only links to, such as its company, currency, units, price list, payment terms, project or cost centres, need no right: ERPNext checks a link without the user's permissions.
 
 Warnings are added to a draft as a comment, which needs no further right (REQ-001-PRS-F015).
 
