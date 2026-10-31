@@ -7,8 +7,6 @@
 | **Date** | 2026-10-30 |
 | **Author** | loxy (drafted with Claude) |
 
-> **This file is the canonical requirement set.** For the dated narrative of *why* the spec evolved (rationale, trade-offs, refs), see [`req-001-core.history.md`](./req-001-core.history.md). The decision log is informational — requirements come from this file only.
-
 ## Intended Use
 
 Enterich is an MCP server for ERPNext. It lets one AI agent read an ERPNext company's books and prepare drafts, which a person reviews and submits in ERPNext. It serves MCP over Streamable HTTP as an OAuth resource server: tokens come from an external authorization server (for example Keycloak), and Enterich accepts only those of one configured client and agent identity. It calls ERPNext's REST API with the API key of one ERPNext agent user and holds no other ERPNext credential.

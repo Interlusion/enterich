@@ -39,10 +39,10 @@ Where the real site answers differently from `FakeErpnext`, the fake is correcte
 - [x] The site: script, pinned image, the company and the agent user with the rights of RIGHTS (`tests/e2e/seed.py`); locally and in the workflow (`e2e.yml`). About 70 seconds locally on a fresh site, a few seconds on a kept one; the workflow's first run on `main` (2026-10-30) took 3 minutes 8 seconds.
 - [x] The reads and reports of each area against the seed, with the catalogues' filters and columns. Every read answered as Enterich expects.
 - [x] The drafts: create, update, warnings as comments, the duplicate check with people's drafts. The rate-0 warning needs an item without a price: the seeded invoices gave the other one its price-list rates (Stock Settings' `auto_insert_price_list_rate_if_missing`, on by default).
-- [x] The ceiling: submit, cancel and delete refused for the agent's key, and any change to a submitted document; a draft discarded with write alone and a cancelled document amended with create alone, so REQ-001-URS-F003 names the amendment among its doors (history entry).
+- [x] The ceiling: submit, cancel and delete refused for the agent's key, and any change to a submitted document; a draft discarded with write alone and a cancelled document amended with create alone, so REQ-001-URS-F003 names the amendment among its doors.
 - [ ] The rights: each listed right removed in turn, and the operations that need it refused.
 - [ ] `FakeErpnext` corrected where the real site differs, with the tests that show it.
-- [ ] Where the specs and arc42's risks name the test as backlog (REQ-001's assumptions, REQ-002-PRS-NF013, the area specs' report requirements and assumptions), they name the test instead; history entries, since the specs are baselined.
+- [ ] Where the specs and arc42's risks name the test as backlog (REQ-001's assumptions, REQ-002-PRS-NF013, the area specs' report requirements and assumptions), they name the test instead.
 
 ## Open Questions
 
