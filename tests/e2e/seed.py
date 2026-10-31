@@ -6,6 +6,7 @@ site without drafts: those of earlier runs are removed, so none is taken for a d
 """
 
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
@@ -104,12 +105,19 @@ RIGHTS = (
 )
 
 
-def granted() -> dict[str, set[str]]:
-    """Every DocType's rights over all rows; read makes select needless."""
+def granted(
+    without: tuple[str, str] | None = None, rows: Sequence[Rights] = RIGHTS
+) -> dict[str, set[str]]:
+    """Every DocType's rights over the rows; read makes select needless. `without` takes
+    one right of a DocType away, and with select every right of it: the others include
+    select."""
     union: dict[str, set[str]] = {}
-    for row in RIGHTS:
+    for row in rows:
         for doctype, rights in row.doctypes.items():
             union.setdefault(doctype, set()).update(rights)
+    if without:
+        doctype, right = without
+        union[doctype] = set() if right == "select" else union[doctype] - {right}
     for rights in union.values():
         if "read" in rights:
             rights.discard("select")
@@ -275,9 +283,10 @@ PERMISSION_TYPES = (
 )
 
 
-def permissions(site: Site) -> None:
-    """The role's rules, set as the role permission manager does; one call when they match."""
-    wanted = granted()
+def permissions(site: Site, wanted: dict[str, set[str]] | None = None) -> None:
+    """The role's rules, those of RIGHTS unless `wanted` says otherwise, set as the role
+    permission manager does; one call when they match."""
+    wanted = granted() if wanted is None else wanted
     held = {
         rule["parent"]: rule
         for rule in site.call(f"{MANAGER}.get_permissions", role=ROLE)
