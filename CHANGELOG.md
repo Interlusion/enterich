@@ -4,6 +4,10 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+### Changed
+
+- A list in which ERPNext held back fields Enterich asked for is refused, naming the DocType and the read right the agent user lacks. Before, with only select on a DocType or a field above the agent's permission level, Enterich returned such fields as null or false (`list_items` said `is_stock_item: false` for a stock item), and a duplicate check missed duplicates.
+
 ### Fixed
 
 - `report_general_ledger`'s description said `currency` names only an account's or party's currency, and REQ-006 that it is null otherwise. ERPNext always names the amounts' currency, so Enterich returns the company's currency there, as it did from the start; both now say so.

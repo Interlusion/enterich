@@ -418,6 +418,20 @@ Only a fixed list of operations, without generic method calls, closes these door
 - Verification: test.
 - Evidence: Enterich's test suite.
 
+#### REQ-001-PRS-F018: Held-back fields refused
+
+**Description**: Enterich SHALL refuse an operation when a row of an ERPNext list it reads lacks a field Enterich asked for, naming the DocType and the read right the agent user lacks. This holds for every list Enterich reads: the list operations' own, a party's addresses, and the checks before a report or a draft (fiscal years, duplicates). ERPNext leaves such a field out, without an error, when the agent user has only select on the DocType or lacks the field's permission level.
+
+**Related URS**: REQ-001-URS-F001, REQ-001-URS-F006, REQ-001-URS-F007
+
+**Definition of Done**:
+
+- `list_items` finding items with only select on Item is refused with a message naming Item and read, and returns no records.
+- A create whose duplicate check gets rows without their item fields is refused, and nothing is inserted.
+- A field that is in the row with an empty value, or a child table's field of a document without rows, is not refused.
+- Verification: test.
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
+
 ## PRS — Non-Functional
 
 #### REQ-001-PRS-NF001: Outside text marked
@@ -535,7 +549,8 @@ Checked against Frappe and ERPNext v16.52 source:
 - Saving a submitted document needs the submit right (`check_docstatus_transition`).
 - A standard report set as a snapshot report runs on the last DuckDB sync of its data, and `frappe.desk.query_report.run` then answers with `snapshot_report` set.
 - ERPNext fills tax rows from a template on insert only when a site setting says so (`add_taxes_from_taxes_and_charges_template`); Enterich therefore fills them itself.
-- With only the select right on a DocType, lists return only its standard fields (such as `name` and `modified`) and its search fields; the operations need read (configuration guide).
+- A list leaves out of every row the fields the user may not read (`get_permitted_fields`): with only the select right on a DocType, all but its standard fields (such as `name` and `modified`) and its search fields, a child table's fields among them; with read, those of a permission level the user lacks. The operations need read (configuration guide).
+- A get returns a field of a permission level the user lacks as null, as if it were empty (`apply_fieldlevel_read_permissions`). A field marked to be masked comes as a placeholder such as `XXXXXXXX`, in lists and gets alike (`mask_fields`).
 
 Checked on a real ERPNext v16 site by the end-to-end test:
 
@@ -544,6 +559,7 @@ Checked on a real ERPNext v16 site by the end-to-end test:
 Not checked yet:
 
 - The deployment gives the agent user a role without submit, cancel, amend, delete, share, import or export, and a User Permission on the assigned company. Enterich neither creates nor checks the role.
+- The deployment neither raises the permission level of a field Enterich returns above the agent's nor masks it (configuration guide). A list without the field is refused (REQ-001-PRS-F018), but a get can't tell it from an empty one.
 - A draft takes the next number of its naming series when created, and an abandoned draft keeps it. Whether that's acceptable is the deployment's decision.
 - Two identical creates at the same instant can both pass the duplicate check. One agent works through one conversation in sequence, and a person reviews every draft, so this is accepted.
 - Document IDs can contain text a person typed (a customer named after itself); they are returned outside `outside_text` because the agent needs them as inputs.
