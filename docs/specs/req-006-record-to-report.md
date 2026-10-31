@@ -214,9 +214,11 @@ ERPNext v16's voucher types: Journal Entry, Inter Company Journal Entry, Bank En
 | `list_accounts` | Account: read |
 | `list_cost_centers` | Cost Center: read |
 | `list_journal_entries`, `get_journal_entry` | Journal Entry: read |
-| `report_general_ledger` | GL Entry: read, report; Account: read; Customer, Supplier: read (the one of the `party` given); the role added to the General Ledger report |
-| `report_trial_balance` | GL Entry: read, report; Account, Fiscal Year: read; the role added to the Trial Balance report |
-| `create_draft_journal_entry`, `update_draft_journal_entry` | Journal Entry: read, create, write; Account, Cost Center: read; Company, Customer, Supplier, Sales Invoice, Purchase Invoice: select (for parties and references in rows) |
+| `report_general_ledger` | GL Entry: read, report; Account: read (the `account` given); Customer, Supplier: read (the one of the `party` given); the role added to the General Ledger report |
+| `report_trial_balance` | GL Entry: read, report; Fiscal Year: read; the role added to the Trial Balance report |
+| `create_draft_journal_entry`, `update_draft_journal_entry` | Journal Entry: read, create, write |
+
+The accounts, cost centres, parties and invoices a journal entry's rows link to need no right: ERPNext checks a link without the user's permissions.
 
 Warnings are added to a draft as a comment, which needs no further right (REQ-001-PRS-F015).
 

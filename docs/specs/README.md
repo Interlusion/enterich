@@ -42,6 +42,6 @@ A spec is Draft until the maintainer baselines it, and edited in place until the
 - **A substantive change** (a requirement added, removed or reworded, or a term changed so that a requirement covers other cases) is folded into the body, and a sibling `req-NNN-name.history.md` records the dated reason, most recent first. The spec's `Version` goes up with each entry.
 - **A change that keeps the meaning** (a typo, a link, formatting, clearer wording) is made in the body only.
 
-Until the first release, details found while building Enterich are folded into the body without a history entry.
+Until a deployment or another repository cites these specs, a substantive change too is made in the body only, and the `Version` stays; its commit says why.
 
 Deployments keep their own requirements elsewhere and trace them to these IDs. A change a deployment needs arrives here as a change to these specs, never as a deployment fact.

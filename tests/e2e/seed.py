@@ -6,6 +6,7 @@ site without drafts: those of earlier runs are removed, so none is taken for a d
 """
 
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
@@ -52,20 +53,9 @@ RIGHTS = (
         {
             "Sales Invoice": ("read", "create", "write"),
             **dict.fromkeys(
-                (
-                    "Customer",
-                    "Address",
-                    "Item",
-                    "Account",
-                    "Cost Center",
-                    "Sales Taxes and Charges Template",
-                ),
-                ("read",),
+                ("Address", "Item", "Account", "Sales Taxes and Charges Template"), ("read",)
             ),
-            **dict.fromkeys(
-                ("Company", "Currency", "UOM", "Price List", "Payment Terms Template", "Project"),
-                ("select",),
-            ),
+            "Customer": ("select",),
         },
     ),
     Rights(("list_suppliers", "get_supplier"), {"Supplier": ("read",), "Address": ("read",)}),
@@ -81,19 +71,8 @@ RIGHTS = (
         {
             "Purchase Invoice": ("read", "create", "write"),
             **dict.fromkeys(
-                (
-                    "Supplier",
-                    "Address",
-                    "Item",
-                    "Account",
-                    "Cost Center",
-                    "Purchase Taxes and Charges Template",
-                ),
+                ("Supplier", "Address", "Item", "Account", "Purchase Taxes and Charges Template"),
                 ("read",),
-            ),
-            **dict.fromkeys(
-                ("Company", "Currency", "UOM", "Price List", "Payment Terms Template", "Project"),
-                ("select",),
             ),
         },
     ),
@@ -102,7 +81,7 @@ RIGHTS = (
     Rights(("list_journal_entries", "get_journal_entry"), {"Journal Entry": ("read",)}),
     Rights(
         ("report_general_ledger",),
-        # Customer or Supplier: the one of the `party` given.
+        # Account: the `account` given; Customer or Supplier: the one of the `party` given.
         {
             "GL Entry": ("read", "report"),
             "Account": ("read",),
@@ -113,20 +92,12 @@ RIGHTS = (
     ),
     Rights(
         ("report_trial_balance",),
-        {"GL Entry": ("read", "report"), "Account": ("read",), "Fiscal Year": ("read",)},
+        {"GL Entry": ("read", "report"), "Fiscal Year": ("read",)},
         ("Trial Balance",),
     ),
     Rights(
         ("create_draft_journal_entry", "update_draft_journal_entry"),
-        {
-            "Journal Entry": ("read", "create", "write"),
-            "Account": ("read",),
-            "Cost Center": ("read",),
-            **dict.fromkeys(
-                ("Company", "Customer", "Supplier", "Sales Invoice", "Purchase Invoice"),
-                ("select",),
-            ),
-        },
+        {"Journal Entry": ("read", "create", "write")},
     ),
     Rights(("list_bank_accounts",), {"Bank Account": ("read",)}),
     Rights(("list_bank_transactions", "get_bank_transaction"), {"Bank Transaction": ("read",)}),
@@ -134,12 +105,19 @@ RIGHTS = (
 )
 
 
-def granted() -> dict[str, set[str]]:
-    """Every DocType's rights over all rows; read makes select needless."""
+def granted(
+    without: tuple[str, str] | None = None, rows: Sequence[Rights] = RIGHTS
+) -> dict[str, set[str]]:
+    """Every DocType's rights over the rows; read makes select needless. `without` takes
+    one right of a DocType away, and with select every right of it: the others include
+    select."""
     union: dict[str, set[str]] = {}
-    for row in RIGHTS:
+    for row in rows:
         for doctype, rights in row.doctypes.items():
             union.setdefault(doctype, set()).update(rights)
+    if without:
+        doctype, right = without
+        union[doctype] = set() if right == "select" else union[doctype] - {right}
     for rights in union.values():
         if "read" in rights:
             rights.discard("select")
@@ -305,9 +283,10 @@ PERMISSION_TYPES = (
 )
 
 
-def permissions(site: Site) -> None:
-    """The role's rules, set as the role permission manager does; one call when they match."""
-    wanted = granted()
+def permissions(site: Site, wanted: dict[str, set[str]] | None = None) -> None:
+    """The role's rules, those of RIGHTS unless `wanted` says otherwise, set as the role
+    permission manager does; one call when they match."""
+    wanted = granted() if wanted is None else wanted
     held = {
         rule["parent"]: rule
         for rule in site.call(f"{MANAGER}.get_permissions", role=ROLE)
