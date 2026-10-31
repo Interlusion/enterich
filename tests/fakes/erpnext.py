@@ -1239,7 +1239,7 @@ def ledger_entry(voucher_no: str, debit: float, credit: float, **overrides: Any)
         "credit_in_account_currency": credit,
         "remarks": "Rent October",
         "bill_no": "",
-        "presentation_currency": None,
+        "presentation_currency": "EUR",
     }
     row.update(overrides)
     return row
@@ -1253,7 +1253,9 @@ def ledger(
 ) -> list[dict[str, Any]]:
     """General Ledger's rows without categorize_by: opening, the entries with a running
     balance, total and closing, the summary rows labelled in the user's language. With
-    `currency`, the account's or party's currency ERPNext switched the amounts to."""
+    `currency`, the account's or party's currency ERPNext switched the amounts to; without,
+    every row names the company's."""
+    presentation = currency or "EUR"
 
     def summary(label: str, debit: float, credit: float) -> dict[str, Any]:
         return {
@@ -1263,15 +1265,17 @@ def ledger(
             "debit_in_account_currency": debit,
             "credit_in_account_currency": credit,
             "balance": debit - credit,
-            "account_currency": currency or "EUR",
-            "presentation_currency": currency,
+            "account_currency": presentation,
+            "presentation_currency": presentation,
         }
 
     balance = opening[0] - opening[1]
     rows = [summary(labels[0], *opening)]
     for entry in entries:
         balance += entry["debit"] - entry["credit"]
-        rows.append({**entry, "balance": balance, "presentation_currency": currency})
+        # get_result_as_list sets both currencies on every row
+        currencies = {"account_currency": presentation, "presentation_currency": presentation}
+        rows.append({**entry, "balance": balance, **currencies})
     debit = sum(e["debit"] for e in entries)
     credit = sum(e["credit"] for e in entries)
     rows.append(summary(labels[1], debit, credit))
