@@ -426,9 +426,6 @@ async def _fiscal_year(context: Context, from_date: date, to_date: date) -> str:
         start=0,
         page_length=MAX_FISCAL_YEAR_ROWS,
     )
-    # With select only, ERPNext leaves out the child table and the non-search fields.
-    if any(not row.get("year_end_date") for row in rows):
-        raise ErpnextError("ERPNext's Fiscal Year list lacks the years' end dates.")
     years: dict[str, tuple[str, set[Any]]] = {}  # one row per company row
     for row in rows:
         _, companies = years.setdefault(

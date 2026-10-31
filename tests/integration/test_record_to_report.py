@@ -615,10 +615,11 @@ def test_the_companys_year_wins_even_when_it_starts_earlier(mcp: Session, erp: F
     assert result["fiscal_year"] == "FY-EX"
 
 
-def test_a_fiscal_year_without_its_end_is_a_faulty_answer(mcp: Session, erp: FakeErpnext) -> None:
-    # With select only, ERPNext lists a year without its non-search fields.
+def test_a_fiscal_year_list_without_its_fields_is_refused(mcp: Session, erp: FakeErpnext) -> None:
+    # REQ-001-PRS-F018: with select only, ERPNext lists a year without its non-search fields
     erp.select_only.add("Fiscal Year")
     result = mcp.call("report_trial_balance", {"from_date": "2026-01-01", "to_date": "2026-10-31"})
     assert result.error
     assert "Fiscal Year" in result.text
+    assert "year_end_date" in result.text
     assert not [r for r in erp.received if r.path == REPORT]

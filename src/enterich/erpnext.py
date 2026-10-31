@@ -1,8 +1,9 @@
 """The one ERPNext client: the agent user's key, its limits, its refusals.
 
 REQ-002-PRS-NF006 (one credential, the configured Host, no cookies, no
-redirects, no proxy), REQ-002-PRS-NF011 (30 s per call, 10 MiB per answer)
-and REQ-001-PRS-F008 (refusals reported as plain text).
+redirects, no proxy), REQ-002-PRS-NF011 (30 s per call, 10 MiB per answer),
+REQ-001-PRS-F008 (refusals reported as plain text) and REQ-001-PRS-F018 (lists
+without the fields asked for refused).
 """
 
 import html
@@ -106,7 +107,11 @@ class Erpnext:
         if or_filters:
             params["or_filters"] = json.dumps([list(f) for f in or_filters])
         answer = await self._call("GET", _resource(doctype), params)
-        return cast("list[dict[str, Any]]", _expect(answer, "data", list))
+        rows = cast("list[Any]", _expect(answer, "data", list))
+        if not all(isinstance(row, dict) for row in rows):
+            raise ErpnextError(f"ERPNext's {doctype} list has a row that isn't a record.")
+        _check_fields(doctype, fields, rows)
+        return rows
 
     async def get_doc(self, doctype: str, name: str) -> dict[str, Any]:
         params = {"doctype": doctype, "name": name}
@@ -245,6 +250,21 @@ def _first_message(answer: Any) -> str | None:
     if not isinstance(message, str):
         return None
     return " ".join(html.unescape(_TAG.sub("", message)).split()) or None
+
+
+def _check_fields(doctype: str, fields: Sequence[str], rows: list[dict[str, Any]]) -> None:
+    """ERPNext leaves the fields the agent user may not read out of every row, without an
+    error; a child table's field comes under its own name."""
+    missing = [f for f in fields if any(f.rpartition(".")[2] not in row for row in rows)]
+    if missing:
+        named = ", ".join(missing[:3]) + (
+            f" and {len(missing) - 3} more" if len(missing) > 3 else ""
+        )
+        raise ErpnextError(
+            f"ERPNext's {doctype} list lacks fields Enterich asked for ({named}): the agent "
+            f"user needs read on {doctype}, at the fields' permission level too "
+            "(configuration guide)."
+        )
 
 
 def _expect[T](answer: Any, key: str, kind: type[T]) -> T:

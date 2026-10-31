@@ -286,7 +286,7 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 **Definition of Done**:
 
 - Every operation of the area specs has its rights listed in its area spec's Rights section.
-- Run as an agent user holding exactly the rights an operation's row lists, besides the rights ERPNext gives every desk user through the roles All and Desk User, the operation works. With one listed right removed, the operations that need it are refused, except where a right that stays keeps part of the access, another row's select or those roles: a list then gets only the DocType's standard and search fields (`list_items` without read on Item, `list_customers` without read on Customer), and `get_customer` and `get_supplier` without read on Address answer without addresses (All's rule for a user's own addresses).
+- Run as an agent user holding exactly the rights an operation's row lists, besides the rights ERPNext gives every desk user through the roles All and Desk User, the operation works. With one listed right removed, the operations that need it are refused. Enterich's refusal of a list that lacks fields counts (REQ-001-PRS-F018): with another row's select or those roles, ERPNext answers `list_items` without read on Item, and `list_customers` without read on Customer, with fewer fields. Only `get_customer` and `get_supplier` without read on Address answer instead, without addresses (All's rule for a user's own addresses).
 - Verification: inspection and test.
 - Evidence: the area specs' Rights sections; the end-to-end test against a real ERPNext v16 site.
 
