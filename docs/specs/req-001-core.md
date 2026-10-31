@@ -535,7 +535,7 @@ Checked against Frappe and ERPNext v16.52 source:
 - Saving a submitted document needs the submit right (`check_docstatus_transition`).
 - A standard report set as a snapshot report runs on the last DuckDB sync of its data, and `frappe.desk.query_report.run` then answers with `snapshot_report` set.
 - ERPNext fills tax rows from a template on insert only when a site setting says so (`add_taxes_from_taxes_and_charges_template`); Enterich therefore fills them itself.
-- With only the select right on a DocType, lists return only its search fields; the operations need read (configuration guide).
+- With only the select right on a DocType, lists return only its standard fields (such as `name` and `modified`) and its search fields; the operations need read (configuration guide).
 
 Not checked yet:
 
