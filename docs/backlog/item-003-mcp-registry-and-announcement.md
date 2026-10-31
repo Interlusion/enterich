@@ -22,7 +22,7 @@ The registry makes Enterich findable for MCP clients and for the directories tha
 
 Enterich isn't a typical entry: it is a service behind an authorization server, not a tool a client starts for itself. A client that installs from the registry would start the image locally, which isn't how Enterich runs; the listing is for finding it, and its description says so.
 
-The announcement follows the listing and the test against a real ERPNext ([ITEM-004](item-004-real-erpnext-test.md)), so that what it points to has been tried on a real site.
+The announcement follows the listing and the test against a real ERPNext ([ITEM-004](archive/item-004-real-erpnext-test.md)), so that what it points to has been tried on a real site.
 
 ## To do
 

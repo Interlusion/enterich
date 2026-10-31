@@ -2,11 +2,12 @@
 
 | Meta | Value |
 | :- | :- |
-| **Status** | CANDIDATE |
+| **Status** | IMPLEMENTED |
 | **Type** | feature |
-| **Origin** | The [backlog](backlog.md)'s line on a test against a real ERPNext; [REQ-002-PRS-NF013](../specs/req-002-service.md#req-002-prs-nf013-rights-listed-and-proven)'s evidence; REQ-001's assumption that the report checks were made against ERPNext v16.52's source |
+| **Origin** | The [backlog](../backlog.md)'s line on a test against a real ERPNext; [REQ-002-PRS-NF013](../../specs/req-002-service.md#req-002-prs-nf013-rights-listed-and-proven)'s evidence; REQ-001's assumption that the report checks were made against ERPNext v16.52's source |
 | **Created** | 2026-10-30 |
 | **Author** | loxy (drafted with Claude) |
+| **Implemented** | 2026-10-31; its changes to Enterich come with the release after v0.1.0 |
 
 ## Summary
 
@@ -16,7 +17,7 @@ Run Enterich's operations against a real ERPNext v16 site with a seeded company 
 
 `tests/integration` runs the whole path an MCP client takes, against `FakeErpnext`, a model of ERPNext v16's REST API written from ERPNext's source. It proves Enterich right about the model, not the model right about ERPNext. What only a real site shows:
 
-- **Rights** ([REQ-002-PRS-NF013](../specs/req-002-service.md#req-002-prs-nf013-rights-listed-and-proven)): every operation works with exactly the rights its area spec's Rights section lists, and with one listed right removed, the operations that need it fail with ERPNext's permission refusal. Its evidence names this test.
+- **Rights** ([REQ-002-PRS-NF013](../../specs/req-002-service.md#req-002-prs-nf013-rights-listed-and-proven)): every operation works with exactly the rights its area spec's Rights section lists, and with one listed right removed, the operations that need it fail with ERPNext's permission refusal. Its evidence names this test.
 - **The ceiling:** the agent user's key, called directly, not through Enterich, is refused for submit (`frappe.client.submit` and a save with `docstatus` 1), cancel and delete, while two of the doors REQ-001-URS-F003 names stay open as it says: discard with write alone, amend with create alone.
 - **Reports:** the filters and columns of Accounts Receivable, Accounts Payable, General Ledger and Trial Balance are the ones the area specs' catalogues name.
 - **Duplicates:** the duplicate check finds drafts that people made, not only Enterich's (REQ-001-PRS-F005).
@@ -31,7 +32,7 @@ Where the real site answers differently from `FakeErpnext`, the fake is correcte
 - **ERPNext** is the official `frappe/erpnext` v16 image, pinned by digest, with MariaDB and Valkey in containers (`tests/e2e/compose.yml`): a new site, ERPNext installed, no scheduler. Only ERPNext, no regional apps: Enterich promises nothing beyond it.
 - **Seed data**, made as Administrator through the REST API from the test code, so the data and the names the tests use live in one place, in Python: the setup wizard for the placeholder company the other tests use (`Example GmbH`) with its chart of accounts and fiscal year; items, a customer and a supplier with addresses, tax templates, a bank account; submitted sales and purchase invoices, journal entries, payment entries and bank transactions for the reads and reports; drafts made by Administrator for the duplicate check, by the tests that use them. `bench` only creates the site and installs ERPNext; a seeding step the API can't reach goes there as an exception.
 - **The agent user** gets one role holding exactly the rights of the Rights sections (DocType permissions and the report roles), and an API key. The rights come from `RIGHTS` in `tests/e2e/seed.py`, one entry per row of the Rights sections, and a repository check (`tests/repo/test_e2e.py`) fails when the two differ.
-- **Tests** in `tests/e2e/`, the end-to-end level of the [development guide](../guides/development.md), skipped unless the site's URL is set, so the default run, the runner's check and the image's test stage stay as they are. A script starts the site locally (`scripts/erpnext-site.sh`) and keeps it running until it removes it; the tests seed it once, so they can run again in seconds, and each run removes the drafts of the runs before it, so none is taken for a duplicate.
+- **Tests** in `tests/e2e/`, the end-to-end level of the [development guide](../../guides/development.md), skipped unless the site's URL is set, so the default run, the runner's check and the image's test stage stay as they are. A script starts the site locally (`scripts/erpnext-site.sh`) and keeps it running until it removes it; the tests seed it once, so they can run again in seconds, and each run removes the drafts of the runs before it, so none is taken for a duplicate.
 - **CI:** a workflow of its own, weekly and started by hand, not on pull requests and not a required check. Each run builds a fresh site: about a minute, plus the image's download. A failure shows on the Actions page.
 
 ## Steps
@@ -42,7 +43,7 @@ Where the real site answers differently from `FakeErpnext`, the fake is correcte
 - [x] The ceiling: submit, cancel and delete refused for the agent's key, and any change to a submitted document; a draft discarded with write alone and a cancelled document amended with create alone, so REQ-001-URS-F003 names the amendment among its doors.
 - [x] The rights: each operation works with its row's rights alone, and with each listed right removed in turn the operations that need it are refused. Removing a right of a draft's link fields (company, currency, units, price list, payment terms, project, cost centre, and a journal entry's accounts, parties and invoices) or Account read from Trial Balance refused nothing: ERPNext checks links without the user's permissions, so the Rights sections dropped them. A sales draft keeps Customer select, which ERPNext checks for the party's details. The agent user also holds ERPNext's roles All and Desk User; with them, or another row's select, four removals answer with less instead of a refusal, which REQ-002-PRS-NF013 now says.
 - [x] `FakeErpnext` corrected where the real site differs, with the tests that show it. Compared with the site by script: the list fields and child tables, the documents, the report rows, the error bodies and the saved drafts. General Ledger always names the amounts' currency, the company's when nothing switched it, so REQ-006 and the tool's description say so instead of null. With select only, a list keeps the standard and search fields, not only `name`. A 404 carries only the message; a cancelled document is refused as v16 refuses its edit, a submitted one with v16's message, and the stale-update and missing-posting-date messages are v16's. Saved amounts and quantities are floats, and a row without a pricing rule has no `pricing_rules`.
-- [ ] Where the specs and arc42's risks name the test as backlog (REQ-001's assumptions, REQ-002-PRS-NF013, the area specs' report requirements and assumptions), they name the test instead.
+- [x] Where the specs and arc42's risks name the test as backlog (REQ-001's assumptions, REQ-002-PRS-NF013, the area specs' report requirements and assumptions), they name the test instead. The assumptions it checked that were not checked yet moved to a group of their own: REQ-001's on the REST API and the area specs' on the rights. REQ-004's on the due date went: REQ-001's, checked against the source, says it in full.
 
 ## Open Questions
 
