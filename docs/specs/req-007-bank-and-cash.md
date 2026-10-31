@@ -130,9 +130,9 @@ Checked against ERPNext v16.52 source:
 - On submit, and only with Accounts Settings' `enable_party_matching` (off by default), ERPNext matches a transaction's party from the counterparty's account number or IBAN, among parties' bank accounts and employees, and with `enable_fuzzy_matching` also from the name and description (`auto_set_party`); a party set by hand stays. A transaction's amount can be allocated to the DocTypes of the `bank_reconciliation_doctypes` hook (Payment Entry, Journal Entry, Sales Invoice, Purchase Invoice) and to another bank transaction.
 - Bank reconciliation sets the `clearance_date` of the voucher a transaction is allocated to, such as a payment entry; nothing sets the allocation row's own `clearance_date`, so Enterich doesn't return it.
 
-Not checked yet:
+Checked on a real ERPNext v16 site by the end-to-end test:
 
-- The rights in the Rights section are the minimum; the end-to-end test proves them (REQ-002-PRS-NF013).
+- The rights in the Rights section suffice, and each is needed (REQ-002-PRS-NF013).
 
 ## Open Questions
 

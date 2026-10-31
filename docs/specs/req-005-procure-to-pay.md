@@ -91,7 +91,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - The report call carries exactly the fixed filters of the ERPNext calls table; `total_outstanding` equals the sum over all rows when `limit` returns fewer.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
-- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site (backlog).
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
 
 #### REQ-005-PRS-F005: Purchase invoice drafts
 
@@ -213,9 +213,9 @@ Checked against ERPNext v16.52 source:
 - ERPNext computes tax withholding only for an invoice with `apply_tds` set. A REST save leaves it at 0, and the form sets it only for a new invoice or a changed supplier, from the supplier's tax withholding category or group (`purchase_invoice.js`, `TaxWithholdingController`); Enterich therefore sends it on create. The withholding rows are among the result's `taxes`.
 - Accounts Payable runs Accounts Receivable's code with the account type Payable: the same filters and columns, plus `bill_no` and `bill_date`, and debit notes in the `credit_note` column. Its rows are read through permission-checked lists of Purchase Invoice and Journal Entry.
 
-Not checked yet:
+Checked on a real ERPNext v16 site by the end-to-end test:
 
-- The rights in the Rights section are the minimum; the end-to-end test proves them (REQ-002-PRS-NF013).
+- The rights in the Rights section suffice, and each is needed (REQ-002-PRS-NF013).
 
 ## Open Questions
 

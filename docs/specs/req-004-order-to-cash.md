@@ -92,7 +92,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - An `as_of_date` in the past ages the rows from that date, not from today; ERPNext's total row is not among the rows.
 - Report filters and columns match ERPNext v16.
 - Verification: test and inspection.
-- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site (backlog).
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
 
 #### REQ-004-PRS-F005: Sales invoice drafts
 
@@ -194,10 +194,9 @@ Checked against ERPNext v16.52 source:
 - Without `age_as_on`, Accounts Receivable ages from today whatever the report date; without `range`, it uses 30, 60, 90, 120. It appends a total row as a list, and a prepared report answers with `prepared_report` set, with an earlier run's rows or none. It reads Sales Invoice and Journal Entry through permission-checked lists, Payment Ledger Entry without a permission check.
 - A list call can filter Address by its Dynamic Link rows, and can return Sales Invoice Item fields, one row per item.
 
-Not checked yet:
+Checked on a real ERPNext v16 site by the end-to-end test:
 
-- The rights in the Rights section are the minimum; the end-to-end test proves them (REQ-002-PRS-NF013).
-- ERPNext computes `due_date` from the customer's payment terms when it isn't given (the template is filled in; the date computation runs through several validation steps).
+- The rights in the Rights section suffice, and each is needed (REQ-002-PRS-NF013).
 
 ## Open Questions
 
