@@ -326,7 +326,7 @@ def test_with_an_account_the_ledger_has_opening_balance_and_closing(
     # As floats, 0.1 + 0.2 is 0.30000000000000004; Enterich sums decimals over every entry.
     assert result["totals"] == {"debit": 0.3, "credit": 0.4, "balance": -0.1}
     assert result["closing"]["balance"] == pytest.approx(999.9)
-    assert result["currency"] is None
+    assert result["currency"] == "EUR"
     assert (result["count"], result["has_more"]) == (2, True)
     first = result["records"][0]
     assert first == {

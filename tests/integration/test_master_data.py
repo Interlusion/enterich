@@ -55,6 +55,23 @@ def test_list_items_returns_records_with_outside_text_apart(mcp: Session) -> Non
     }
 
 
+def test_with_select_only_items_arrive_with_their_search_fields_alone(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    # REQ-002-PRS-NF013: ERPNext leaves out the other fields, and Enterich shows them as
+    # null or false
+    erp.select_only.add("Item")
+    record = mcp.call("list_items").data["records"][0]
+    assert record == {
+        "item_code": None,
+        "item_group": "Products",
+        "stock_uom": None,
+        "is_stock_item": False,
+        "disabled": False,
+        "outside_text": {"item_name": "Widget SKU-1"},
+    }
+
+
 def test_paging_reports_more(mcp: Session, erp: FakeErpnext) -> None:
     first = mcp.call("list_items", {"limit": 2}).data
     assert [i["item_code"] for i in first["records"]] == ["SKU-1", "SKU-2"]
