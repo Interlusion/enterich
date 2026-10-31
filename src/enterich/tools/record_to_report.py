@@ -405,7 +405,8 @@ async def report_general_ledger(inputs: ReportGeneralLedger, context: Context) -
         "opening": _summary(opening),
         "totals": {"debit": debit, "credit": credit, "balance": debit - credit},
         "closing": _summary(closing),
-        # An account or party in another currency switches ERPNext's amounts to it.
+        # The company's currency, unless an account or party in another currency switched
+        # ERPNext's amounts to it.
         "currency": opening.get("presentation_currency"),
     }
 
@@ -717,9 +718,9 @@ OPERATIONS: list[Operation[Any]] = [
             "is the balance before `from_date` and each record carries its running `balance`; "
             "without, `opening` holds only entries marked as opening (such as an Opening "
             "Entry), which are never among the records, and `balance` is null. `totals` cover "
-            "every record, not only this page. Amounts are in the company's currency unless "
-            "`currency` names the account's or party's. A busy ledger may be too large for a "
-            "year without `account`: narrow it by account or period."
+            "every record, not only this page. Amounts are in `currency`: the company's, or the "
+            "account's or party's when ERPNext switched to it. A busy ledger may be too large "
+            "for a year without `account`: narrow it by account or period."
         ),
         kind="read",
         inputs=ReportGeneralLedger,
