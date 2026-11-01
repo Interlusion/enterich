@@ -1,0 +1,119 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "dev.interlusion/enterich",
+  "title": "Enterich",
+  "description": "A service for ERPNext accounting behind OAuth: fixed tools, drafts only, one agent user's rights",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/Interlusion/enterich",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/Interlusion/enterich",
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/interlusion/enterich:0.1.0",
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://localhost:{ENTERICH_PORT}/mcp"
+      },
+      "environmentVariables": [
+        {
+          "name": "ENTERICH_RESOURCE_URL",
+          "description": "The MCP endpoint exactly as clients enter it, https; its path is the one served",
+          "isRequired": true
+        },
+        {
+          "name": "ENTERICH_ISSUER",
+          "description": "The authorization server's issuer, https",
+          "isRequired": true
+        },
+        {
+          "name": "ENTERICH_JWKS_URL",
+          "description": "The authorization server's signing keys, https",
+          "isRequired": true
+        },
+        {
+          "name": "ENTERICH_CLIENT_ID",
+          "description": "The OAuth client the agent's tokens are issued to",
+          "isRequired": true
+        },
+        {
+          "name": "ENTERICH_SUBJECT",
+          "description": "The agent identity's sub",
+          "isRequired": true
+        },
+        {
+          "name": "ENTERICH_REQUIRED_SCOPES",
+          "description": "Scopes required in the token, space-separated",
+          "default": "openid"
+        },
+        {
+          "name": "ENTERICH_TOKEN_ALGORITHMS",
+          "description": "Token signing algorithms accepted, comma-separated",
+          "default": "RS256"
+        },
+        {
+          "name": "ENTERICH_CLOCK_LEEWAY",
+          "description": "Seconds of clock leeway for token times, 0 to 60",
+          "default": "5"
+        },
+        {
+          "name": "ENTERICH_ERPNEXT_URL",
+          "description": "The base URL Enterich calls ERPNext at",
+          "isRequired": true
+        },
+        {
+          "name": "ENTERICH_ERPNEXT_HOST",
+          "description": "The Host header sent to ERPNext, by default the URL's host"
+        },
+        {
+          "name": "ENTERICH_ERPNEXT_PUBLIC_URL",
+          "description": "The base URL people open ERPNext at, for links in results",
+          "isRequired": true
+        },
+        {
+          "name": "ENTERICH_ERPNEXT_API_KEY",
+          "description": "The ERPNext agent user's API key",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "ENTERICH_ERPNEXT_API_SECRET",
+          "description": "The ERPNext agent user's API secret",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "ENTERICH_COMPANY",
+          "description": "The assigned company, exactly as named in ERPNext",
+          "isRequired": true
+        },
+        {
+          "name": "ENTERICH_TOOLS",
+          "description": "The operations to offer, comma-separated; by default all"
+        },
+        {
+          "name": "ENTERICH_TIMEZONE",
+          "description": "IANA time zone for today's date, the ERPNext site's",
+          "default": "UTC"
+        },
+        {
+          "name": "ENTERICH_HOST",
+          "description": "The listen address",
+          "default": "0.0.0.0"
+        },
+        {
+          "name": "ENTERICH_PORT",
+          "description": "The listen port",
+          "default": "8000"
+        },
+        {
+          "name": "ENTERICH_LOG_LEVEL",
+          "description": "The level for libraries' log lines: DEBUG, INFO, WARNING or ERROR",
+          "default": "INFO"
+        }
+      ]
+    }
+  ]
+}

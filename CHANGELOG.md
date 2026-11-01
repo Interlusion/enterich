@@ -4,6 +4,10 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+### Added
+
+- **The MCP Registry:** each release publishes Enterich's entry, `dev.interlusion/enterich`, from `server.json`. The image carries the label `io.modelcontextprotocol.server.name` with that name, which the registry checks. Enterich runs as a service behind an authorization server; the entry is for finding it, not for a client to start it.
+
 ### Changed
 
 - A list in which ERPNext held back fields Enterich asked for is refused, naming the DocType and the read right the agent user lacks. Before, with only select on a DocType or a field above the agent's permission level, Enterich returned such fields as null or false (`list_items` said `is_stock_item: false` for a stock item), and a duplicate check missed duplicates.

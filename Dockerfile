@@ -22,7 +22,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 FROM python:3.14-slim@sha256:82abc9f53600280b0757126f83c5a7d47088592d2acb6b4c0b9e97f76865508c AS runtime
 LABEL org.opencontainers.image.title="enterich" \
-      org.opencontainers.image.licenses="Apache-2.0"
+      org.opencontainers.image.licenses="Apache-2.0" \
+      io.modelcontextprotocol.server.name="dev.interlusion/enterich"
 COPY --from=build /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
