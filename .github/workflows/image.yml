@@ -220,6 +220,10 @@ jobs:
           # The Ed25519 key whose public half is in the TXT record of the namespace's domain.
           KEY: ${{ secrets.MCP_REGISTRY_KEY }}
         run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::MCP_REGISTRY_KEY is empty: the environment mcp-registry lacks it, or release.yml doesn't pass secrets"
+            exit 1
+          fi
           # dev.interlusion/enterich is published under the domain interlusion.dev.
           domain=$(jq -r '.name | split("/")[0] | split(".") | reverse | join(".")' server.json)
           "$RUNNER_TEMP/mcp-publisher" login dns --domain "$domain" --private-key "$KEY"
