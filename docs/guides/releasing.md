@@ -20,31 +20,45 @@ Compare `CHANGELOG.md`'s `Unreleased` section with the last release:
 
 ## The version
 
-The version lives in one place: `version` in `pyproject.toml`, set with `uv version X.Y.Z` and shown with `uv version --short`. Enterich reports it at start (`start` log event), and the release workflow refuses a tag that doesn't equal it.
+The version lives in one place: `version` in `pyproject.toml`, set with `uv version X.Y.Z` and shown with `uv version --short`. `server.json` repeats it for the registry, in its `version` and its image tag; a repository test fails until they agree. Enterich reports it at start (`start` log event), and the release workflow refuses a tag that doesn't equal it.
 
 ## Steps
 
-1. **On a branch:** run `uv version X.Y.Z`; check the `Unreleased` section against the `feat` and `fix` commits since the last tag (`git log --oneline vLAST.. | grep -E '^[0-9a-f]+ (feat|fix)'`), then move it to `## [X.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md` and add the compare link; the README's tool list is checked against `tests/snapshots/tools.json` by the tests. Open a pull request (`chore: release vX.Y.Z`); merge when CI is green.
+1. **On a branch:** run `uv version X.Y.Z` and set `version` and the image tag in `server.json` to X.Y.Z (a repository test checks that they agree); check the `Unreleased` section against the `feat` and `fix` commits since the last tag (`git log --oneline vLAST.. | grep -E '^[0-9a-f]+ (feat|fix)'`), then move it to `## [X.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md` and add the compare link; the README's tool list is checked against `tests/snapshots/tools.json` by the tests. Open a pull request (`chore: release vX.Y.Z`); merge when CI is green.
 2. **Tag the merge commit on `main`:**
    ```sh
    git switch main && git pull --ff-only
    git tag -a vX.Y.Z -m "Enterich vX.Y.Z"
    git push origin vX.Y.Z
    ```
-3. **CI** (`release.yml`, triggered by the tag) checks that the tag equals the version in `pyproject.toml`, is annotated, is on `main` and was pushed to `interlusion/enterich`, and that `CHANGELOG.md` has the version's section. Then `image.yml` builds the `test` stage for amd64 and arm64, each on a runner of its own architecture, and runs the tests in it; builds the runtime image for both once, from the layers the tests ran on; pushes the runtime image `ghcr.io/interlusion/enterich:X.Y.Z` with its SBOM and provenance, adds a build provenance attestation, and creates the GitHub release with the changelog section and the digest, attaching `tests/snapshots/tools.json` as `enterich-X.Y.Z-tools.json`.
-4. **Check** the release page: notes, digest, both architectures, the tools asset.
+3. **CI** (`release.yml`, triggered by the tag) checks that the tag equals the version in `pyproject.toml`, is annotated, is on `main` and was pushed to `interlusion/enterich`, that `CHANGELOG.md` has the version's section, and that `server.json` passes the registry's checks (`mcp-publisher validate`). Then `image.yml` builds the `test` stage for amd64 and arm64, each on a runner of its own architecture, and runs the tests in it; builds the runtime image for both once, from the layers the tests ran on; pushes the runtime image `ghcr.io/interlusion/enterich:X.Y.Z` with its SBOM and provenance, adds a build provenance attestation, and creates the GitHub release with the changelog section and the digest, attaching `tests/snapshots/tools.json` as `enterich-X.Y.Z-tools.json`. Last, the `registry` job publishes `server.json` to the [MCP Registry](https://registry.modelcontextprotocol.io) as `dev.interlusion/enterich`, signed in with the key of the environment `mcp-registry` ([below](#the-mcp-registry-key)); the registry checks that the pushed image carries the same name in its label `io.modelcontextprotocol.server.name`.
+4. **Check** the release page: notes, digest, both architectures, the tools asset; and the entry: `https://registry.modelcontextprotocol.io/v0/servers?search=dev.interlusion/enterich` lists the version.
 
 ## Dry run
 
-`release.yml` can also be started by hand (`workflow_dispatch`) with a version: in GitHub under Actions, Release, Run workflow, or `gh workflow run release.yml -f version=X.Y.Z`. It runs the same `image.yml` as a release, with read rights only: the version check, the build for both architectures, the tests in both, and the same build step for the runtime image, which it writes as an OCI image layout instead of pushing it. `scripts/image_index.py` then checks that the layout holds the image under its release name for both architectures, each with SBOM and provenance, and that no provenance carries GitHub's event payload, which for a tag push names people with their email addresses. The run's artefact `dry-run-X.Y.Z` holds the release notes, the tools file, and the SBOM and provenance per architecture. The version must equal `pyproject.toml`'s, so a dry run checks the version about to be released; where `CHANGELOG.md` has no section for it yet, the notes are the `Unreleased` section.
+`release.yml` can also be started by hand (`workflow_dispatch`) with a version: in GitHub under Actions, Release, Run workflow, or `gh workflow run release.yml -f version=X.Y.Z`. It runs the same `image.yml` as a release, with read rights only: the version check and `server.json`'s, the build for both architectures, the tests in both, and the same build step for the runtime image, which it writes as an OCI image layout instead of pushing it. `scripts/image_index.py` then checks that the layout holds the image under its release name for both architectures, each with the registry label of `server.json`'s name, SBOM and provenance, and that no provenance carries GitHub's event payload, which for a tag push names people with their email addresses. The run's artefact `dry-run-X.Y.Z` holds the release notes, the tools file, and the SBOM and provenance per architecture. The version must equal `pyproject.toml`'s, so a dry run checks the version about to be released; where `CHANGELOG.md` has no section for it yet, the notes are the `Unreleased` section.
 
-Only a tag run signs in to GHCR, pushes, attests and creates the release. Run the dry run after every change to `release.yml`, `image.yml`, the scripts they run or the `Dockerfile`.
+Only a tag run signs in to GHCR, pushes, attests, creates the release and publishes the registry entry. Run the dry run after every change to `release.yml`, `image.yml`, the scripts they run, the `Dockerfile` or `server.json`.
+
+## The MCP Registry key
+
+The registry accepts the namespace `dev.interlusion` from whoever proves control of `interlusion.dev`: the TXT record on the domain's apex holds the public half of an Ed25519 key, and the release workflow signs in with the private half. Set it up once, before the first release that publishes, and again to replace the key:
+
+1. With OpenSSL 3, in a directory outside the repository:
+   ```sh
+   openssl genpkey -algorithm Ed25519 -out key.pem
+   echo "v=MCPv1; k=ed25519; p=$(openssl pkey -in key.pem -pubout -outform DER | tail -c 32 | base64)"
+   openssl pkey -in key.pem -noout -text | grep -A3 "priv:" | tail -n +2 | tr -d ' :\n'
+   ```
+2. **DNS:** a TXT record on `interlusion.dev` itself, not on a subdomain, with the first line printed. Replacing a key, remove the old record: the registry tries a stale one first and fails.
+3. **GitHub:** in the repository's settings, the environment `mcp-registry`, its deployment rule limited to tags `v*`, with the secret `MCP_REGISTRY_KEY` set to the second line printed (the private key in hex). Only the release workflow's `registry` job uses the environment.
+4. Delete `key.pem`, or keep it where the organisation keeps its secrets. Neither key line goes into the repository, a log or a chat.
 
 ## With an agent
 
 An agent does the steps above except the decisions and what needs GitHub's interface or API (`AGENTS.md`):
 
-- **The operator** decides to release and on the version, starts the dry run, opens and merges the pull request, and gives the go for the tag.
+- **The operator** decides to release and on the version, sets up the registry key, starts the dry run, opens and merges the pull request, and gives the go for the tag.
 - **The agent** proposes the version from `Unreleased` and the table above, prepares the release branch (step 1) and the pull request's title and description, pushes when asked, and creates and pushes the tag only after the operator's go: a tag can't be taken back. If the merge falls on a later day than the changelog's date, it changes the date first.
 - **The checks after the tag run** (step 4) without `api.github.com`:
   - The release: `https://github.com/Interlusion/enterich/releases.atom` lists the pushed tag at once; the release is the entry titled `Enterich X.Y.Z`, with the digest at the end of its notes.
@@ -58,6 +72,7 @@ A release run that failed for a passing reason (a registry or runner outage) is 
 
 - If a `test` job or the `image` job failed, nothing was pushed, and they run again. The `image` job refuses to start when the version's image exists already, so a published image tag is never overwritten. It takes the layers from the `test` jobs' build caches, which are kept for 7 days; after that, re-run all jobs.
 - If the `release` job failed (attestation or GitHub release), only it runs again, for the image already pushed.
+- If the `registry` job failed, look up the entry first (step 4): a publish whose answer was lost may have gone through, and a version the registry has published can't be changed or published again. If the version isn't listed, re-run only the `registry` job; the release stands.
 
 Anything that needs a commit, including a fix to the workflows, needs a new patch version: the tag can't move to the fixed commit.
 

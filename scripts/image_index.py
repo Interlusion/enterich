@@ -3,9 +3,10 @@
     python3 scripts/image_index.py LAYOUT OUT NAME PLATFORM...
 
 It checks that the layout holds one image named NAME (image:tag) for exactly the given
-platforms (os/arch), each with an SBOM and a provenance attestation without GitHub's
-event payload (which names people and their email addresses), and writes those
-in-toto statements to OUT as <os>_<arch>-sbom.spdx.json and <os>_<arch>-provenance.json.
+platforms (os/arch), each labelled with server.json's name for the MCP Registry and
+with an SBOM and a provenance attestation without GitHub's event payload (which names
+people and their email addresses), and writes those in-toto statements to OUT as
+<os>_<arch>-sbom.spdx.json and <os>_<arch>-provenance.json.
 Standard library only: the release workflow runs it with the runner's Python (3.12).
 """
 
@@ -17,6 +18,9 @@ from typing import Any
 INDEX = "application/vnd.oci.image.index.v1+json"
 MANIFEST = "application/vnd.oci.image.manifest.v1+json"
 FILES = ("sbom.spdx.json", "provenance.json")
+# The registry lists an image only when this label equals the name in server.json.
+SERVER_LABEL = "io.modelcontextprotocol.server.name"
+SERVER_JSON = Path(__file__).parent.parent / "server.json"
 
 
 class LayoutError(Exception):
@@ -35,9 +39,9 @@ def _file(predicate: str) -> str | None:
     return "provenance.json" if predicate.startswith("https://slsa.dev/provenance/") else None
 
 
-def check(layout: Path, name: str, platforms: list[str]) -> dict[str, Any]:
+def check(layout: Path, name: str, platforms: list[str], server: str) -> dict[str, Any]:
     """The attestation statements by output file name; LayoutError when the layout isn't
-    the image asked for."""
+    the image asked for, labelled with the registry name `server`."""
     top = json.loads((layout / "index.json").read_text())["manifests"]
     named = [m for m in top if m.get("annotations", {}).get("io.containerd.image.name") == name]
     if len(top) != 1 or len(named) != 1 or named[0]["mediaType"] != INDEX:
@@ -57,6 +61,12 @@ def check(layout: Path, name: str, platforms: list[str]) -> dict[str, Any]:
     }
     statements: dict[str, Any] = {}
     for platform, digest in sorted(images.items()):
+        config = _blob(layout, _blob(layout, digest)["config"]["digest"])
+        settings: dict[str, Any] = config.get("config") or {}
+        labels: dict[str, str] = settings.get("Labels") or {}
+        label = labels.get(SERVER_LABEL)
+        if label != server:
+            raise LayoutError(f"{platform}'s label {SERVER_LABEL} is {label!r}, not {server!r}")
         if digest not in attestations:
             raise LayoutError(f"{platform} has no attestations")
         found: dict[str, Any] = {}
@@ -80,15 +90,16 @@ def main(argv: list[str]) -> int:
         print("usage: image_index.py LAYOUT OUT NAME PLATFORM...", file=sys.stderr)
         return 2
     layout, out, name, platforms = Path(argv[0]), Path(argv[1]), argv[2], argv[3:]
+    server = json.loads(SERVER_JSON.read_text())["name"]
     try:
-        statements = check(layout, name, platforms)
+        statements = check(layout, name, platforms, server)
     except LayoutError as exc:
         print(f"The image isn't as a release needs it: {exc}.", file=sys.stderr)
         return 1
     out.mkdir(parents=True, exist_ok=True)
     for file, statement in statements.items():
         (out / file).write_text(json.dumps(statement, indent=2) + "\n")
-    print(f"{name}: {', '.join(sorted(platforms))}, each with SBOM and provenance")
+    print(f"{name}: {', '.join(sorted(platforms))}, each with its label, SBOM and provenance")
     return 0
 
 

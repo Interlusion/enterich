@@ -26,6 +26,7 @@ def load() -> ModuleType:
 
 
 image_index = load()
+SERVER = json.loads(image_index.SERVER_JSON.read_text())["name"]
 
 
 def blob(layout: Path, content: Any) -> str:
@@ -47,14 +48,23 @@ def write_layout(
     platforms: list[str] = PLATFORMS,
     predicates: tuple[str, ...] = (SBOM, PROVENANCE),
     internal: dict[str, Any] | None = None,
+    labels: dict[str, str] | None = None,
 ) -> None:
     """An OCI image layout as buildx writes it: a named index of the platforms' manifests,
-    each with an attestation manifest of in-toto statements; `internal` goes into the
-    provenance's internal parameters."""
+    each with its config's labels and an attestation manifest of in-toto statements;
+    `internal` goes into the provenance's internal parameters."""
     entries: list[dict[str, Any]] = []
     for platform in platforms:
         os, arch = platform.split("/")
-        image = blob(layout, {"layers": []})
+        config = blob(
+            layout,
+            {
+                "config": {
+                    "Labels": {image_index.SERVER_LABEL: SERVER} if labels is None else labels
+                }
+            },
+        )
+        image = blob(layout, {"config": {"digest": config}, "layers": []})
         layers = [
             {
                 "mediaType": "application/vnd.in-toto+json",
@@ -94,7 +104,7 @@ def write_layout(
 
 def test_a_release_image_gives_its_attestations_per_platform(tmp_path: Path) -> None:
     write_layout(tmp_path)
-    statements = image_index.check(tmp_path, NAME, PLATFORMS)
+    statements = image_index.check(tmp_path, NAME, PLATFORMS, SERVER)
     assert sorted(statements) == [
         "linux_amd64-provenance.json",
         "linux_amd64-sbom.spdx.json",
@@ -110,7 +120,7 @@ def test_a_release_image_gives_its_attestations_per_platform(tmp_path: Path) -> 
 
 def test_slsa_provenance_v02_counts_too(tmp_path: Path) -> None:
     write_layout(tmp_path, predicates=(SBOM, "https://slsa.dev/provenance/v0.2"))
-    assert len(image_index.check(tmp_path, NAME, PLATFORMS)) == 4
+    assert len(image_index.check(tmp_path, NAME, PLATFORMS, SERVER)) == 4
 
 
 @pytest.mark.parametrize(
@@ -125,6 +135,11 @@ def test_slsa_provenance_v02_counts_too(tmp_path: Path) -> None:
         ({"predicates": (PROVENANCE,)}, "linux/amd64 lacks sbom.spdx.json"),
         ({"predicates": (SBOM,)}, "linux/amd64 lacks provenance.json"),
         ({"predicates": ()}, "lacks sbom.spdx.json, provenance.json"),
+        ({"labels": {}}, "linux/amd64's label io.modelcontextprotocol.server.name is None"),
+        (
+            {"labels": {"io.modelcontextprotocol.server.name": "io.github.interlusion/enterich"}},
+            f"is 'io.github.interlusion/enterich', not '{SERVER}'",
+        ),
     ],
 )
 def test_an_image_unlike_a_release_is_refused(
@@ -132,7 +147,7 @@ def test_an_image_unlike_a_release_is_refused(
 ) -> None:
     write_layout(tmp_path, **layout)
     with pytest.raises(image_index.LayoutError) as info:
-        image_index.check(tmp_path, NAME, PLATFORMS)
+        image_index.check(tmp_path, NAME, PLATFORMS, SERVER)
     assert says in str(info.value)
 
 
@@ -141,12 +156,12 @@ def test_provenance_with_githubs_event_payload_is_refused(tmp_path: Path) -> Non
     payload = {"pusher": {"name": "someone", "email": "someone@example.com"}}
     write_layout(tmp_path, internal={"github_event_payload": payload})
     with pytest.raises(image_index.LayoutError, match="carries GitHub's event payload"):
-        image_index.check(tmp_path, NAME, PLATFORMS)
+        image_index.check(tmp_path, NAME, PLATFORMS, SERVER)
 
 
 def test_provenance_with_other_github_parameters_passes(tmp_path: Path) -> None:
     write_layout(tmp_path, internal={"github_repository": "interlusion/enterich"})
-    assert len(image_index.check(tmp_path, NAME, PLATFORMS)) == 4
+    assert len(image_index.check(tmp_path, NAME, PLATFORMS, SERVER)) == 4
 
 
 def test_a_platform_without_attestations_is_refused(tmp_path: Path) -> None:
@@ -157,7 +172,7 @@ def test_a_platform_without_attestations_is_refused(tmp_path: Path) -> None:
     top["manifests"][0]["digest"] = blob(tmp_path, {"manifests": images})
     (tmp_path / "index.json").write_text(json.dumps(top))
     with pytest.raises(image_index.LayoutError, match="linux/amd64 has no attestations"):
-        image_index.check(tmp_path, NAME, PLATFORMS)
+        image_index.check(tmp_path, NAME, PLATFORMS, SERVER)
 
 
 def test_main_writes_the_statements(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -167,7 +182,7 @@ def test_main_writes_the_statements(tmp_path: Path, capsys: pytest.CaptureFixtur
     assert len(list(out.iterdir())) == 4
     statement = json.loads((out / "linux_amd64-provenance.json").read_text())
     assert statement["predicateType"] == PROVENANCE
-    assert "each with SBOM and provenance" in capsys.readouterr().out
+    assert "each with its label, SBOM and provenance" in capsys.readouterr().out
 
 
 def test_main_refuses_without_writing(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
