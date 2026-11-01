@@ -3,7 +3,7 @@
 Quick items. Items with detail have their own file (`item-NNN-*.md`); done or rejected ones move to `archive/`.
 
 - [ ] Licence check of the locked dependencies in CI (no copyleft in the image).
-- [ ] Release candidates (`vX.Y.Z-rc.N`) published as GitHub pre-releases, to rehearse a whole release, including GHCR sign-in, push, attestation and the GitHub release, which the dry run can't run. Needs ADR-004 and the release workflow's version check to allow pre-release versions, and leaves the candidates' images public. Not for the first release (decided 2026-10-30); reconsider after it.
+- [ ] Release candidates (`vX.Y.Z-rc.N`) published as GitHub pre-releases, to rehearse a whole release, including GHCR sign-in, push, attestation and the GitHub release, which the dry run can't run: v0.2.0's `registry` job failed on such a step, a called workflow without its environment's secret. Needs ADR-004 and the release workflow's version check to allow pre-release versions, and leaves the candidates' images public. Not for the first release (decided 2026-10-30); reconsider after it.
 - [ ] Signed commits or tags: should the organisation require them?
 - [ ] OpenSSF Scorecard as a CI job, now that the repository is public.
 - [ ] When the organisation gets a second member: members' base permission read; only owners may change repository visibility or create public packages; `CODEOWNERS` names an organisation team instead of `@loxy`, with write access to the repository.

@@ -4,7 +4,7 @@
 | :- | :- |
 | **Date** | 2026-10-26 |
 | **Author** | loxy (drafted with Claude) |
-| **Status** | Draft: every step run for v0.1.0, the first release |
+| **Status** | Draft: every step run; the MCP Registry's since v0.2.1 |
 
 Why it works this way: [ADR-004](../arc42/adr/ADR-004-releases-and-image.md).
 

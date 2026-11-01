@@ -16,8 +16,8 @@ List Enterich in the official MCP Registry, published by each release, and annou
 
 The registry makes Enterich findable for MCP clients and for the directories that copy the registry. It accepts container images from GHCR (registry documentation as of 2026-10-30):
 
-- **Ownership:** the image carries the label `io.modelcontextprotocol.server.name`, equal to the `name` in `server.json`. The v0.1.0 image doesn't, and a published image never changes, so the listing starts with the next release.
-- **Namespace:** `io.github.interlusion/…` needs GitHub OIDC from a workflow, or a personal token that can read the organisation's members; the interactive GitHub login can't publish for an organisation. A domain namespace (`de.interlusion/…`) needs a DNS TXT record and a key, and stays valid wherever the code lives.
+- **Ownership:** the image carries the label `io.modelcontextprotocol.server.name`, equal to the `name` in `server.json`. The v0.1.0 image doesn't, and a published image never changes, so the listing started with v0.2.1.
+- **Namespace:** `io.github.interlusion/…` needs GitHub OIDC from a workflow, or a personal token that can read the organisation's members; the interactive GitHub login can't publish for an organisation. A domain namespace (`dev.interlusion/…`) needs a DNS TXT record and a key, and stays valid wherever the code lives.
 - **Format:** an OCI package with `streamable-http` transport and a URL template for the port, and the `ENTERICH_` variables as environment variables, the secrets marked as such.
 
 Enterich isn't a typical entry: it is a service behind an authorization server, not a tool a client starts for itself. A client that installs from the registry would start the image locally, which isn't how Enterich runs; the listing is for finding it, and its description says so.
@@ -30,8 +30,9 @@ The announcement follows the listing and the test against a real ERPNext ([ITEM-
 - [x] The label in the `Dockerfile`'s runtime stage, checked by the dry run's `scripts/image_index.py`.
 - [x] `server.json` in the repository: name, description, repository, version, the OCI package with its transport and variables; reviewed and versioned like the code, its version set with each release. A repository check holds it to the image's label, `pyproject.toml`'s version and the configuration guide's variables; the dry run validates it with `mcp-publisher`.
 - [x] Publishing in the release workflow's tag run, after the image is pushed: the `registry` job, with the key of the environment `mcp-registry`.
-- [ ] The key and the DNS record, set up by the operator (releasing guide, "The MCP Registry key").
-- [ ] The release that carries it; then check the entry, and how third-party directories that copy the registry describe Enterich.
+- [x] The key and the DNS record, set up by the operator (releasing guide, "The MCP Registry key").
+- [x] The release that carries it: v0.2.1, the first version listed, on 2026-11-01. v0.2.0's `registry` job got an empty key, because `release.yml` passed no secrets to `image.yml`, and a re-run would have run the tag's workflow files.
+- [ ] How third-party directories that copy the registry describe Enterich, once they have synced.
 - [ ] **Announcement:** planned and done outside this repository, after the entry and the real-ERPNext test.
 
 ## Open Questions
