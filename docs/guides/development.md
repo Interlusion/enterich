@@ -29,7 +29,8 @@ scripts/             check-links.sh: the Markdown link check;
                      check-workflows.sh: actionlint and zizmor;
                      changelog.py: a version's release notes;
                      erpnext-site.sh: the end-to-end tests' ERPNext site;
-                     image_index.py: the dry run's check of the image
+                     image_index.py: the dry run's check of the image;
+                     mcp-publisher.sh: the MCP Registry's publisher, checked
 AGENTS.md            rules for coding agents; CLAUDE.md imports it
 CONTRIBUTING.md, SECURITY.md
 Dockerfile           build, runtime and test stages

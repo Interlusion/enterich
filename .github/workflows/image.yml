@@ -4,8 +4,8 @@ name: Release image
 # stage for each architecture on a runner of that architecture, then write the runtime
 # image for both with the same build step, from the layers the tests ran on: the test
 # jobs hand over their build cache, so the image job builds nothing anew. The dry run
-# writes the image as an OCI image layout and checks the index, the tag run pushes it.
-# Only the tag run signs in to GHCR, attests and creates the release (releasing guide).
+# writes the image as an OCI image layout and checks the index, the tag run pushes it. Only the tag run signs in to GHCR, attests, creates the release and
+# publishes the entry in the MCP Registry (releasing guide).
 on:
   workflow_call:
     inputs:
@@ -196,3 +196,31 @@ jobs:
           cp tests/snapshots/tools.json "$RUNNER_TEMP/enterich-$VERSION-tools.json"
           gh release create "v$VERSION" --verify-tag --title "Enterich $VERSION" \
             --notes-file "$notes" "$RUNNER_TEMP/enterich-$VERSION-tools.json"
+
+  # The tag run, after the release: the entry in the MCP Registry, which checks the pushed
+  # image's label. Its own job, so only it reads the registry's key, from the environment
+  # mcp-registry, and a failure is re-run alone.
+  registry:
+    needs: release
+    if: inputs.publish
+    runs-on: ubuntu-24.04
+    environment: mcp-registry
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: The publisher
+        run: scripts/mcp-publisher.sh "$RUNNER_TEMP"
+      - name: Entry in the MCP Registry
+        env:
+          # The Ed25519 key whose public half is in the TXT record of the namespace's domain.
+          KEY: ${{ secrets.MCP_REGISTRY_KEY }}
+        run: |
+          # dev.interlusion/enterich is published under the domain interlusion.dev.
+          domain=$(jq -r '.name | split("/")[0] | split(".") | reverse | join(".")' server.json)
+          "$RUNNER_TEMP/mcp-publisher" login dns --domain "$domain" --private-key "$KEY"
+          "$RUNNER_TEMP/mcp-publisher" publish server.json
