@@ -109,6 +109,9 @@ jobs:
       attestations: write
       artifact-metadata: write
     uses: ./.github/workflows/image.yml # zizmor: ignore[self-repository]
+    # A called workflow gets only the secrets its caller passes, its jobs' environment
+    # secrets too: without inherit, image.yml's registry job reads MCP_REGISTRY_KEY as empty.
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     with:
       version: ${{ needs.check.outputs.version }}
       publish: true
