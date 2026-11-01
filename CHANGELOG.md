@@ -4,6 +4,8 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-01
+
 ### Added
 
 - **The MCP Registry:** each release publishes Enterich's entry, `dev.interlusion/enterich`, from `server.json`. The image carries the label `io.modelcontextprotocol.server.name` with that name, which the registry checks. Enterich runs as a service behind an authorization server; the entry is for finding it, not for a client to start it.
@@ -18,7 +20,8 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ### Rights
 
-- Fewer rights: the drafts need none on what they only link to (company, currency, units, price list, payment terms, project, cost centres, and a journal entry's accounts, parties and invoices), a sales draft needs only select on Customer, and Trial Balance needs no read on Account. ERPNext's roles All and Desk User add their own rights to every desk user (configuration guide).
+- Fewer rights: the drafts need none on what they only link to (company, currency, units, price list, payment terms, project, cost centres, and a journal entry's accounts, parties and invoices), a sales draft needs only select on Customer, Trial Balance needs no read on Account, and General Ledger needs read on Account only for the `account` given. ERPNext's roles All and Desk User add their own rights to every desk user (configuration guide).
+- No hidden fields: don't raise the permission level of a field Enterich returns above the agent's role, and don't mask it. A list without the field is refused, but a get returns it as empty, and a masked value as a placeholder such as `XXXXXXXX` (configuration guide).
 
 ## [0.1.0] - 2026-10-30
 
@@ -48,4 +51,5 @@ The first release.
 - The agent user needs read rights for the reads, report rights for the reports, and create and write for the drafts' DocTypes, never submit, cancel, amend or delete. Each area spec's Rights section lists them; the configuration guide says how to grant them.
 
 [0.1.0]: https://github.com/Interlusion/enterich/releases/tag/v0.1.0
-[unreleased]: https://github.com/Interlusion/enterich/compare/v0.1.0...HEAD
+[0.2.0]: https://github.com/Interlusion/enterich/compare/v0.1.0...v0.2.0
+[unreleased]: https://github.com/Interlusion/enterich/compare/v0.2.0...HEAD
