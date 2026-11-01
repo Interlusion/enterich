@@ -4,6 +4,12 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-01
+
+### Fixed
+
+- **The MCP Registry:** v0.2.0's release didn't publish Enterich's entry, because the release workflow didn't pass the registry's key to the job that publishes it. 0.2.1 is the first version in the MCP Registry, as `dev.interlusion/enterich`. Enterich itself is unchanged from 0.2.0.
+
 ## [0.2.0] - 2026-11-01
 
 ### Added
@@ -52,4 +58,5 @@ The first release.
 
 [0.1.0]: https://github.com/Interlusion/enterich/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Interlusion/enterich/compare/v0.1.0...v0.2.0
-[unreleased]: https://github.com/Interlusion/enterich/compare/v0.2.0...HEAD
+[0.2.1]: https://github.com/Interlusion/enterich/compare/v0.2.0...v0.2.1
+[unreleased]: https://github.com/Interlusion/enterich/compare/v0.2.1...HEAD

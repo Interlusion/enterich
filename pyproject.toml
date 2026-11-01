@@ -1,6 +1,6 @@
 [project]
 name = "enterich"
-version = "0.2.0"
+version = "0.2.1"
 description = "An MCP server for ERPNext with a fixed tool list and the rights of one agent user"
 readme = "README.md"
 license = "Apache-2.0"

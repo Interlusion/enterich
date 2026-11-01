@@ -4,7 +4,7 @@
 
 An MCP server for ERPNext with hard limits: a short, fixed list of tools, tokens from an external OAuth authorization server, and only the rights of one ERPNext user.
 
-**Status:** v0.2.0. Every operation is tested against a model of ERPNext v16's API, and weekly against a real ERPNext v16 site.
+**Status:** v0.2.1. Every operation is tested against a model of ERPNext v16's API, and weekly against a real ERPNext v16 site.
 
 ## What it is
 
