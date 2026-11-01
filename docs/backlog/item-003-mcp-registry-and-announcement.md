@@ -2,7 +2,7 @@
 
 | Meta | Value |
 | :- | :- |
-| **Status** | CANDIDATE |
+| **Status** | IN PROGRESS |
 | **Type** | feature |
 | **Origin** | [ITEM-001](archive/item-001-going-public.md)'s steps after the first release, moved here on 2026-10-30 |
 | **Created** | 2026-10-30 |
@@ -26,17 +26,20 @@ The announcement follows the listing and the test against a real ERPNext ([ITEM-
 
 ## To do
 
-- [ ] Decide the namespace and how the entry is published (below).
-- [ ] The label in the `Dockerfile`'s runtime stage, checked by the dry run's `scripts/image_index.py`.
-- [ ] `server.json` in the repository: name, description, repository, version, the OCI package with its transport and variables; reviewed and versioned like the code, its version set with each release.
-- [ ] Publishing in the release workflow's tag run (or a step in the releasing guide), after the image is pushed.
+- [x] Decide the namespace and how the entry is published (below).
+- [x] The label in the `Dockerfile`'s runtime stage, checked by the dry run's `scripts/image_index.py`.
+- [x] `server.json` in the repository: name, description, repository, version, the OCI package with its transport and variables; reviewed and versioned like the code, its version set with each release. A repository check holds it to the image's label, `pyproject.toml`'s version and the configuration guide's variables; the dry run validates it with `mcp-publisher`.
+- [x] Publishing in the release workflow's tag run, after the image is pushed: the `registry` job, with the key of the environment `mcp-registry`.
+- [ ] The key and the DNS record, set up by the operator (releasing guide, "The MCP Registry key").
 - [ ] The release that carries it; then check the entry, and how third-party directories that copy the registry describe Enterich.
 - [ ] **Announcement:** planned and done outside this repository, after the entry and the real-ERPNext test.
 
 ## Open Questions
 
-- Namespace: `io.github.interlusion/enterich` (OIDC from the release workflow, nothing to keep secret) or `de.interlusion/enterich` (DNS record and a private key as a secret)?
-- Published by the release workflow, or by hand with `mcp-publisher` as a step of the releasing guide?
+None. Decided on 2026-11-01:
+
+- **Namespace** `dev.interlusion/enterich`, proven by a TXT record on `interlusion.dev`, Interlusion's website domain (`interlusion.de` redirects to it). A domain names the publisher rather than where the code lives, and stays valid if the repository moves; the price is a private key kept as a secret, where `io.github.interlusion` with OIDC would need none.
+- **Published by the release workflow's tag run**, in a job of its own that alone reads the key from a protected environment.
 
 ## Notes
 
