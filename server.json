@@ -3,7 +3,7 @@
   "name": "dev.interlusion/enterich",
   "title": "Enterich",
   "description": "A service for ERPNext accounting behind OAuth: fixed tools, drafts only, one agent user's rights",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "repository": {
     "url": "https://github.com/Interlusion/enterich",
     "source": "github"
@@ -12,7 +12,7 @@
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/interlusion/enterich:0.1.0",
+      "identifier": "ghcr.io/interlusion/enterich:0.2.0",
       "transport": {
         "type": "streamable-http",
         "url": "http://localhost:{ENTERICH_PORT}/mcp"
