@@ -12,7 +12,8 @@
 | Contribute or work on it | [Contributing](../CONTRIBUTING.md), [Development](guides/development.md) |
 | Report a vulnerability | [Security policy](../SECURITY.md) |
 | Release it | [Releasing](guides/releasing.md) |
-| See open work | [Backlog](backlog/backlog.md), [ITEM-002 OpenTelemetry](backlog/item-002-opentelemetry.md), [ITEM-003 MCP Registry and announcement](backlog/item-003-mcp-registry-and-announcement.md); done items in [archive](backlog/archive/) |
+| See open work | [Backlog](backlog/backlog.md), [ITEM-002 OpenTelemetry](backlog/item-002-opentelemetry.md), [ITEM-003 MCP Registry and announcement](backlog/item-003-mcp-registry-and-announcement.md), [ITEM-005 Updates only on own drafts](backlog/item-005-updates-only-own-drafts.md), [ITEM-006 Provenance on every write](backlog/item-006-provenance-on-every-write.md), [ITEM-007 Party IDs as outside text](backlog/item-007-party-ids-as-outside-text.md), [ITEM-008 Write ceilings](backlog/item-008-write-ceilings.md), [ITEM-009 Agent eval suite](backlog/item-009-agent-eval-suite.md); done items in [archive](backlog/archive/) |
+| Read past reviews | [Analysis 001: excessive agency](analysis/analysis-001-excessive-agency-review.md) |
 
 ## Directories
 
@@ -20,6 +21,7 @@
 - **`arc42/`**: the architecture, all sections in one file for now; `arc42/adr/` holds the decisions.
 - **`guides/`**: how-tos, kept current.
 - **`backlog/`**: `backlog.md` for quick items, `item-NNN-*.md` for items with detail, `archive/` for done or rejected ones.
+- **`analysis/`**: dated reviews and investigations (`analysis-NNN-*.md`), whose findings become backlog items; `archive/` for those fully resolved.
 
 ## Document status
 
@@ -29,6 +31,7 @@
 | ADRs | Proposed until accepted; superseded by new ADRs rather than rewritten |
 | Architecture, guides | Kept current with every change they describe |
 | Backlog | Living |
+| Analyses | Snapshots of their date, not kept current; Draft until reviewed, archived once their findings are resolved |
 
 ## Conventions
 
