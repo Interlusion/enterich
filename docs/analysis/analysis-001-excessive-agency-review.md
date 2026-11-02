@@ -68,7 +68,7 @@ A fixed tool list held as a snapshot; drafts only in two layers, proven against 
 
 | # | Severity | Finding | Section | Item |
 | :- | :- | :- | :- | :- |
-| 1 | High | Updates change drafts a person prepared | [3.5](#35-write-operations) | [ITEM-005](../backlog/item-005-updates-only-own-drafts.md) |
+| 1 | High | Updates change drafts a person prepared | [3.5](#35-write-operations) | [ITEM-005](../backlog/archive/item-005-updates-only-own-drafts.md) |
 | 2 | Medium | All people share one identity and see everything the agent user reads | [3.2](#32-identity-and-rights) | [backlog](../backlog/backlog.md): guide for several instances; existing item for several identities |
 | 3 | Medium | Drafts carry no mark of session or task | [3.3](#33-provenance) | [ITEM-006](../backlog/item-006-provenance-on-every-write.md) |
 | 4 | Medium | Party IDs carry unmarked outside text | [3.4](#34-outside-data-in-results) | [ITEM-007](../backlog/item-007-party-ids-as-outside-text.md) |

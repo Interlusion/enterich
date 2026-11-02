@@ -20,7 +20,7 @@ The input limits are technical (1e9 per rate or amount, 10,000 per quantity, 20 
 
 - Two optional variables, off when unset, for example `ENTERICH_MAX_DRAFT_TOTAL` (in the company's currency) and `ENTERICH_MAX_DRAFTS_PER_HOUR`; REQ-002's configuration and the configuration guide first.
 - The total is checked on ERPNext's computed grand total: before the insert where Enterich can compute it, otherwise the draft isn't saved. Decide which; a saved draft over the ceiling must not stay behind silently.
-- The hourly count comes from ERPNext (the agent user's documents of the draft DocTypes created in the last hour), not from Enterich's memory, so it holds across replicas and restarts.
+- The hourly count comes from ERPNext (the agent user's documents of the draft DocTypes created in the last hour), not from Enterich's memory, so it holds across replicas and restarts. The agent user's name comes from `Erpnext.user()`, as for [ITEM-005](archive/item-005-updates-only-own-drafts.md).
 - A refusal names the limit and says that the operator sets it; no limit depends on the client asking for approval.
 
 ## Open Questions
@@ -28,4 +28,3 @@ The input limits are technical (1e9 per rate or amount, 10,000 per quantity, 20 
 - A ceiling per DocType (journal entries carry other amounts than invoices), or one for all?
 - Count `allow_duplicate` creates separately, with a lower limit?
 - Updates too: an update can raise a draft's total as well as a create.
-- The agent user's name: shared with [ITEM-005](item-005-updates-only-own-drafts.md).
