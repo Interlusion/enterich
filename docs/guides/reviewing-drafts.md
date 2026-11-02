@@ -28,7 +28,9 @@ Read the timeline before submitting.
 
 ## Correcting a draft
 
-Change the draft as usual. If the agent later tries to change it again, it is refused because the draft changed since it was read, and it has to read your version first. Your correction is never overwritten unseen.
+Enterich lets the agent change only drafts it created. A draft you or a colleague started is refused to the agent, even though it can read it. A draft of the agent's that you corrected can still be changed by it, after it has read your version; read the version history before submitting.
+
+Change the agent's draft as usual. If the agent later tries to change it again, it is refused because the draft changed since it was read, and it has to read your version first. Your correction is never overwritten unseen.
 
 ## What the agent can't do
 

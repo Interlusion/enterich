@@ -68,7 +68,7 @@ flowchart LR
 | `/.well-known/oauth-protected-resource<path>` | client → Enterich | RFC 9728 metadata, no token |
 | `/healthz` | deployment → Enterich | Liveness, no token |
 | JWKS URL | Enterich → authorization server | Signing keys over HTTPS, cached 5 min |
-| ERPNext REST | Enterich → ERPNext | `/api/resource/<fixed DocType>`, `frappe.client.get`, `frappe.desk.query_report.run` with fixed reports, `get_taxes_and_charges`; `Authorization: token key:secret` and the configured Host |
+| ERPNext REST | Enterich → ERPNext | `/api/resource/<fixed DocType>`, `frappe.client.get`, `frappe.desk.query_report.run` with fixed reports, `get_taxes_and_charges`, `frappe.desk.form.utils.add_comment`, `frappe.auth.get_logged_user`; `Authorization: token key:secret` and the configured Host |
 
 **Out of scope:** signing in and second factors (the authorization server), network policy and rate limits (the deployment), the agent user's role (the site), browser-based clients calling Enterich directly (no CORS), everything the person does in ERPNext.
 
@@ -76,7 +76,7 @@ flowchart LR
 
 | Goal | Approach | Decision or requirement |
 | :- | :- | :- |
-| Containment | A separate service holding only the agent user's key; ERPNext role without submit/cancel/delete as the outer limit; Enterich offers only fixed operations, drafts only, assigned company only | [ADR-001](adr/ADR-001-separate-service-fixed-tools.md), [REQ-001-URS-F003](../specs/req-001-core.md#req-001-urs-f003-never-post-cancel-delete-or-discard), [REQ-001-URS-F004](../specs/req-001-core.md#req-001-urs-f004-a-fixed-list-of-operations), [REQ-001-URS-F005](../specs/req-001-core.md#req-001-urs-f005-one-company) |
+| Containment | A separate service holding only the agent user's key; ERPNext role without submit/cancel/delete as the outer limit; Enterich offers only fixed operations, drafts only, assigned company only, updates only of the agent user's own drafts | [ADR-001](adr/ADR-001-separate-service-fixed-tools.md), [REQ-001-URS-F003](../specs/req-001-core.md#req-001-urs-f003-never-post-cancel-delete-or-discard), [REQ-001-URS-F004](../specs/req-001-core.md#req-001-urs-f004-a-fixed-list-of-operations), [REQ-001-URS-F005](../specs/req-001-core.md#req-001-urs-f005-one-company) |
 | Access control | Local JWT check of issuer, audience, client, subject, type, time; one identity per instance; 5 s leeway | [ADR-003](adr/ADR-003-local-token-check.md) |
 | Protocol | Official SDK, stateless Streamable HTTP, JSON, POST only | [ADR-002](adr/ADR-002-mcp-sdk-stateless-streamable-http.md) |
 | Traceability | One JSON log line per operation with `sub`, `sid`, outcome | [REQ-002-PRS-NF008](../specs/req-002-service.md#req-002-prs-nf008-log) |
@@ -164,7 +164,7 @@ sequenceDiagram
 
 ### Updating a draft
 
-Enterich reads the document with `frappe.client.get`, refuses unless it is a draft of the assigned company with the given `modified`, then sends a PUT with the catalogue's fields for the given inputs and `modified`. ERPNext refuses the PUT if the document changed in between (`TimestampMismatchError`, [REQ-001-PRS-F004](../specs/req-001-core.md#req-001-prs-f004-stale-updates-refused)), and refuses a save of a document a person has submitted meanwhile, because the agent user lacks the submit right.
+Enterich reads the document with `frappe.client.get`, refuses unless it is a draft of the assigned company that the agent user created (`owner`), with the given `modified`, then sends a PUT with the catalogue's fields for the given inputs and `modified`. ERPNext refuses the PUT if the document changed in between (`TimestampMismatchError`, [REQ-001-PRS-F004](../specs/req-001-core.md#req-001-prs-f004-stale-updates-refused)), and refuses a save of a document a person has submitted meanwhile, because the agent user lacks the submit right. Enterich learns the agent user's name at the first update, from `frappe.auth.get_logged_user`, and keeps it until it stops: it comes from the key itself, and a start doesn't depend on ERPNext. Renaming the agent user in ERPNext needs a restart; until then Enterich refuses the agent's own drafts as another user's. The rule is Enterich's alone: the agent user's role may write every draft of the company.
 
 ## 7. Deployment view
 
@@ -245,6 +245,7 @@ The quality goals of section 1, made testable. Each scenario names what happens,
 | :- | :- | :- | :- |
 | QS-01 | A manipulated agent tries to submit, cancel or delete, or sends `docstatus: 1` in a create | No operation exists for it; the extra input is refused before ERPNext; zero writes reach ERPNext | [REQ-001-PRS-F002](../specs/req-001-core.md#req-001-prs-f002-draft-create-operations), [REQ-001-PRS-F006](../specs/req-001-core.md#req-001-prs-f006-no-generic-operations) |
 | QS-02 | The agent updates a draft that a person submitted after the agent read it | Refused by Enterich's check or by ERPNext (stale `modified`, no submit right); the document is unchanged | [REQ-001-PRS-F003](../specs/req-001-core.md#req-001-prs-f003-draft-update-operations), [REQ-001-PRS-F004](../specs/req-001-core.md#req-001-prs-f004-stale-updates-refused) |
+| QS-22 | A manipulated agent updates a draft a bookkeeper prepared | Refused, saying only the agent user's drafts can be updated; zero writes reach ERPNext | [REQ-001-PRS-F003](../specs/req-001-core.md#req-001-prs-f003-draft-update-operations) |
 | QS-03 | The agent asks for another company's invoice by name | Answered as "doesn't exist or isn't permitted"; no field of the other company's document returned | [REQ-001-PRS-F007](../specs/req-001-core.md#req-001-prs-f007-the-assigned-company-from-configuration) |
 | QS-04 | The client calls every write operation without asking a person | The same limits apply; the integration suite passes with a client that never confirms | [REQ-001-PRS-F013](../specs/req-001-core.md#req-001-prs-f013-no-approval-in-the-loop) |
 | QS-05 | A name input is `X?run_method=discard` | It reaches ERPNext as one encoded path segment; no document method runs | [REQ-001-PRS-F010](../specs/req-001-core.md#req-001-prs-f010-name-inputs-stay-names) |

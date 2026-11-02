@@ -29,6 +29,7 @@ MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 MAX_MESSAGE = 300
 TAXES_METHOD = "erpnext.controllers.accounts_controller.get_taxes_and_charges"
 COMMENT_METHOD = "frappe.desk.form.utils.add_comment"
+LOGGED_USER_METHOD = "frappe.auth.get_logged_user"
 # A tag starts with its name right after `<` or `</`; `qty < 0 and rate > 5` has none.
 _TAG = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?/?>")
 
@@ -85,6 +86,7 @@ class Erpnext:
             follow_redirects=False,
             timeout=None,  # CALL_TIMEOUT covers the whole call, body included
         )
+        self._user: str | None = None
 
     async def get_list(
         self,
@@ -112,6 +114,13 @@ class Erpnext:
             raise ErpnextError(f"ERPNext's {doctype} list has a row that isn't a record.")
         _check_fields(doctype, fields, rows)
         return rows
+
+    async def user(self) -> str:
+        """The agent user, whom the key belongs to: asked at first need, then kept."""
+        if self._user is None:
+            answer = await self._call("GET", f"/api/method/{LOGGED_USER_METHOD}", {})
+            self._user = _expect(answer, "message", str)
+        return self._user
 
     async def get_doc(self, doctype: str, name: str) -> dict[str, Any]:
         params = {"doctype": doctype, "name": name}

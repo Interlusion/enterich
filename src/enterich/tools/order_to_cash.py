@@ -386,11 +386,11 @@ OPERATIONS: list[Operation[Any]] = [
         name="update_draft_sales_invoice",
         title="Update draft sales invoice",
         description=(
-            "Change a draft sales invoice of the assigned company. Give its `name` and its "
-            "`modified` as last read; a draft changed since is refused. Give only what "
-            "changes: `items` replace all rows; an empty `remarks` or `taxes_and_charges` "
-            "clears it, and a cleared tax template takes its tax rows with it. The customer "
-            "stays; for another customer, create a new draft."
+            "Change a draft sales invoice of the assigned company that the agent user created. "
+            "Give its `name` and its `modified` as last read; a draft changed since is refused. "
+            "Give only what changes: `items` replace all rows; an empty `remarks` or "
+            "`taxes_and_charges` clears it, and a cleared tax template takes its tax rows with it. "
+            "The customer stays; for another customer, create a new draft."
         ),
         kind="update",
         inputs=UpdateDraftSalesInvoice,

@@ -4,6 +4,10 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+### Changed
+
+- **Updates only on the agent's own drafts:** `update_draft_sales_invoice`, `update_draft_purchase_invoice` and `update_draft_journal_entry` change only drafts the agent user created, and refuse a draft another user created without writing to it, so that an agent misled by outside text can't rewrite a draft a person prepared. A draft of the agent's that a person then edited can still be updated, with its new `modified`. Enterich asks ERPNext once, at the first update, which user its key belongs to (`frappe.auth.get_logged_user`); no right is needed for that.
+
 ## [0.2.1] - 2026-11-01
 
 ### Fixed
