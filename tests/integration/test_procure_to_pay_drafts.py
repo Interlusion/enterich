@@ -412,6 +412,17 @@ def test_a_posting_date_set_by_an_update_is_kept(mcp: Session, erp: FakeErpnext)
     assert later["posting_date"] == "2026-11-02"
 
 
+def test_a_draft_another_user_created_isnt_updated(mcp: Session, erp: FakeErpnext) -> None:
+    erp.docs["Purchase Invoice"][DRAFT]["owner"] = "bookkeeper@example.com"
+    result = update(mcp, bill_no="B-2")
+    assert (result.error, result.text) == (
+        True,
+        f"name: {DRAFT} was created by another user; only drafts the agent user created can "
+        "be updated.",
+    )
+    assert erp.writes() == []
+
+
 def test_only_drafts_can_be_updated(mcp: Session, erp: FakeErpnext) -> None:
     stored = erp.docs["Purchase Invoice"]["ACC-PINV-2026-00001"]
     result = update(mcp, "ACC-PINV-2026-00001", stored["modified"], remarks="Changed")

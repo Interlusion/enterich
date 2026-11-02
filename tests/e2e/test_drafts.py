@@ -144,6 +144,44 @@ def test_a_submitted_sales_invoice_isnt_updated(mcp: Session, seeded: Seed) -> N
     )
 
 
+def test_a_persons_draft_isnt_updated(mcp: Session, seeded: Seed, site: Site) -> None:
+    theirs = site.insert(
+        {
+            "doctype": "Sales Invoice",
+            "company": COMPANY,
+            "customer": seeded.customer,
+            "items": [{"item_code": seeded.item, "qty": 9, "rate": 10}],
+        }
+    )
+    refused = mcp.call(
+        "update_draft_sales_invoice",
+        {"name": theirs["name"], "modified": theirs["modified"], "remarks": "Changed"},
+    )
+    assert (refused.error, refused.text) == (
+        True,
+        f"name: {theirs['name']} was created by another user; only drafts the agent user "
+        "created can be updated.",
+    )
+    assert stored(site, "Sales Invoice", theirs["name"])["modified"] == theirs["modified"]
+
+
+def test_the_agents_draft_a_person_edited_is_updated(
+    mcp: Session, seeded: Seed, site: Site
+) -> None:
+    draft = mcp.call(
+        "create_draft_sales_invoice",
+        {"customer": seeded.customer, "items": [{"item_code": seeded.item, "qty": 11}]},
+    ).data
+    edited = site.update("Sales Invoice", draft["name"], {"remarks": "Checked"})
+    updated = mcp.call(
+        "update_draft_sales_invoice",
+        {"name": draft["name"], "modified": edited["modified"], "remarks": "Agent's again"},
+    )
+    assert not updated.error, updated.text
+    doc = stored(site, "Sales Invoice", draft["name"])
+    assert (doc["owner"], doc["remarks"]) == (AGENT, "Agent's again")
+
+
 # Purchase invoices
 
 

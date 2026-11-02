@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from tests.fakes.erpnext import (
+    AGENT,
     COMPANY,
     FakeErpnext,
     address,
@@ -275,7 +276,7 @@ def test_get_sales_invoice_returns_rows_with_outside_text_apart(
         "status": "Unpaid",
         "docstatus": 1,
         "is_return": False,
-        "owner": "agent@example.com",
+        "owner": AGENT,
         "modified": "2026-10-01 09:00:00.000000",
         "taxes_and_charges": "VAT 19% - EX",
         "total_taxes_and_charges": 19.0,

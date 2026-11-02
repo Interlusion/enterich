@@ -12,6 +12,8 @@ import anyio
 import httpx2
 
 COMPANY = "Example GmbH"
+# The agent user, whom the API key belongs to
+AGENT = "agent@example.com"
 
 # The v16 fields the fake lets a list select or filter on, checked against the
 # DocType JSON of ERPNext 16.52 and Frappe 16.54; ERPNext refuses any other.
@@ -333,6 +335,8 @@ class FakeErpnext:
     unique_bills: bool = False
     comments: list[dict[str, Any]] = field(default_factory=list[dict[str, Any]])
     saves: int = 0
+    # The user the API key belongs to: the owner of every document inserted
+    agent_user: str = AGENT
 
     def add(self, doctype: str, doc: dict[str, Any]) -> dict[str, Any]:
         self.docs.setdefault(doctype, {})[doc["name"]] = doc
@@ -398,6 +402,8 @@ class FakeErpnext:
             return httpx2.Response(200, json={"message": {"name": "c1", **comment}})
         if request.url.path == "/api/method/frappe.desk.query_report.run":
             return httpx2.Response(200, json={"message": self._report(params)}, headers=headers)
+        if request.url.path == LOGGED_USER_METHOD and request.method == "GET":
+            return httpx2.Response(200, json={"message": self.agent_user}, headers=headers)
         if request.url.path == "/api/method/frappe.client.get":
             doc = self.docs.get(params.get("doctype", ""), {}).get(params.get("name", ""))
             if doc is None:
@@ -408,7 +414,8 @@ class FakeErpnext:
     def _insert(self, doctype: str, body: dict[str, Any]) -> httpx2.Response:
         series = "ACC-JV-2026-" if doctype == "Journal Entry" else INVOICES[doctype][1]
         name = f"{series}{101 + len(self.docs.get(doctype, {})):05d}"
-        doc = {"doctype": doctype, "name": name, "owner": "agent@example.com", **body}
+        # Frappe sets the owner to the session user, whatever the body says
+        doc = {"doctype": doctype, "name": name, **body, "owner": self.agent_user}
         return self._save(doctype, copy.deepcopy(doc))
 
     def _update(self, doctype: str, name: str, body: dict[str, Any]) -> httpx2.Response:
@@ -672,6 +679,7 @@ def _rows(doc: dict[str, Any], table: str) -> list[dict[str, Any]]:
 
 TAXES_METHOD = "/api/method/erpnext.controllers.accounts_controller.get_taxes_and_charges"
 COMMENT_METHOD = "/api/method/frappe.desk.form.utils.add_comment"
+LOGGED_USER_METHOD = "/api/method/frappe.auth.get_logged_user"
 
 
 # REQ-001-PRS-F006's doors: methods that post, cancel, delete, discard or run a document's
@@ -919,7 +927,7 @@ def sales_invoice(name: str = "ACC-SINV-2026-00001", **overrides: Any) -> dict[s
         "status": "Unpaid",
         "docstatus": 1,
         "is_return": 0,
-        "owner": "agent@example.com",
+        "owner": AGENT,
         "modified": "2026-10-01 09:00:00.000000",
         "taxes_and_charges": "VAT 19% - EX",
         "total_taxes_and_charges": 19.0,
@@ -1051,7 +1059,7 @@ def purchase_invoice(name: str = "ACC-PINV-2026-00001", **overrides: Any) -> dic
         "docstatus": 1,
         "is_return": 0,
         "update_stock": 0,
-        "owner": "agent@example.com",
+        "owner": AGENT,
         "modified": "2026-10-01 09:00:00.000000",
         "taxes_and_charges": "Input VAT 19% - EX",
         "total_taxes_and_charges": 38.0,

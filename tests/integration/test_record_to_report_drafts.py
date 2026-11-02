@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from tests.fakes.erpnext import (
+    AGENT,
     COMPANY,
     FakeErpnext,
     account,
@@ -39,6 +40,7 @@ def erp(erpnext: FakeErpnext) -> FakeErpnext:
         journal_entry(
             DRAFT,
             docstatus=0,
+            owner=AGENT,
             posting_date=TODAY,
             modified=MODIFIED,
             cheque_no=None,
@@ -465,6 +467,17 @@ def test_a_multi_currency_draft_isnt_changed(mcp: Session, erp: FakeErpnext) -> 
     assert result.text == (
         f"name: {DRAFT} has accounts in several currencies; Enterich changes only journal "
         "entries in the company's currency."
+    )
+    assert erp.writes() == []
+
+
+def test_a_draft_another_user_created_isnt_updated(mcp: Session, erp: FakeErpnext) -> None:
+    erp.docs["Journal Entry"][DRAFT]["owner"] = "bookkeeper@example.com"
+    result = update(mcp, user_remark="Changed")
+    assert (result.error, result.text) == (
+        True,
+        f"name: {DRAFT} was created by another user; only drafts the agent user created can "
+        "be updated.",
     )
     assert erp.writes() == []
 
