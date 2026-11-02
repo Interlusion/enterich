@@ -95,6 +95,7 @@ This spec holds the product's personas, user stories and terms, and the rules ev
 - **Name input**: an operation input that names an ERPNext record (a document number, a customer, an item, an account).
 - **Rejection**: an answer with HTTP 401 or 403 to a request to the MCP endpoint because of its token.
 - **Today**: the current date in the configured time zone.
+- **Write only if creator**: the write right in a rule with ERPNext's "Only If Creator" set and no other right, in a second role of the agent user; the agent's role holds the DocType's other rights without it. The agent user then writes only documents it created (`owner`), and reads all. A second role, because ERPNext's role permission manager edits one rule per role and DocType.
 
 ## URS — Functional
 
@@ -116,7 +117,7 @@ This spec holds the product's personas, user stories and terms, and the rules ev
 
 **Related User Stories**: REQ-001-P1-3 | **Rationale**: ERPNext's role refuses submit, cancel and delete to an agent user without those rights, and saving a submitted document needs the submit right too. It can't refuse everything, because some doors check only create, write or read and never look at `docstatus`:
 
-- `Document.discard` sets a draft to `docstatus` 2 with write alone.
+- `Document.discard` sets a draft to `docstatus` 2 with write alone; with write only if creator, a draft the agent user created.
 - A new document with `amended_from` amends a cancelled one with create alone; the amend right only shows the form's Amend button.
 - Purchase Invoice's `block_invoice`, `unblock_invoice` and `change_release_date` change the invoice by `db_set`, a submitted one too, with write alone.
 - The v1 `run_doc_method` checks only read before it calls a whitelisted method of a document.
@@ -557,6 +558,7 @@ Checked against Frappe and ERPNext v16.52 source:
 Checked on a real ERPNext v16 site by the end-to-end test:
 
 - ERPNext v16's REST API: `/api/resource` for lists, inserts and updates; `frappe.client.get` for a document with its rows; `frappe.desk.query_report.run` for reports; ERPNext's `get_taxes_and_charges` for a template's rows. Enterich calls these only with fixed DocTypes, reports and methods. Report filters and columns are the ones the area specs' catalogues name, as checked against ERPNext v16.52's source too (area specs).
+- With write only if creator on the draft DocTypes, the agent user's key reads, lists and comments on every draft, child rows included, and changes or discards only the drafts it created, a person's edit of such a draft notwithstanding; a person's draft is refused with 403 `PermissionError`.
 
 Not checked yet:
 

@@ -187,7 +187,7 @@ Supplier names are not in report rows; `get_supplier` gives them. `bill_no` and 
 | `list_purchase_invoices`, `get_purchase_invoice` | Purchase Invoice: read |
 | `list_purchase_tax_templates` | Purchase Taxes and Charges Template: read |
 | `report_accounts_payable` | Purchase Invoice: read, report; Journal Entry: read (the report lists them for due dates; with select only, they arrive without); the role added to the Accounts Payable report |
-| `create_draft_purchase_invoice`, `update_draft_purchase_invoice` | Purchase Invoice: read, create, write; Supplier, Address, Item, Account, Purchase Taxes and Charges Template: read (ERPNext or Enterich reads them while saving) |
+| `create_draft_purchase_invoice`, `update_draft_purchase_invoice` | Purchase Invoice: read, create, write only if creator; Supplier, Address, Item, Account, Purchase Taxes and Charges Template: read (ERPNext or Enterich reads them while saving) |
 
 The DocTypes a draft only links to, such as its company, currency, units, price list, payment terms, project or cost centres, need no right: ERPNext checks a link without the user's permissions.
 
