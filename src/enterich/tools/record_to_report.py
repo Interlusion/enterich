@@ -762,11 +762,11 @@ OPERATIONS: list[Operation[Any]] = [
         name="update_draft_journal_entry",
         title="Update draft journal entry",
         description=(
-            "Change a draft journal entry (voucher type Journal Entry) of the assigned company. "
-            "Give its `name` and its `modified` as last read; a draft changed since is "
-            "refused. Give only what changes: `accounts` replace all rows, under the same "
-            "rules as on create; without them, the draft's rows must balance. A draft with "
-            "accounts in several currencies can't be changed. An empty `user_remark` clears "
+            "Change a draft journal entry (voucher type Journal Entry) of the assigned company "
+            "that the agent user created. Give its `name` and its `modified` as last read; a draft "
+            "changed since is refused. Give only what changes: `accounts` replace all rows, under "
+            "the same rules as on create; without them, the draft's rows must balance. A draft "
+            "with accounts in several currencies can't be changed. An empty `user_remark` clears "
             "it, and an empty `cheque_no` clears it with `cheque_date`."
         ),
         kind="update",

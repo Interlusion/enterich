@@ -10,6 +10,7 @@ import pytest
 from tests.fakes.erpnext import (
     COMMENT_METHOD,
     COMPANY,
+    LOGGED_USER_METHOD,
     TAXES_METHOD,
     FakeErpnext,
     customer,
@@ -563,6 +564,59 @@ def test_only_the_companys_drafts_can_be_updated(
     assert result.text.startswith("name:")
     assert says in result.text
     assert erp.writes() == []
+
+
+def test_a_draft_another_user_created_isnt_updated(mcp: Session, erp: FakeErpnext) -> None:
+    erp.docs["Sales Invoice"][DRAFT]["owner"] = "bookkeeper@example.com"
+    before = dict(erp.docs["Sales Invoice"][DRAFT])
+    result = update(mcp, remarks="Changed")
+    assert (result.error, result.text) == (
+        True,
+        f"name: {DRAFT} was created by another user; only drafts the agent user created can "
+        "be updated.",
+    )
+    assert erp.writes() == []
+    assert erp.docs["Sales Invoice"][DRAFT] == before
+
+
+def test_the_agents_draft_a_person_edited_can_be_updated(mcp: Session, erp: FakeErpnext) -> None:
+    edited = "2026-10-28 12:00:00.000000"
+    erp.docs["Sales Invoice"][DRAFT].update(modified_by="bookkeeper@example.com", modified=edited)
+    result = update(mcp, modified=edited, remarks="Checked")
+    assert not result.error, result.text
+    assert erp.docs["Sales Invoice"][DRAFT]["remarks"] == "Checked"
+
+
+def test_the_agent_user_is_asked_for_once(mcp: Session, erp: FakeErpnext) -> None:
+    first = update(mcp, remarks="First").data
+    update(mcp, modified=first["modified"], remarks="Second")
+    assert [r.path for r in erp.received].count(LOGGED_USER_METHOD) == 1
+
+
+def test_creates_dont_ask_for_the_agent_user(mcp: Session, erp: FakeErpnext) -> None:
+    create(mcp)
+    assert LOGGED_USER_METHOD not in [r.path for r in erp.received]
+
+
+def test_an_update_without_the_agent_user_writes_nothing(mcp: Session, erp: FakeErpnext) -> None:
+    erp.fail(LOGGED_USER_METHOD, 500, error(500, "Exception", "Down"))
+    refused = update(mcp, remarks="Changed")
+    assert refused.error
+    assert "500" in refused.text
+    assert erp.writes() == []
+    # A failed answer isn't kept: the next update asks again
+    assert not update(mcp, remarks="Changed").error
+    assert [r.path for r in erp.received].count(LOGGED_USER_METHOD) == 2
+
+
+def test_another_users_draft_is_refused_before_its_modified_is_compared(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    # A stale answer would send the agent to re-read and retry, which can't succeed
+    erp.docs["Sales Invoice"][DRAFT]["owner"] = "bookkeeper@example.com"
+    result = update(mcp, modified="2026-10-28 10:00:00.000000", remarks="Changed")
+    assert result.error
+    assert "created by another user" in result.text
 
 
 @pytest.mark.parametrize("sent", ["2026-10-28 11:00:00", "2026-10-28 11:00:00.000000"])

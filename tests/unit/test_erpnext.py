@@ -171,6 +171,17 @@ async def test_a_refusal_is_at_most_300_characters(fake: FakeErpnext) -> None:
     assert len(text) <= 300
 
 
+@pytest.mark.parametrize("answer", [{}, {"message": None}, {"message": ["x"]}])
+async def test_an_answer_without_the_agent_user_is_an_error_and_not_kept(
+    fake: FakeErpnext, answer: object
+) -> None:
+    client = Erpnext(settings(), fake.transport())
+    fake.fail("/api/method/frappe.auth.get_logged_user", 200, answer)
+    with pytest.raises(ErpnextError):
+        await client.user()
+    assert await client.user() == fake.agent_user
+
+
 async def test_a_refusal_that_isnt_json_still_reports_the_status(fake: FakeErpnext) -> None:
     fake.fail("/api/method/frappe.client.get", 502, None)
     with pytest.raises(ErpnextError, match="502"):

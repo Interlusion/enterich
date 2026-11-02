@@ -19,7 +19,7 @@ In scope is anything that breaks what Enterich promises in its [core](docs/specs
 - **The token check:** a request that gets through without a valid access token for the configured issuer, audience, client and subject, or with an expired one; protected resource metadata that names another authorization server than the configured one.
 - **The tool limits:**
   - making Enterich send ERPNext a request its specs don't catalogue, for example through a name input;
-  - submitting, cancelling, amending, deleting or discarding a document, or changing one that isn't a draft;
+  - submitting, cancelling, amending, deleting or discarding a document, or changing one that isn't a draft, or a draft another user created;
   - reaching another company's data;
   - calling a tool the configuration (`ENTERICH_TOOLS`) doesn't offer;
   - getting past the limits on input, result size and time.

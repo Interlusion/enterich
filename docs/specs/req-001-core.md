@@ -211,13 +211,14 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-F003: Draft update operations
 
-**Description**: The update operations SHALL change only drafts of the assigned company, SHALL send ERPNext exactly the "Sent to ERPNext" fields of their area catalogue for the given inputs, and SHALL replace a draft's rows as a whole when rows are given.
+**Description**: The update operations SHALL change only drafts of the assigned company that the agent user created, SHALL send ERPNext exactly the "Sent to ERPNext" fields of their area catalogue for the given inputs, and SHALL replace a draft's rows as a whole when rows are given.
 
 **Related URS**: REQ-001-URS-F002, REQ-001-URS-F003, REQ-001-URS-F005
 
 **Definition of Done**:
 
 - An update of a submitted or cancelled document, or of another company's document, is refused without a write to ERPNext.
+- An update of a draft another user created (`owner`) is refused without a write to ERPNext, with a message saying that the agent changes only the agent user's drafts; a draft the agent user created and a person then edited can be updated with its new `modified`.
 - The body ERPNext receives equals the "Sent to ERPNext" column for the given inputs.
 - Rows given in an update replace all existing rows: a draft with three rows updated with one row has exactly that row.
 - Verification: test.
@@ -522,7 +523,7 @@ Document `state` inputs map to ERPNext as follows. No `state` means all, unless 
 
 ### ERPNext calls
 
-Lists use `/api/resource/<DocType>` with the fields of their area catalogue; gets use `frappe.client.get`; reports use `frappe.desk.query_report.run` with `are_default_filters` false, so a site's saved report filters never replace Enterich's. Each area spec's ERPNext calls table names, for its reads and duplicate checks, the DocType or report, the fixed filters and the order. Creates and updates make these further calls: `get_taxes_and_charges` for a given tax template's rows, `frappe.client.get` for the draft before an update, `/api/resource` to write (POST for a create, PUT for an update), and `frappe.desk.form.utils.add_comment` (POST) for warnings (REQ-001-PRS-F015), which needs only read on the draft. Every list of a company's records and every report filters by the assigned company (REQ-001-PRS-F007). Enterich leaves out the total row ERPNext appends to a report's rows and computes the totals its area spec names itself. A site that runs a report as a prepared report, or as a snapshot report on synced data, gets a refusal saying so; Enterich doesn't wait for prepared reports and doesn't take snapshots for current data. ERPNext turns a report into a prepared report for good after one run longer than 15 seconds; the configuration guide says how a site prevents that.
+Lists use `/api/resource/<DocType>` with the fields of their area catalogue; gets use `frappe.client.get`; reports use `frappe.desk.query_report.run` with `are_default_filters` false, so a site's saved report filters never replace Enterich's. Each area spec's ERPNext calls table names, for its reads and duplicate checks, the DocType or report, the fixed filters and the order. Creates and updates make these further calls: `get_taxes_and_charges` for a given tax template's rows, `frappe.client.get` for the draft before an update, `frappe.auth.get_logged_user` for the agent user's name, at the first update and again after a failed answer, which it keeps until it stops, `/api/resource` to write (POST for a create, PUT for an update), and `frappe.desk.form.utils.add_comment` (POST) for warnings (REQ-001-PRS-F015), which needs only read on the draft. Every list of a company's records and every report filters by the assigned company (REQ-001-PRS-F007). Enterich leaves out the total row ERPNext appends to a report's rows and computes the totals its area spec names itself. A site that runs a report as a prepared report, or as a snapshot report on synced data, gets a refusal saying so; Enterich doesn't wait for prepared reports and doesn't take snapshots for current data. ERPNext turns a report into a prepared report for good after one run longer than 15 seconds; the configuration guide says how a site prevents that.
 
 ### Drafts
 
@@ -532,7 +533,7 @@ Lists use `/api/resource/<DocType>` with the fields of their area catalogue; get
 ## Acceptance Criteria Summary
 
 - Each operation of the area specs works against a fake ERPNext and sends ERPNext only its catalogued DocType, fields, filters and order; nothing else is offered.
-- No operation submits, cancels, amends, deletes or discards, or changes a non-draft or another company's document; none waits for client approval.
+- No operation submits, cancels, amends, deletes or discards, or changes a non-draft, another company's document or a draft another user created; none waits for client approval.
 - Stale updates change nothing; a create that duplicates an existing document is refused unless the agent explicitly allows it.
 - Refusals reach the agent with ERPNext's reason; names that don't exist or aren't permitted are reported as such.
 - Outside-text fields arrive only under `outside_text`.
@@ -547,6 +548,7 @@ Checked against Frappe and ERPNext v16.52 source:
 - At every save, an invoice takes its due date from its payment schedule, the latest date in it, and builds the schedule only while it is empty: from the payment terms template, or as one term on the due date (`set_due_date`, `set_payment_schedule`). A REST update never empties it; the form does when a date changes. A due date later than the payment terms allow is refused unless the user is a credit controller (`validate_due_date_with_template`); with `payment_terms_template` empty there's no such check, and an empty template stays empty (`update_if_missing` fills only empty values). A save without `due_date` counts it from the payment terms of the invoice, else of the party, its group, or the company (`get_due_date`).
 - ERPNext rounds every number it saves to its field's precision: quantities to the site's float precision (3 unless System Settings say otherwise), rates and amounts to the currency's.
 - Saving a submitted document needs the submit right (`check_docstatus_transition`).
+- A document's `owner` is the user who inserted it (`set_user_and_timestamp`); no Enterich body carries `owner`. `frappe.auth.get_logged_user` returns the user an API key belongs to.
 - A standard report set as a snapshot report runs on the last DuckDB sync of its data, and `frappe.desk.query_report.run` then answers with `snapshot_report` set.
 - ERPNext fills tax rows from a template on insert only when a site setting says so (`add_taxes_from_taxes_and_charges_template`); Enterich therefore fills them itself.
 - A list leaves out of every row the fields the user may not read (`get_permitted_fields`): with only the select right on a DocType, all but its standard fields (such as `name` and `modified`) and its search fields, a child table's fields among them; with read, those of a permission level the user lacks. The operations need read (configuration guide).

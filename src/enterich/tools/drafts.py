@@ -97,15 +97,20 @@ async def editable(
     what: str,
     only: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """The company's draft as last read; refuse an update of anything else (REQ-001-PRS-F003,
-    REQ-001-PRS-F004). A document without the values in `only` answers as an unknown one,
-    before its state is told."""
+    """The company's draft the agent user created, as last read; refuse an update of
+    anything else (REQ-001-PRS-F003, REQ-001-PRS-F004). A document without the values in
+    `only` answers as an unknown one, before its state is told."""
     stored = await get_named(context, doctype, name, field="name", what=what, company=True)
     if any(stored.get(field) != value for field, value in (only or {}).items()):
         raise unknown_name("name", what, name)
     state = DOCSTATUS.get(stored.get("docstatus", 0))
     if state is not None:
         raise Refusal(f"name: {name} is {state}; only drafts can be updated.")
+    if stored.get("owner") != await context.erpnext.user():
+        raise Refusal(
+            f"name: {name} was created by another user; only drafts the agent user created "
+            "can be updated."
+        )
     if _timestamp(stored.get("modified")) != _timestamp(modified):
         raise Refusal(STALE)
     return stored
