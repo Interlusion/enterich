@@ -71,6 +71,7 @@ Adding a permission rule for a DocType in ERPNext replaces its standard rules wi
 
 - **Site settings:**
 
+  - Name customers and suppliers by naming series (Selling Settings, Customer Naming By; Buying Settings, Supplier Naming By). ERPNext's default names a party after itself, so its ID carries text the party chose, and Enterich returns IDs outside `outside_text` because the agent passes them on as inputs. Parties that already exist keep their names.
   - Document sharing is on by default and lets any user with share rights pass the agent user further rights: turn it off (System Settings, `disable_document_sharing`).
   - For purchase invoice drafts, keep Purchase Order Required and Purchase Receipt Required at No (Buying Settings), or allow the suppliers invoices without them (`allow_purchase_invoice_creation_without_purchase_order`, `allow_purchase_invoice_creation_without_purchase_receipt`): otherwise ERPNext refuses drafts without one at their first save: every draft for a required purchase order, drafts with stock or asset items for a required purchase receipt.
   - Turn on API request logging (System Settings, `log_api_requests`): it records path, user and method of the agent user's calls in ERPNext, next to Enterich's own log.
