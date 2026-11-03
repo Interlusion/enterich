@@ -21,6 +21,7 @@ ALLOWED_ALGORITHMS = frozenset(
     {"RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA"}
 )
 MAX_CLOCK_LEEWAY = 60
+MAX_DRAFTS_PER_HOUR = 1000
 
 type LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 LOG_LEVELS: tuple[LogLevel, ...] = get_args(LogLevel.__value__)
@@ -51,6 +52,7 @@ KNOWN = frozenset(
         "HOST",
         "PORT",
         "LOG_LEVEL",
+        "MAX_DRAFTS_PER_HOUR",
     }
 )
 
@@ -78,6 +80,7 @@ class Settings(BaseModel):
     host: str
     port: int
     log_level: LogLevel
+    max_drafts_per_hour: int | None = None
     warnings: tuple[str, ...] = ()
 
     @property
@@ -127,6 +130,7 @@ def load(env: Mapping[str, str], operations: Collection[str]) -> Settings:
         "host": reader.optional("HOST", "0.0.0.0"),  # noqa: S104 - a container listens on all addresses
         "port": reader.integer("PORT", "8000", 1, 65535),
         "log_level": reader.log_level(),
+        "max_drafts_per_hour": reader.limit("MAX_DRAFTS_PER_HOUR", 1, MAX_DRAFTS_PER_HOUR),
     }
     if resource and issuer:
         reader.as_published(resource.geturl(), issuer.geturl())
@@ -192,6 +196,12 @@ class _Reader:
         if not low <= value <= high:
             self.fail(name, f"must be from {low} to {high}")
         return value
+
+    def limit(self, name: str, low: int, high: int) -> int | None:
+        """An optional whole number; unset, no limit."""
+        if name not in self.env:
+            return None
+        return self.integer(name, "", low, high)
 
     def log_level(self) -> LogLevel:
         value = self.optional("LOG_LEVEL", "INFO").upper()

@@ -263,9 +263,7 @@ async def create_draft_sales_invoice(
     )
     if matches and not inputs.allow_duplicate:
         raise drafts.refuse_duplicates(matches, DRAFT_MATCH)
-    saved = await context.erpnext.insert(
-        "Sales Invoice", {**doc, "company": context.settings.company, "docstatus": 0}
-    )
+    saved = await drafts.insert(context, "Sales Invoice", doc)
     warnings = [drafts.duplicate_warning(matches, DRAFT_MATCH)] if matches else []
     warnings += drafts.tax_warning(saved, inputs.taxes_and_charges)
     warnings += drafts.row_warnings(saved, doc["items"])
