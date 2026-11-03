@@ -57,9 +57,8 @@ RIGHTS = (
         ("create_draft_sales_invoice", "update_draft_sales_invoice"),
         {
             "Sales Invoice": ("read", "create", OWN_WRITE),
-            **dict.fromkeys(
-                ("Address", "Item", "Account", "Sales Taxes and Charges Template"), ("read",)
-            ),
+            **dict.fromkeys(("Address", "Item", "Sales Taxes and Charges Template"), ("read",)),
+            "Account": ("select",),
             "Customer": ("select",),
         },
     ),
@@ -76,9 +75,9 @@ RIGHTS = (
         {
             "Purchase Invoice": ("read", "create", OWN_WRITE),
             **dict.fromkeys(
-                ("Supplier", "Address", "Item", "Account", "Purchase Taxes and Charges Template"),
-                ("read",),
+                ("Supplier", "Address", "Item", "Purchase Taxes and Charges Template"), ("read",)
             ),
+            "Account": ("select",),
         },
     ),
     Rights(("list_accounts",), {"Account": ("read",)}),

@@ -4,6 +4,10 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+### Rights
+
+- Fewer rights: the sales and purchase drafts need only select on Account, not read.
+
 ## [0.3.0] - 2026-11-03
 
 ### Added
