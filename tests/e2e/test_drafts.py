@@ -1,7 +1,8 @@
 """The drafts against the seeded site: create and update as the agent user, the warnings
 as a comment on the draft, and the duplicate check with drafts and invoices people made
 (REQ-001 Drafts, REQ-004-PRS-F005, REQ-004-PRS-F006, REQ-005-PRS-F005 to
-REQ-005-PRS-F007, REQ-006-PRS-F005 to REQ-006-PRS-F008).
+REQ-005-PRS-F007, REQ-006-PRS-F005 to REQ-006-PRS-F008), and the limit of drafts per hour
+(REQ-001-PRS-F019).
 
 The seed removes earlier runs' drafts; within a run, each test uses its own quantities
 or amounts, so no test's draft is another's duplicate by party, date and items or rows.
@@ -52,6 +53,27 @@ def test_create_draft_sales_invoice(mcp: Session, seeded: Seed, site: Site) -> N
     doc = stored(site, "Sales Invoice", draft["name"])
     assert (doc["owner"], doc["remarks"]) == (AGENT, "Agent's draft")
     assert comments(site, "Sales Invoice", draft["name"]) == []
+
+
+def test_the_limit_counts_the_hour_in_the_sites_time(
+    mcp: Session, limited: Session, seeded: Seed, site: Site
+) -> None:
+    """ERPNext's `creation` is in the site's time zone, without a zone; a draft just made
+    counts towards the hour Enterich counts back in ENTERICH_TIMEZONE."""
+    made = mcp.call(
+        "create_draft_sales_invoice",
+        {"customer": seeded.customer, "items": [{"item_code": seeded.item, "qty": 13, "rate": 1}]},
+    )
+    assert not made.error, made.text
+    mine = {"owner": AGENT, "docstatus": 0}
+    before = site.get_list("Sales Invoice", mine, ["name"])
+    result = limited.call(
+        "create_draft_sales_invoice",
+        {"customer": seeded.customer, "items": [{"item_code": seeded.item, "qty": 14, "rate": 1}]},
+    )
+    assert result.error
+    assert "(ENTERICH_MAX_DRAFTS_PER_HOUR)" in result.text
+    assert site.get_list("Sales Invoice", mine, ["name"]) == before
 
 
 def test_the_warnings_go_on_the_draft_as_one_comment(

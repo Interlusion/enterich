@@ -1,13 +1,15 @@
 """Sales invoice drafts (REQ-004-PRS-F005, REQ-004-PRS-F006), and through them
 REQ-001's draft rules: bodies, duplicates, stale updates, clearing, warnings and their
-comment (REQ-001-PRS-F002, REQ-001-PRS-F003, REQ-001-PRS-F004, REQ-001-PRS-F005,
-REQ-001-PRS-F012, REQ-001-PRS-F015, REQ-001-PRS-F016)."""
+comment, the limit of drafts per hour (REQ-001-PRS-F002, REQ-001-PRS-F003,
+REQ-001-PRS-F004, REQ-001-PRS-F005, REQ-001-PRS-F012, REQ-001-PRS-F015,
+REQ-001-PRS-F016, REQ-001-PRS-F019)."""
 
 from typing import Any
 
 import pytest
 
 from tests.fakes.erpnext import (
+    AGENT,
     COMMENT_METHOD,
     COMPANY,
     LOGGED_USER_METHOD,
@@ -18,7 +20,8 @@ from tests.fakes.erpnext import (
     sales_invoice,
     tax_template,
 )
-from tests.integration.clock import TODAY
+from tests.fakes.settings import DRAFTS_PER_HOUR
+from tests.integration.clock import HOUR_AGO, TODAY
 from tests.integration.mcp import Result, Session
 
 PATH = "/api/resource/Sales Invoice"
@@ -785,3 +788,85 @@ def test_an_update_without_a_date_keeps_the_due_date(mcp: Session, erp: FakeErpn
     assert result["due_date"] == "2026-12-20"
     put = erp.writes(PATH)[-1]
     assert put.body == {"remarks": "Checked", "modified": created["modified"]}
+
+
+# Drafts per hour (REQ-001-PRS-F019)
+
+LIMITED = (
+    f"The agent user created {DRAFTS_PER_HOUR} sales invoices in the last hour, the most "
+    "the operator allows (ENTERICH_MAX_DRAFTS_PER_HOUR); nothing was created. Try again "
+    "later, or ask a person to review the drafts or to raise the limit."
+)
+
+
+def created(erp: FakeErpnext, name: str, creation: str, **overrides: Any) -> None:
+    """A sales invoice made at `creation`, by the agent user unless `owner` says otherwise."""
+    erp.add(
+        "Sales Invoice", sales_invoice(name, **{"owner": AGENT, "creation": creation, **overrides})
+    )
+
+
+def test_at_the_limit_a_create_is_refused_without_a_write(
+    limited: Session, erp: FakeErpnext
+) -> None:
+    created(erp, "ACC-SINV-2026-00030", "2026-10-29 01:00:00.000001", docstatus=0)
+    created(erp, "ACC-SINV-2026-00031", "2026-10-29 01:59:59.000000")  # submitted since
+    result = create(limited)
+    assert result.error
+    assert result.text == LIMITED
+    assert erp.writes() == []
+
+
+def test_a_document_older_than_an_hour_doesnt_count(limited: Session, erp: FakeErpnext) -> None:
+    created(erp, "ACC-SINV-2026-00030", "2026-10-29 00:59:59.999999")
+    created(erp, "ACC-SINV-2026-00031", "2026-10-29 01:30:00.000000")
+    result = create(limited)
+    assert not result.error, result.text
+
+
+def test_another_users_or_companys_documents_dont_count(limited: Session, erp: FakeErpnext) -> None:
+    created(erp, "ACC-SINV-2026-00030", "2026-10-29 01:30:00.000000")
+    created(
+        erp, "ACC-SINV-2026-00031", "2026-10-29 01:30:00.000000", owner="bookkeeper@example.com"
+    )
+    created(erp, "ACC-SINV-2026-00032", "2026-10-29 01:30:00.000000", company="Other AG")
+    result = create(limited)
+    assert not result.error, result.text
+
+
+def test_the_count_sends_exactly_the_catalogued_call(limited: Session, erp: FakeErpnext) -> None:
+    assert not create(limited).error
+    count = erp.lists(PATH)[-1]
+    assert count.param("fields") == ["name"]
+    assert count.param("filters") == [
+        ["company", "=", COMPANY],
+        ["owner", "=", AGENT],
+        ["creation", ">", HOUR_AGO],
+    ]
+    assert count.params["limit_page_length"] == str(DRAFTS_PER_HOUR)
+
+
+def test_the_limit_counts_the_drafts_enterich_creates(limited: Session, erp: FakeErpnext) -> None:
+    for qty in range(1, DRAFTS_PER_HOUR + 1):
+        assert not create(limited, items=[{"item_code": "SKU-1", "qty": qty}]).error
+    result = create(limited, items=[{"item_code": "SKU-1", "qty": 99}])
+    assert result.text == LIMITED
+
+
+def test_a_repeated_create_is_refused_as_a_duplicate_first(
+    limited: Session, erp: FakeErpnext
+) -> None:
+    first = create(limited).data["name"]
+    created(erp, "ACC-SINV-2026-00030", "2026-10-29 01:30:00.000000")
+    result = create(limited)
+    assert result.error
+    assert result.text.startswith("allow_duplicate: ")
+    assert first in result.text
+
+
+def test_without_the_limit_a_create_makes_no_count(mcp: Session, erp: FakeErpnext) -> None:
+    for name in ("ACC-SINV-2026-00030", "ACC-SINV-2026-00031", "ACC-SINV-2026-00032"):
+        created(erp, name, "2026-10-29 01:30:00.000000")
+    assert not create(mcp).error
+    [duplicates] = erp.lists(PATH)
+    assert "creation" not in duplicates.params["filters"]

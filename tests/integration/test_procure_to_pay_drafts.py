@@ -1,7 +1,8 @@
 """Purchase invoice drafts (REQ-005-PRS-F005, REQ-005-PRS-F006,
 REQ-005-PRS-F007). REQ-001's draft rules are tested through the sales drafts; these tests
-show the buying side's bodies, its duplicate match by supplier invoice number, and its
-warnings."""
+show the buying side's bodies, its duplicate match by supplier invoice number, its
+warnings, and that the limit of drafts per hour counts purchase invoices on their own
+(REQ-001-PRS-F019)."""
 
 from datetime import date, timedelta
 from typing import Any
@@ -9,15 +10,18 @@ from typing import Any
 import pytest
 
 from tests.fakes.erpnext import (
+    AGENT,
     COMPANY,
     STOCK_NOT_BILLED,
     TAXES_METHOD,
     FakeErpnext,
     purchase_invoice,
     purchase_tax_template,
+    sales_invoice,
     supplier,
     tax_template,
 )
+from tests.fakes.settings import DRAFTS_PER_HOUR
 from tests.integration.clock import TODAY
 from tests.integration.mcp import Result, Session
 
@@ -574,3 +578,24 @@ def test_a_bill_older_than_its_terms_needs_its_due_date(mcp: Session) -> None:
     given = create(mcp, bill_no="R-3000", bill_date="2026-09-01", due_date="2026-09-15")
     assert not given.error, given.text
     assert given.data["due_date"] == "2026-09-15"
+
+
+# Drafts per hour (REQ-001-PRS-F019)
+
+
+def test_the_limit_counts_purchase_invoices_on_their_own(
+    limited: Session, erp: FakeErpnext
+) -> None:
+    for number in range(DRAFTS_PER_HOUR):
+        name = f"ACC-SINV-2026-{30 + number:05d}"
+        erp.add("Sales Invoice", sales_invoice(name, creation="2026-10-29 01:30:00.000000"))
+    assert not create(limited).error
+    for number in range(DRAFTS_PER_HOUR - 1):
+        name = f"ACC-PINV-2026-{30 + number:05d}"
+        doc = purchase_invoice(name, owner=AGENT, creation="2026-10-29 01:30:00.000000")
+        erp.add("Purchase Invoice", doc)
+    result = create(limited, items=[{"item_code": "PAPER", "qty": 11, "rate": 20}])
+    assert result.error
+    assert result.text.startswith(
+        f"The agent user created {DRAFTS_PER_HOUR} purchase invoices in the last hour, "
+    )

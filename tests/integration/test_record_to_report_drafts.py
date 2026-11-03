@@ -1,7 +1,8 @@
 """Journal entry drafts (REQ-006-PRS-F005, REQ-006-PRS-F006, REQ-006-PRS-F007,
 REQ-006-PRS-F008). REQ-001's draft rules are tested through the sales drafts; these tests
-show the journal entry's bodies, its rules before ERPNext, its duplicate match and its
-rounding warning."""
+show the journal entry's bodies, its rules before ERPNext, its duplicate match, its
+rounding warning, and that the limit of drafts per hour counts journal entries
+(REQ-001-PRS-F019)."""
 
 from typing import Any
 
@@ -15,6 +16,7 @@ from tests.fakes.erpnext import (
     customer,
     journal_entry,
 )
+from tests.fakes.settings import DRAFTS_PER_HOUR
 from tests.integration.clock import TODAY
 from tests.integration.mcp import Result, Session
 
@@ -516,3 +518,19 @@ def test_a_draft_without_rows_matches_nothing(mcp: Session, erp: FakeErpnext) ->
     result = create(mcp)
     assert not result.error, result.text
     assert result.data["warnings"] == []
+
+
+# Drafts per hour (REQ-001-PRS-F019)
+
+
+def test_the_limit_counts_journal_entries(limited: Session, erp: FakeErpnext) -> None:
+    for number in range(DRAFTS_PER_HOUR):
+        name = f"ACC-JV-2026-{30 + number:05d}"
+        doc = journal_entry(name, owner=AGENT, creation="2026-10-29 01:30:00.000000")
+        erp.add("Journal Entry", doc)
+    result = create(limited)
+    assert result.error
+    assert result.text.startswith(
+        f"The agent user created {DRAFTS_PER_HOUR} journal entries in the last hour, "
+    )
+    assert erp.writes() == []
