@@ -609,7 +609,7 @@ async def update_draft_journal_entry(
         inputs.name,
         inputs.modified,
         "the journal entry",
-        only={"voucher_type": "Journal Entry"},
+        only=({"voucher_type": "Journal Entry"},),
     )
     if stored.get("multi_currency"):
         raise Refusal(

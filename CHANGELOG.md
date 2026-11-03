@@ -4,6 +4,15 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+### Added
+
+- **Payment entry drafts:** `create_draft_payment_entry` and `update_draft_payment_entry` draft a payment received from a customer or made to a supplier through one of the company's bank accounts, allocated to the party's open invoices. Enterich refuses an allocation to an invoice that isn't the party's, submitted and open, or above what is outstanding or paid, and a bank reference (`reference_no`) already recorded for the party unless the agent allows it. A part not allocated, which ERPNext books as an advance, and a bank account in another currency than the party's account are named in `warnings`. Cash accounts, internal transfers, refunds and deductions such as a discount aren't drafted. The limit of drafts per hour counts payment entries on their own.
+
+### Rights
+
+- **Payment Entry:** read, create and write only if creator for the new operations, with select on Account, read on Bank Account, and read on Customer and Sales Invoice for a customer's payment, Supplier and Purchase Invoice for a supplier's (REQ-007). Write only if creator goes on Payment Entry too, in the second role of the configuration guide.
+- Fewer rights: the sales and purchase drafts need only select on Account, not read.
+
 ## [0.3.0] - 2026-11-03
 
 ### Added

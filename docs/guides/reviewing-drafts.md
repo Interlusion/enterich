@@ -12,7 +12,7 @@ For the people who check and submit what the agent prepares (the bookkeeper of [
 
 The agent works as its own ERPNext user, so its drafts carry that user as owner.
 
-- In any list (Sales Invoice, Purchase Invoice, Journal Entry), filter by **Status: Draft** and **Owner: the agent user**, and save the filter.
+- In any list (Sales Invoice, Purchase Invoice, Journal Entry, Payment Entry), filter by **Status: Draft** and **Owner: the agent user**, and save the filter.
 - The agent also gives a link to each draft it prepares, if you follow the conversation.
 
 ## Warnings
@@ -21,6 +21,7 @@ When something about a draft looks wrong, Enterich adds a comment to it, in the 
 
 - **Possible duplicate:** a matching document existed, and the agent created the draft anyway. The comment names the match.
 - **A value ERPNext set differently:** a rate a pricing rule changed, an expense account ERPNext replaced, or journal totals that differ after ERPNext rounded each row. The comment names the row and both values.
+- **A payment not fully allocated:** part of a payment isn't set against an invoice and stays an advance, or the bank account and the party's account are in two currencies, so the received amount and the exchange rates need correcting. The comment names the amount or both currencies.
 
 Each area spec lists the warnings of its operations ([specs index](../specs/README.md)).
 

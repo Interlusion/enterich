@@ -57,9 +57,8 @@ RIGHTS = (
         ("create_draft_sales_invoice", "update_draft_sales_invoice"),
         {
             "Sales Invoice": ("read", "create", OWN_WRITE),
-            **dict.fromkeys(
-                ("Address", "Item", "Account", "Sales Taxes and Charges Template"), ("read",)
-            ),
+            **dict.fromkeys(("Address", "Item", "Sales Taxes and Charges Template"), ("read",)),
+            "Account": ("select",),
             "Customer": ("select",),
         },
     ),
@@ -76,9 +75,9 @@ RIGHTS = (
         {
             "Purchase Invoice": ("read", "create", OWN_WRITE),
             **dict.fromkeys(
-                ("Supplier", "Address", "Item", "Account", "Purchase Taxes and Charges Template"),
-                ("read",),
+                ("Supplier", "Address", "Item", "Purchase Taxes and Charges Template"), ("read",)
             ),
+            "Account": ("select",),
         },
     ),
     Rights(("list_accounts",), {"Account": ("read",)}),
@@ -107,6 +106,19 @@ RIGHTS = (
     Rights(("list_bank_accounts",), {"Bank Account": ("read",)}),
     Rights(("list_bank_transactions", "get_bank_transaction"), {"Bank Transaction": ("read",)}),
     Rights(("list_payment_entries", "get_payment_entry"), {"Payment Entry": ("read",)}),
+    Rights(
+        ("create_draft_payment_entry", "update_draft_payment_entry"),
+        # Customer and Sales Invoice for a customer's payment, Supplier and Purchase
+        # Invoice for a supplier's
+        {
+            "Payment Entry": ("read", "create", OWN_WRITE),
+            "Account": ("select",),
+            **dict.fromkeys(
+                ("Bank Account", "Customer", "Sales Invoice", "Supplier", "Purchase Invoice"),
+                ("read",),
+            ),
+        },
+    ),
 )
 
 
@@ -423,6 +435,28 @@ def bank(site: Site) -> tuple[str, str]:
     return ledger, account
 
 
+def advances_apart(site: Site, on: bool) -> str:
+    """Turn the company's booking of advances in a separate party account on or off; the
+    customers' advance account it books to."""
+    account = ensure(
+        site,
+        "Account",
+        {"account_name": "Advances Received", "company": COMPANY},
+        account_number="2190",
+        parent_account=f"2100-2400 - Current Liabilities - {ABBR}",
+        account_type="Receivable",
+    )
+    site.update(
+        "Company",
+        COMPANY,
+        {
+            "book_advance_payments_in_separate_party_account": int(on),
+            "default_advance_received_account": account,
+        },
+    )
+    return account
+
+
 class Vouchers:
     """Submitted vouchers, each found by a reference only the seed uses. A kept site keeps
     those of its first run, so `posted` and `sales_due` are read from the sales invoice."""
@@ -529,9 +563,9 @@ class Vouchers:
         )
 
     def cancelled(self, customer: str, supplier: str) -> dict[str, str]:
-        """A cancelled sales invoice, purchase invoice and journal entry. Their ledger
-        entries are cancelled too, so the balances, open items and reports stay as the
-        submitted vouchers make them; only a list of cancelled documents shows them."""
+        """A cancelled sales invoice, purchase invoice, journal entry and payment entry.
+        Their ledger entries are cancelled too, so the balances, open items and reports stay
+        as the submitted vouchers make them; only a list of cancelled documents shows them."""
         day = {"posting_date": self.posted.isoformat(), "set_posting_time": 1}
         item = [{"item_code": self.item, "qty": 1, "rate": 1}]
         return {
@@ -560,6 +594,20 @@ class Vouchers:
                     {"account": CASH, "debit_in_account_currency": 1},
                     {"account": CAPITAL, "credit_in_account_currency": 1},
                 ],
+            ),
+            "Payment Entry": self.cancel(
+                "Payment Entry",
+                {"reference_no": "SEED-PAY-CANCELLED"},
+                payment_type="Receive",
+                posting_date=self.posted.isoformat(),
+                reference_date=self.posted.isoformat(),
+                party_type="Customer",
+                party=customer,
+                paid_from=DEBTORS,
+                paid_to=self.bank_ledger,
+                bank_account=self.bank_account,
+                paid_amount=1,
+                received_amount=1,
             ),
         }
 
@@ -592,7 +640,7 @@ def unpriced(site: Site) -> str:
 
 
 # What the draft operations make; earlier runs' drafts of these are removed.
-DRAFTED = ("Sales Invoice", "Purchase Invoice", "Journal Entry")
+DRAFTED = ("Sales Invoice", "Purchase Invoice", "Journal Entry", "Payment Entry")
 MARKER = "Removed by the end-to-end seed"
 REMOVAL_TIMEOUT = 60.0
 

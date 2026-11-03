@@ -39,6 +39,7 @@ COUNTED = {
     "Sales Invoice": "sales invoices",
     "Purchase Invoice": "purchase invoices",
     "Journal Entry": "journal entries",
+    "Payment Entry": "payment entries",
 }
 
 
@@ -139,13 +140,14 @@ async def editable(
     name: str,
     modified: str,
     what: str,
-    only: Mapping[str, Any] | None = None,
+    only: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """The company's draft the agent user created, as last read; refuse an update of
-    anything else (REQ-001-PRS-F003, REQ-001-PRS-F004). A document without the values in
-    `only` answers as an unknown one, before its state is told."""
+    anything else (REQ-001-PRS-F003, REQ-001-PRS-F004). With `only`, a document that has
+    the values of none of its mappings answers as an unknown one, before its state is
+    told."""
     stored = await get_named(context, doctype, name, field="name", what=what, company=True)
-    if any(stored.get(field) != value for field, value in (only or {}).items()):
+    if only and not any(all(stored.get(f) == v for f, v in kind.items()) for kind in only):
         raise unknown_name("name", what, name)
     state = DOCSTATUS.get(stored.get("docstatus", 0))
     if state is not None:

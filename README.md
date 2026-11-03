@@ -23,7 +23,7 @@ An MCP server for ERPNext with hard limits: a short, fixed list of tools, tokens
 
 <!-- tools:start -->
 
-Enterich offers 31 tools. A deployment may offer fewer ([`ENTERICH_TOOLS`](docs/guides/configuration.md)); every tool works on one company, within the rights ERPNext gives the agent user.
+Enterich offers 33 tools. A deployment may offer fewer ([`ENTERICH_TOOLS`](docs/guides/configuration.md)); every tool works on one company, within the rights ERPNext gives the agent user.
 
 ### Master data ([REQ-003](docs/specs/req-003-master-data.md))
 
@@ -90,6 +90,8 @@ Bank accounts, bank transactions, payments.
 | `get_bank_transaction` | Get bank transaction | read |
 | `list_payment_entries` | List payment entries | read |
 | `get_payment_entry` | Get payment entry | read |
+| `create_draft_payment_entry` | Create draft payment entry | create draft |
+| `update_draft_payment_entry` | Update draft payment entry | update draft |
 
 <!-- tools:end -->
 

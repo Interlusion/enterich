@@ -1,17 +1,27 @@
 """The drafts against the seeded site: create and update as the agent user, the warnings
 as a comment on the draft, and the duplicate check with drafts and invoices people made
 (REQ-001 Drafts, REQ-004-PRS-F005, REQ-004-PRS-F006, REQ-005-PRS-F005 to
-REQ-005-PRS-F007, REQ-006-PRS-F005 to REQ-006-PRS-F008), and the limit of drafts per hour
-(REQ-001-PRS-F019).
+REQ-005-PRS-F007, REQ-006-PRS-F005 to REQ-006-PRS-F008, REQ-007-PRS-F004 to
+REQ-007-PRS-F007), and the limit of drafts per hour (REQ-001-PRS-F019).
 
 The seed removes earlier runs' drafts; within a run, each test uses its own quantities
-or amounts, so no test's draft is another's duplicate by party, date and items or rows.
+or amounts, so no test's draft is another's duplicate by party, date and items or rows,
+and its own bank reference for a payment.
 By bill_no they are: two tests make drafts with the seeded purchase invoice's, which the
 duplicate check finds too, so those tests expect the seeded invoice first, not alone."""
 
 from typing import Any
 
-from tests.e2e.seed import AGENT, CAPITAL, COMPANY, SALES_VAT, Seed, site_today
+from tests.e2e.seed import (
+    AGENT,
+    CAPITAL,
+    COMPANY,
+    DEBTORS,
+    SALES_VAT,
+    Seed,
+    advances_apart,
+    site_today,
+)
 from tests.e2e.site import Site
 from tests.integration.mcp import Session
 
@@ -379,3 +389,127 @@ def test_only_journal_entries_of_its_own_voucher_type_are_updated(
         f"name: the journal entry {theirs['name']!r} doesn't exist, or the agent user isn't "
         "permitted to read it.",
     )
+
+
+# Payment entries
+
+
+def test_create_and_update_draft_payment_entry(mcp: Session, seeded: Seed, site: Site) -> None:
+    # The seeded payment left 69 of the seeded invoice open
+    draft = mcp.call(
+        "create_draft_payment_entry",
+        {
+            "party_type": "Customer",
+            "party": seeded.customer,
+            "bank_account": seeded.bank_account,
+            "paid_amount": "30",
+            "reference_no": "E2E-PAY-1",
+            "references": [{"reference_name": seeded.sales_invoice, "allocated_amount": "20"}],
+        },
+    ).data
+    assert (draft["payment_type"], draft["status"], draft["docstatus"]) == ("Receive", "Draft", 0)
+    assert (draft["paid_from"], draft["paid_to"]) == (DEBTORS, seeded.bank_ledger)
+    assert (draft["paid_amount"], draft["received_amount"]) == (30, 30)
+    assert (draft["total_allocated_amount"], draft["unallocated_amount"]) == (20, 10)
+    assert draft["references"] == [
+        {
+            "reference_doctype": "Sales Invoice",
+            "reference_name": seeded.sales_invoice,
+            "allocated_amount": 20,
+            "outstanding_amount": 69,
+            "outside_text": {},
+        }
+    ]
+    assert draft["reference_date"] == draft["posting_date"] == site_today().isoformat()
+    [warning] = draft["warnings"]
+    assert "10" in warning
+    [comment] = comments(site, "Payment Entry", draft["name"])
+    assert comment["owner"] == AGENT
+    updated = mcp.call(
+        "update_draft_payment_entry",
+        {"name": draft["name"], "modified": draft["modified"], "paid_amount": "20"},
+    ).data
+    assert (updated["unallocated_amount"], updated["warnings"]) == (0, [])
+    doc = stored(site, "Payment Entry", draft["name"])
+    assert (doc["owner"], doc["bank_account"], doc["reference_no"]) == (
+        AGENT,
+        seeded.bank_account,
+        "E2E-PAY-1",
+    )
+
+
+def test_an_advance_takes_invoices_later(mcp: Session, seeded: Seed, site: Site) -> None:
+    advances = advances_apart(site, on=True)
+    try:
+        draft = mcp.call(
+            "create_draft_payment_entry",
+            {
+                "party_type": "Customer",
+                "party": seeded.customer,
+                "bank_account": seeded.bank_account,
+                "paid_amount": "12",
+                "reference_no": "E2E-PAY-4",
+            },
+        ).data
+        assert draft["paid_from"] == advances
+        updated = mcp.call(
+            "update_draft_payment_entry",
+            {
+                "name": draft["name"],
+                "modified": draft["modified"],
+                "references": [{"reference_name": seeded.sales_invoice, "allocated_amount": "12"}],
+            },
+        )
+        assert not updated.error, updated.text
+        assert (updated.data["paid_from"], updated.data["unallocated_amount"]) == (DEBTORS, 0)
+    finally:
+        advances_apart(site, on=False)
+
+
+def test_a_payment_to_a_supplier(mcp: Session, seeded: Seed) -> None:
+    draft = mcp.call(
+        "create_draft_payment_entry",
+        {
+            "party_type": "Supplier",
+            "party": seeded.supplier,
+            "bank_account": seeded.bank_account,
+            "paid_amount": "47.6",
+            "reference_no": "E2E-PAY-2",
+            "references": [{"reference_name": seeded.purchase_invoice, "allocated_amount": "47.6"}],
+        },
+    ).data
+    assert (draft["payment_type"], draft["paid_from"]) == ("Pay", seeded.bank_ledger)
+    assert (draft["unallocated_amount"], draft["warnings"]) == (0, [])
+
+
+def test_a_recorded_bank_reference_is_a_duplicate(mcp: Session, seeded: Seed) -> None:
+    refused = mcp.call(
+        "create_draft_payment_entry",
+        {
+            "party_type": "Customer",
+            "party": seeded.customer,
+            "bank_account": seeded.bank_account,
+            "paid_amount": "50",
+            "reference_no": "SEED-PAY-1",
+        },
+    )
+    assert refused.error
+    assert refused.text.startswith("allow_duplicate: ")
+    assert seeded.payment_entry in refused.text
+
+
+def test_an_allocation_above_what_is_open_is_refused(mcp: Session, seeded: Seed) -> None:
+    refused = mcp.call(
+        "create_draft_payment_entry",
+        {
+            "party_type": "Customer",
+            "party": seeded.customer,
+            "bank_account": seeded.bank_account,
+            "paid_amount": "70",
+            "reference_no": "E2E-PAY-3",
+            "references": [{"reference_name": seeded.sales_invoice, "allocated_amount": "70"}],
+        },
+    )
+    assert refused.error
+    assert refused.text.startswith("references: ")
+    assert "69" in refused.text
