@@ -322,6 +322,8 @@ class FakeErpnext:
     snapshots: set[str] = field(default_factory=set[str])
     # The site's today, which a draft without set_posting_time gets at every save
     today: str = "2026-10-29"
+    # The site's now, an inserted document's `creation`: the frozen clock's in Kiritimati
+    now: str = "2026-10-29 02:00:00.000000"
     # item code -> price list rate
     prices: dict[str, float] = field(default_factory=dict[str, float])
     # item code -> the rate a price pricing rule sets
@@ -414,8 +416,15 @@ class FakeErpnext:
     def _insert(self, doctype: str, body: dict[str, Any]) -> httpx2.Response:
         series = "ACC-JV-2026-" if doctype == "Journal Entry" else INVOICES[doctype][1]
         name = f"{series}{101 + len(self.docs.get(doctype, {})):05d}"
-        # Frappe sets the owner to the session user, whatever the body says
-        doc = {"doctype": doctype, "name": name, **body, "owner": self.agent_user}
+        # Frappe sets the owner to the session user and the creation time, whatever the
+        # body says
+        doc = {
+            "doctype": doctype,
+            "name": name,
+            **body,
+            "owner": self.agent_user,
+            "creation": self.now,
+        }
         return self._save(doctype, copy.deepcopy(doc))
 
     def _update(self, doctype: str, name: str, body: dict[str, Any]) -> httpx2.Response:

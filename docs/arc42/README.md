@@ -76,7 +76,7 @@ flowchart LR
 
 | Goal | Approach | Decision or requirement |
 | :- | :- | :- |
-| Containment | A separate service holding only the agent user's key; ERPNext role without submit/cancel/delete, with write only on its own drafts, as the outer limit; Enterich offers only fixed operations, drafts only, assigned company only, updates only of the agent user's own drafts | [ADR-001](adr/ADR-001-separate-service-fixed-tools.md), [REQ-001-URS-F003](../specs/req-001-core.md#req-001-urs-f003-never-post-cancel-delete-or-discard), [REQ-001-URS-F004](../specs/req-001-core.md#req-001-urs-f004-a-fixed-list-of-operations), [REQ-001-URS-F005](../specs/req-001-core.md#req-001-urs-f005-one-company) |
+| Containment | A separate service holding only the agent user's key; ERPNext role without submit/cancel/delete, with write only on its own drafts, as the outer limit; Enterich offers only fixed operations, drafts only, assigned company only, updates only of the agent user's own drafts, and where the operator sets one, a limit of drafts per hour | [ADR-001](adr/ADR-001-separate-service-fixed-tools.md), [REQ-001-URS-F003](../specs/req-001-core.md#req-001-urs-f003-never-post-cancel-delete-or-discard), [REQ-001-URS-F004](../specs/req-001-core.md#req-001-urs-f004-a-fixed-list-of-operations), [REQ-001-URS-F005](../specs/req-001-core.md#req-001-urs-f005-one-company) |
 | Access control | Local JWT check of issuer, audience, client, subject, type, time; one identity per instance; 5 s leeway | [ADR-003](adr/ADR-003-local-token-check.md) |
 | Protocol | Official SDK, stateless Streamable HTTP, JSON, POST only | [ADR-002](adr/ADR-002-mcp-sdk-stateless-streamable-http.md) |
 | Traceability | One JSON log line per operation with `sub`, `sid`, outcome | [REQ-002-PRS-NF008](../specs/req-002-service.md#req-002-prs-nf008-log) |
@@ -154,6 +154,10 @@ sequenceDiagram
     else no match, or allow_duplicate set
         opt taxes_and_charges given
             E->>N: get_taxes_and_charges(template)
+        end
+        opt ENTERICH_MAX_DRAFTS_PER_HOUR set
+            E->>N: list the agent user's sales invoices of the last hour
+            Note over E: at the limit: refusal, nothing created
         end
         E->>N: POST /api/resource/Sales Invoice (fields, company, docstatus 0)
         N-->>E: draft
@@ -246,6 +250,7 @@ The quality goals of section 1, made testable. Each scenario names what happens,
 | QS-01 | A manipulated agent tries to submit, cancel or delete, or sends `docstatus: 1` in a create | No operation exists for it; the extra input is refused before ERPNext; zero writes reach ERPNext | [REQ-001-PRS-F002](../specs/req-001-core.md#req-001-prs-f002-draft-create-operations), [REQ-001-PRS-F006](../specs/req-001-core.md#req-001-prs-f006-no-generic-operations) |
 | QS-02 | The agent updates a draft that a person submitted after the agent read it | Refused by Enterich's check or by ERPNext (stale `modified`, no submit right); the document is unchanged | [REQ-001-PRS-F003](../specs/req-001-core.md#req-001-prs-f003-draft-update-operations), [REQ-001-PRS-F004](../specs/req-001-core.md#req-001-prs-f004-stale-updates-refused) |
 | QS-22 | A manipulated agent updates a draft a bookkeeper prepared | Refused, saying only the agent user's drafts can be updated; zero writes reach ERPNext. The agent's key used directly is refused by ERPNext (write only if creator) | [REQ-001-PRS-F003](../specs/req-001-core.md#req-001-prs-f003-draft-update-operations), [REQ-002-PRS-NF013](../specs/req-002-service.md#req-002-prs-nf013-rights-listed-and-proven) |
+| QS-23 | A manipulated or looping agent creates drafts one after another | Where `ENTERICH_MAX_DRAFTS_PER_HOUR` is set, each create beyond it within an hour is refused, naming the limit; nothing is inserted | [REQ-001-PRS-F019](../specs/req-001-core.md#req-001-prs-f019-drafts-per-hour) |
 | QS-03 | The agent asks for another company's invoice by name | Answered as "doesn't exist or isn't permitted"; no field of the other company's document returned | [REQ-001-PRS-F007](../specs/req-001-core.md#req-001-prs-f007-the-assigned-company-from-configuration) |
 | QS-04 | The client calls every write operation without asking a person | The same limits apply; the integration suite passes with a client that never confirms | [REQ-001-PRS-F013](../specs/req-001-core.md#req-001-prs-f013-no-approval-in-the-loop) |
 | QS-05 | A name input is `X?run_method=discard` | It reaches ERPNext as one encoded path segment; no document method runs | [REQ-001-PRS-F010](../specs/req-001-core.md#req-001-prs-f010-name-inputs-stay-names) |

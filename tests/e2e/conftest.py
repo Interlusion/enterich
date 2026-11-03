@@ -1,5 +1,6 @@
 import os
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
+from contextlib import contextmanager
 
 import httpx2
 import pytest
@@ -33,8 +34,10 @@ def seeded(site: Site) -> Seed:
     return seed(site)
 
 
-@pytest.fixture
-def mcp(url: str, seeded: Seed, jwks: FakeJwks, signer: Signer, logs: Logs) -> Iterator[Session]:
+@contextmanager
+def session(
+    url: str, seeded: Seed, jwks: FakeJwks, signer: Signer, logs: Logs, **overrides: str
+) -> Generator[Session]:
     """A client's session with Enterich, which calls the site as the agent user; checked
     for the agent's key and secret."""
     s = settings(
@@ -44,11 +47,27 @@ def mcp(url: str, seeded: Seed, jwks: FakeJwks, signer: Signer, logs: Logs) -> I
         erpnext_api_secret=seeded.api_secret,
         company=COMPANY,
         timezone=TIMEZONE,
+        **overrides,
     )
     with checked_session(
         client(jwks, s), signer, logs, (seeded.api_key, seeded.api_secret)
-    ) as session:
-        yield session
+    ) as checked:
+        yield checked
+
+
+@pytest.fixture
+def mcp(url: str, seeded: Seed, jwks: FakeJwks, signer: Signer, logs: Logs) -> Iterator[Session]:
+    with session(url, seeded, jwks, signer, logs) as checked:
+        yield checked
+
+
+@pytest.fixture
+def limited(
+    url: str, seeded: Seed, jwks: FakeJwks, signer: Signer, logs: Logs
+) -> Iterator[Session]:
+    """As `mcp`, with Enterich limited to one draft of each DocType per hour."""
+    with session(url, seeded, jwks, signer, logs, max_drafts_per_hour="1") as checked:
+        yield checked
 
 
 @pytest.fixture(scope="session")

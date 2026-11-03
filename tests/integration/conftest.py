@@ -5,7 +5,7 @@ import pytest
 from tests.conftest import Logs
 from tests.fakes.erpnext import FakeErpnext
 from tests.fakes.jwks import FakeJwks, Signer
-from tests.fakes.settings import API_KEY, API_SECRET, settings
+from tests.fakes.settings import API_KEY, API_SECRET, DRAFTS_PER_HOUR, settings
 from tests.integration.clock import TIMEZONE, freeze
 from tests.integration.mcp import Session, checked_session, client
 
@@ -34,5 +34,14 @@ def erp(erpnext: FakeErpnext) -> FakeErpnext:
 def mcp(jwks: FakeJwks, signer: Signer, erp: FakeErpnext, logs: Logs) -> Iterator[Session]:
     """A client's session with Enterich in TIMEZONE, checked for the API key and secret."""
     c = client(jwks, settings(timezone=TIMEZONE), erp)
+    with checked_session(c, signer, logs, (API_KEY, API_SECRET)) as session:
+        yield session
+
+
+@pytest.fixture
+def limited(jwks: FakeJwks, signer: Signer, erp: FakeErpnext, logs: Logs) -> Iterator[Session]:
+    """As `mcp`, with Enterich limited to DRAFTS_PER_HOUR drafts per hour
+    (REQ-001-PRS-F019)."""
+    c = client(jwks, settings(timezone=TIMEZONE, max_drafts_per_hour=str(DRAFTS_PER_HOUR)), erp)
     with checked_session(c, signer, logs, (API_KEY, API_SECRET)) as session:
         yield session

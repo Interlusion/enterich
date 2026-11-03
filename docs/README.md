@@ -12,7 +12,7 @@
 | Contribute or work on it | [Contributing](../CONTRIBUTING.md), [Development](guides/development.md) |
 | Report a vulnerability | [Security policy](../SECURITY.md) |
 | Release it | [Releasing](guides/releasing.md) |
-| See open work | [Backlog](backlog/backlog.md), [ITEM-002 OpenTelemetry](backlog/item-002-opentelemetry.md), [ITEM-003 MCP Registry and announcement](backlog/item-003-mcp-registry-and-announcement.md), [ITEM-006 Provenance on every write](backlog/item-006-provenance-on-every-write.md), [ITEM-007 Party IDs as outside text](backlog/item-007-party-ids-as-outside-text.md), [ITEM-008 Write ceilings](backlog/item-008-write-ceilings.md), [ITEM-009 Agent eval suite](backlog/item-009-agent-eval-suite.md); done items in [archive](backlog/archive/) |
+| See open work | [Backlog](backlog/backlog.md) and the items with their own file in [backlog/](backlog/); done items in [archive](backlog/archive/) |
 | Read past reviews | [Analysis 001: excessive agency](analysis/analysis-001-excessive-agency-review.md) |
 
 ## Directories

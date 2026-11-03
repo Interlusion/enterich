@@ -591,15 +591,8 @@ async def create_draft_journal_entry(
     matches = await _journal_duplicates(context, posting_date, inputs.accounts)
     if matches and not inputs.allow_duplicate:
         raise drafts.refuse_duplicates(matches, JOURNAL_MATCH)
-    saved = await context.erpnext.insert(
-        "Journal Entry",
-        {
-            **doc,
-            "voucher_type": "Journal Entry",
-            "multi_currency": 0,
-            "company": context.settings.company,
-            "docstatus": 0,
-        },
+    saved = await drafts.insert(
+        context, "Journal Entry", {**doc, "voucher_type": "Journal Entry", "multi_currency": 0}
     )
     warnings = [drafts.duplicate_warning(matches, JOURNAL_MATCH)] if matches else []
     warnings += _rounding_warning(saved)

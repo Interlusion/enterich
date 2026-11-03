@@ -71,8 +71,8 @@ A fixed tool list held as a snapshot; drafts only in two layers, proven against 
 | 1 | High | Updates change drafts a person prepared | [3.5](#35-write-operations) | [ITEM-005](../backlog/archive/item-005-updates-only-own-drafts.md) |
 | 2 | Medium | All people share one identity and see everything the agent user reads | [3.2](#32-identity-and-rights) | [backlog](../backlog/backlog.md): guide for several instances; existing item for several identities |
 | 3 | Medium | Drafts carry no mark of session or task | [3.3](#33-provenance) | [ITEM-006](../backlog/item-006-provenance-on-every-write.md) |
-| 4 | Medium | Party IDs carry unmarked outside text | [3.4](#34-outside-data-in-results) | [ITEM-007](../backlog/item-007-party-ids-as-outside-text.md) |
-| 5 | Medium | No ceiling on amounts or on the number of drafts | [3.5](#35-write-operations) | [ITEM-008](../backlog/item-008-write-ceilings.md) |
+| 4 | Medium | Party IDs carry unmarked outside text | [3.4](#34-outside-data-in-results) | [ITEM-007](../backlog/archive/item-007-party-ids-as-outside-text.md) |
+| 5 | Medium | No ceiling on amounts or on the number of drafts | [3.5](#35-write-operations) | [ITEM-008](../backlog/archive/item-008-write-ceilings.md) |
 | 6 | Medium | No eval suite for a model change | [3.6](#36-quality-in-operation) | [ITEM-009](../backlog/item-009-agent-eval-suite.md) |
 | 7 | Low | Lists and reports don't cut text fields | [3.4](#34-outside-data-in-results) | [backlog](../backlog/backlog.md) |
 | 8 | Low | The deployment's rights aren't checked | [3.1](#31-drafts-only) | [backlog](../backlog/backlog.md) |

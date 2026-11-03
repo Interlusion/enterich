@@ -9,6 +9,8 @@ from enterich import shapes
 TIMEZONE = "Pacific/Kiritimati"  # UTC+14
 NOW = datetime(2026, 10, 28, 12, 0, tzinfo=UTC)
 TODAY = "2026-10-29"  # in Kiritimati at NOW; UTC is still at 2026-10-28
+# The start of the hour a limit of drafts per hour counts, in Kiritimati at NOW
+HOUR_AGO = "2026-10-29 01:00:00.000000"
 
 
 class Frozen(datetime):

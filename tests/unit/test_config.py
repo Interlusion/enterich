@@ -41,7 +41,14 @@ def test_example_configuration_loads_with_defaults() -> None:
     assert s.tools == ("get_item", "list_items")
     assert str(s.timezone) == "UTC"
     assert (s.host, s.port, s.log_level) == ("0.0.0.0", 8000, "INFO")
+    assert s.max_drafts_per_hour is None
     assert s.warnings == ()
+
+
+@pytest.mark.parametrize(("value", "limit"), [("1", 1), (" 20 ", 20), ("1000", 1000)])
+def test_a_limit_of_drafts_per_hour_is_a_whole_number(value: str, limit: int) -> None:
+    s = load({**ENV, "ENTERICH_MAX_DRAFTS_PER_HOUR": value}, ("list_items",))
+    assert s.max_drafts_per_hour == limit
 
 
 @pytest.mark.parametrize("value", ["", "  ", "erp example.com", "erp.example.com/x", "user@erp"])
@@ -108,6 +115,11 @@ def test_all_problems_are_reported_at_once() -> None:
         ("JWKS_URL", "https://id.example.com:/certs"),
         ("ERPNEXT_URL", "http://erp internal:8080"),
         ("TIMEZONE", "a" * 300),
+        ("MAX_DRAFTS_PER_HOUR", "0"),
+        ("MAX_DRAFTS_PER_HOUR", "1001"),
+        ("MAX_DRAFTS_PER_HOUR", "-5"),
+        ("MAX_DRAFTS_PER_HOUR", "ten"),
+        ("MAX_DRAFTS_PER_HOUR", ""),
     ],
 )
 def test_invalid_values_stop_enterich_with_name_and_rule(name: str, value: str) -> None:

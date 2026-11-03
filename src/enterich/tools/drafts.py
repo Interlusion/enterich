@@ -4,14 +4,24 @@ duplicate check, the update checks, the warnings and their comment, the result."
 import html
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Self
 
 from pydantic import model_validator
 
 from enterich.erpnext import ErpnextError, Refused
-from enterich.shapes import Inputs, Modified, Name, cut_rows, decimal, form_url, rows_of, shape
+from enterich.shapes import (
+    Inputs,
+    Modified,
+    Name,
+    ago,
+    cut_rows,
+    decimal,
+    form_url,
+    rows_of,
+    shape,
+)
 from enterich.tools import Context, Refusal, get_named, unknown_name
 
 MAX_DUPLICATE_ROWS = 1000
@@ -24,6 +34,12 @@ STALE = (
 DOCSTATUS = {1: "submitted", 2: "cancelled"}
 ROW_FIELDS = ("item_code", "qty", "rate", "amount", "is_free_item")
 TAX_FIELDS = ("account_head", "rate", "tax_amount")
+# The documents a create counts towards the limit of drafts per hour, by DocType
+COUNTED = {
+    "Sales Invoice": "sales invoices",
+    "Purchase Invoice": "purchase invoices",
+    "Journal Entry": "journal entries",
+}
 
 
 # The inputs of an update: the draft as read, and at least one of the subclass's changes.
@@ -87,6 +103,34 @@ def refuse_duplicates(names: Sequence[str], match: str, kind: str = "draft") -> 
 
 def duplicate_warning(names: Sequence[str], match: str, kind: str = "draft") -> str:
     return f"Possible duplicate of {named(names)}: a {kind} with the same {match}."
+
+
+async def insert(context: Context, doctype: str, doc: dict[str, Any]) -> dict[str, Any]:
+    """A new draft of the assigned company, once the limit of drafts per hour allows it
+    (REQ-001-PRS-F019): call it after the duplicate check."""
+    limit = context.settings.max_drafts_per_hour
+    if limit is not None:
+        made = await context.erpnext.get_list(
+            doctype,
+            fields=("name",),
+            filters=[
+                ["company", "=", context.settings.company],
+                ["owner", "=", await context.erpnext.user()],
+                ["creation", ">", ago(context.settings.timezone, timedelta(hours=1))],
+            ],
+            order_by="name asc",
+            start=0,
+            page_length=limit,
+        )
+        if len(made) >= limit:
+            raise Refusal(
+                f"The agent user created {limit} {COUNTED[doctype]} in the last hour, the most "
+                "the operator allows (ENTERICH_MAX_DRAFTS_PER_HOUR); nothing was created. Try "
+                "again later, or ask a person to review the drafts or to raise the limit."
+            )
+    return await context.erpnext.insert(
+        doctype, {**doc, "company": context.settings.company, "docstatus": 0}
+    )
 
 
 async def editable(

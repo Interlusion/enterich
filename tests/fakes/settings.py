@@ -10,6 +10,7 @@ CLIENT_ID = "enterich-agent"
 SUBJECT = "00000000-0000-0000-0000-000000000001"
 API_KEY = "example-api-key"
 API_SECRET = "example-api-secret"
+DRAFTS_PER_HOUR = 2  # ENTERICH_MAX_DRAFTS_PER_HOUR where a test sets it
 
 ENV: dict[str, str] = {
     "ENTERICH_RESOURCE_URL": RESOURCE_URL,

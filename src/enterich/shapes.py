@@ -5,7 +5,7 @@ import re
 import unicodedata
 from collections.abc import Sequence
 from collections.abc import Set as AbstractSet
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Any, Literal, cast
 from urllib.parse import quote
@@ -94,6 +94,12 @@ def in_order(from_date: date | None, to_date: date | None) -> None:
 def today(timezone: ZoneInfo) -> date:
     """Today in the configured time zone (ENTERICH_TIMEZONE)."""
     return datetime.now(timezone).date()
+
+
+def ago(timezone: ZoneInfo, span: timedelta) -> str:
+    """The time `span` ago in the configured time zone, as ERPNext stores a document's
+    `creation`: in the site's time zone, without a zone."""
+    return (datetime.now(timezone) - span).strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
 type InvoiceState = Literal["draft", "unpaid", "overdue", "paid", "return", "cancelled"]

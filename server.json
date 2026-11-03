@@ -94,6 +94,10 @@
           "description": "The operations to offer, comma-separated; by default all"
         },
         {
+          "name": "ENTERICH_MAX_DRAFTS_PER_HOUR",
+          "description": "Most drafts of each type the agent may create in an hour; unset, no limit"
+        },
+        {
           "name": "ENTERICH_TIMEZONE",
           "description": "IANA time zone for today's date, the ERPNext site's",
           "default": "UTC"
