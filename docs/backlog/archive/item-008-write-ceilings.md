@@ -32,4 +32,4 @@ None. Decided on 2026-11-03:
 - **Counted per DocType, with one number:** each create counts only its own DocType, so it needs no read right beyond its own, and two invoices don't hold back a journal entry.
 - **What counts:** the documents the agent user created in the assigned company in the last 60 minutes, whatever their state now, read from ERPNext (`owner`, `creation`). `allow_duplicate` creates count like any other; updates don't count.
 - **Order:** the count comes after the duplicate check, so a create repeated after a lost answer still learns of its first draft.
-- **Its worth is small:** drafts wait for a person, and a limit caps how many, not what they say.
+- **Its worth is small:** drafts wait for a person, and a limit caps how many, not what they say. A check of the drafts' content is [ITEM-010](../item-010-draft-validator.md).
