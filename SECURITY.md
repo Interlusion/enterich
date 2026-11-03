@@ -22,7 +22,7 @@ In scope is anything that breaks what Enterich promises in its [core](docs/specs
   - submitting, cancelling, amending, deleting or discarding a document, or changing one that isn't a draft, or a draft another user created;
   - reaching another company's data;
   - calling a tool the configuration (`ENTERICH_TOOLS`) doesn't offer;
-  - getting past the limits on input, result size and time.
+  - getting past the limits on input, result size and time, or the configured limit of drafts per hour (`ENTERICH_MAX_DRAFTS_PER_HOUR`).
 - **Outside text:** text from outside parties (customers, suppliers, banks) returned anywhere but in `outside_text`, or more of ERPNext's error than Enterich forwards, so an agent could mistake it for instructions.
 - **Secret handling and the log:** an ERPNext key or secret, or an access token, appearing in a log, a result, an error or anywhere else outside Enterich; an operation logged without its caller, or a log line a caller can forge.
 - **Configuration:** a setting Enterich accepts although its rules refuse it, such as an issuer over plain HTTP.

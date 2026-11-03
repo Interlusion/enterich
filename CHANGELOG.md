@@ -4,6 +4,10 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+### Added
+
+- **A limit of drafts per hour:** with `ENTERICH_MAX_DRAFTS_PER_HOUR` set, `create_draft_sales_invoice`, `create_draft_purchase_invoice` and `create_draft_journal_entry` count the documents of their type the agent user created in the assigned company in the last hour, and refuse a create at the limit without writing, saying that the operator sets it. A misled or looping agent then can't bury the reviewers in drafts. Documents a person created don't count. Unset, nothing changes.
+
 ### Changed
 
 - **Updates only on the agent's own drafts:** `update_draft_sales_invoice`, `update_draft_purchase_invoice` and `update_draft_journal_entry` change only drafts the agent user created, and refuse a draft another user created without writing to it, so that an agent misled by outside text can't rewrite a draft a person prepared. A draft of the agent's that a person then edited can still be updated, with its new `modified`. Enterich asks ERPNext once, at the first update, which user its key belongs to (`frappe.auth.get_logged_user`); no right is needed for that.
@@ -11,6 +15,10 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 ### Rights
 
 - **Write only if creator** on Sales Invoice, Purchase Invoice and Journal Entry: take write from the agent's role and give the agent user a second role holding only write with Only If Creator on these DocTypes (configuration guide). ERPNext then refuses the agent user's key a change to, or a discard of, a draft a person created, as Enterich does. Enterich works with the old rights too.
+
+### Configuration
+
+- `ENTERICH_MAX_DRAFTS_PER_HOUR`, optional: the most drafts of each type the agent user may create in an hour, from 1 to 1000. Unset, there is no limit. It counts the hour in `ENTERICH_TIMEZONE`, so set that to the site's time zone, as the configuration guide already asks.
 
 ## [0.2.1] - 2026-11-01
 
