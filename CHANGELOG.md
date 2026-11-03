@@ -4,6 +4,8 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-03
+
 ### Added
 
 - **A limit of drafts per hour:** with `ENTERICH_MAX_DRAFTS_PER_HOUR` set, `create_draft_sales_invoice`, `create_draft_purchase_invoice` and `create_draft_journal_entry` count the documents of their type the agent user created in the assigned company in the last hour, and refuse a create at the limit without writing, saying that the operator sets it. A misled or looping agent then can't bury the reviewers in drafts. Documents a person created don't count. Unset, nothing changes.
@@ -75,4 +77,5 @@ The first release.
 [0.1.0]: https://github.com/Interlusion/enterich/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Interlusion/enterich/compare/v0.1.0...v0.2.0
 [0.2.1]: https://github.com/Interlusion/enterich/compare/v0.2.0...v0.2.1
-[unreleased]: https://github.com/Interlusion/enterich/compare/v0.2.1...HEAD
+[0.3.0]: https://github.com/Interlusion/enterich/compare/v0.2.1...v0.3.0
+[unreleased]: https://github.com/Interlusion/enterich/compare/v0.3.0...HEAD
