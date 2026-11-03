@@ -83,6 +83,8 @@ UNREFUSED: dict[tuple[str, str | None, str], Callable[[Result], None]] = {
     ("update_draft_purchase_invoice", "Purchase Invoice", "create"): works,
     ("create_draft_journal_entry", "Journal Entry", OWN_WRITE): works,
     ("update_draft_journal_entry", "Journal Entry", "create"): works,
+    ("create_draft_payment_entry", "Payment Entry", OWN_WRITE): works,
+    ("update_draft_payment_entry", "Payment Entry", "create"): works,
 }
 
 # ERPNext's permission refusal, Enterich's answer for a name it may not read
@@ -156,11 +158,40 @@ def journal(seeded: Seed) -> dict[str, Any]:
     }
 
 
-def creates(seeded: Seed) -> dict[str, dict[str, Any]]:
+def supplier_side(removal: Removal | None) -> bool:
+    """Whether the removed right is one only the supplier's side of a row needs."""
+    return removal is not None and removal.doctype in ("Supplier", "Purchase Invoice")
+
+
+def payment(seeded: Seed, removal: Removal | None) -> dict[str, Any]:
+    """A payment allocated to the party's seeded invoice, through the bank account: the
+    supplier's where the removed right is the supplier side's, else the customer's."""
+    if supplier_side(removal):
+        invoice, amount = seeded.purchase_invoice, "45"
+    else:
+        invoice, amount = seeded.sales_invoice, "44"
+    return {
+        "bank_account": seeded.bank_account,
+        "paid_amount": amount,
+        "references": [{"reference_name": invoice, "allocated_amount": amount}],
+    }
+
+
+def creates(seeded: Seed, removal: Removal | None) -> dict[str, dict[str, Any]]:
+    party = (
+        {"party_type": "Supplier", "party": seeded.supplier}
+        if supplier_side(removal)
+        else {"party_type": "Customer", "party": seeded.customer}
+    )
     return {
         "create_draft_sales_invoice": {"customer": seeded.customer, **sales(seeded)},
         "create_draft_purchase_invoice": {"supplier": seeded.supplier, **purchase(seeded)},
         "create_draft_journal_entry": journal(seeded),
+        "create_draft_payment_entry": {
+            **party,
+            **payment(seeded, removal),
+            "reference_no": "E2E-RIGHTS",
+        },
     }
 
 
@@ -170,13 +201,14 @@ def arguments(
     """The operation's input: one that reaches every right of its row, the removed one
     included."""
     year = {"from_date": f"{seeded.posted.year}-01-01", "to_date": f"{seeded.posted.year}-12-31"}
-    if operation in (made := creates(seeded)):
+    if operation in (made := creates(seeded, removal)):
         return {**made[operation], "allow_duplicate": True}
     if draft is not None:
         changes = {
             "update_draft_sales_invoice": sales(seeded),
             "update_draft_purchase_invoice": purchase(seeded),
             "update_draft_journal_entry": journal(seeded),
+            "update_draft_payment_entry": payment(seeded, removal),
         }[operation]
         return {"name": draft["name"], "modified": draft["modified"], **changes}
     party = (
@@ -218,13 +250,16 @@ def arguments(
     }[operation]
 
 
-def updated(mcp: Session, seeded: Seed, row: Rights) -> dict[str, dict[str, Any]]:
-    """Drafts for the row's update operations, made with the role as it is."""
+def updated(
+    mcp: Session, seeded: Seed, row: Rights, removal: Removal | None = None
+) -> dict[str, dict[str, Any]]:
+    """Drafts for the row's update operations, made with the role as it is, for the side
+    of the party the removal's arguments take."""
     drafts: dict[str, dict[str, Any]] = {}
     for op in row.operations:
         if op.startswith("update_draft_"):
             create = op.replace("update_", "create_")
-            made = mcp.call(create, arguments(seeded, create, None, None))
+            made = mcp.call(create, arguments(seeded, create, removal, None))
             assert not made.error, made.text
             drafts[op] = made.data
     return drafts
@@ -285,7 +320,7 @@ def test_a_removed_right_refuses_the_operations_that_need_it(
     mcp: Session, seeded: Seed, site: Site, removal: Removal
 ) -> None:
     permissions(site)
-    drafts = updated(mcp, seeded, removal.row)
+    drafts = updated(mcp, seeded, removal.row, removal)
     with withdrawn(site, removal):
         answers = {
             op: mcp.call(op, arguments(seeded, op, removal, drafts.get(op)))

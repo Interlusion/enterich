@@ -31,6 +31,19 @@ def draft_body(seeded: Seed, doctype: str, amount: int) -> dict[str, Any]:
         return {"customer": seeded.customer, "items": items}
     if doctype == "Purchase Invoice":
         return {"supplier": seeded.supplier, "items": items}
+    if doctype == "Payment Entry":
+        return {
+            "payment_type": "Receive",
+            "party_type": "Customer",
+            "party": seeded.customer,
+            "paid_to": seeded.bank_ledger,
+            "bank_account": seeded.bank_account,
+            "paid_amount": amount,
+            "received_amount": amount,
+            "reference_no": f"CEILING-{amount}",
+            "reference_date": site_today().isoformat(),
+            "posting_date": site_today().isoformat(),
+        }
     return {
         "voucher_type": "Journal Entry",
         "posting_date": site_today().isoformat(),
@@ -103,6 +116,7 @@ def submitted(seeded: Seed, doctype: str) -> str:
         "Sales Invoice": seeded.sales_invoice,
         "Purchase Invoice": seeded.purchase_invoice,
         "Journal Entry": seeded.journal_entry,
+        "Payment Entry": seeded.payment_entry,
     }[doctype]
 
 

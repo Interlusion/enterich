@@ -111,6 +111,7 @@ FIELDS: dict[str, set[str]] = {
         "return_against",
         "remarks",
         "update_stock",
+        "on_hold",
     },
     "Purchase Invoice Item": {
         "item_code",
@@ -266,6 +267,8 @@ TABLES: dict[str, dict[str, str]] = {
 }
 # Reports whose JSON sets add_total_row: Frappe appends a total row as a list
 TOTAL_ROW_REPORTS = {"Accounts Receivable", "Accounts Payable"}
+# The naming series of the drafts that aren't invoices
+SERIES = {"Journal Entry": "ACC-JV-2026-", "Payment Entry": "ACC-PAY-2026-"}
 # invoice DocType -> (party DocType, naming series)
 INVOICES = {
     "Sales Invoice": ("Customer", "ACC-SINV-2026-"),
@@ -274,6 +277,11 @@ INVOICES = {
 STOCK_NOT_BILLED = "2100 - Stock Received But Not Billed - EX"
 # The accounts a purchase row can name; a link is saved in the stored name's case
 ACCOUNTS = {a.lower(): a for a in ("5000 - Cost - EX", "4930 - Office - EX", STOCK_NOT_BILLED)}
+# Party DocType -> (the party's receivable or payable account, its invoices' DocType)
+PARTY_ACCOUNTS = {
+    "Customer": ("1400 - Debtors - EX", "Sales Invoice"),
+    "Supplier": ("1600 - Creditors - EX", "Purchase Invoice"),
+}
 # Payment Terms Template -> credit days of its one term
 TERMS = {"Net 30": 30, "Net 14": 14}
 
@@ -414,7 +422,7 @@ class FakeErpnext:
         return httpx2.Response(404, json=error(404, "DoesNotExistError", "No such route"))
 
     def _insert(self, doctype: str, body: dict[str, Any]) -> httpx2.Response:
-        series = "ACC-JV-2026-" if doctype == "Journal Entry" else INVOICES[doctype][1]
+        series = SERIES.get(doctype) or INVOICES[doctype][1]
         name = f"{series}{101 + len(self.docs.get(doctype, {})):05d}"
         # Frappe sets the owner to the session user and the creation time, whatever the
         # body says
@@ -465,6 +473,8 @@ class FakeErpnext:
         accounts, totals."""
         if doctype == "Journal Entry":
             return self._save_journal(doc)
+        if doctype == "Payment Entry":
+            return self._save_payment(doc)
         party_type, _ = INVOICES[doctype]
         party_field = party_type.lower()
         party = self.docs.get(party_type, {}).get(doc.get(party_field, ""))
@@ -575,6 +585,76 @@ class FakeErpnext:
             modified=f"2026-10-28 12:00:00.{self.saves:06d}",
         )
         self.add("Journal Entry", doc)
+        return httpx2.Response(200, json={"data": doc})
+
+    def _save_payment(self, doc: dict[str, Any]) -> httpx2.Response:
+        """Save a payment entry draft as v16's validate does for a payment received from a
+        customer or made to a supplier: the amounts first, then the party's account, the
+        references and the totals."""
+        party_type = str(doc.get("party_type"))
+        party = self.docs.get(party_type, {}).get(doc.get("party", ""))
+        if party is None:
+            message = f"{party_type} {doc.get('party')} does not exist"
+            return _refused(417, "ValidationError", message)
+        mandatory = (("paid_amount", "Paid Amount"), ("received_amount", "Received Amount"))
+        for amount, label in mandatory:
+            if not doc.get(amount):  # validate_mandatory, before set_amounts
+                return _refused(417, "ValidationError", f"{label} is mandatory")
+        party_account, invoice_type = PARTY_ACCOUNTS[party_type]
+        receive = doc.get("payment_type") == "Receive"
+        party_field, bank_field = ("paid_from", "paid_to") if receive else ("paid_to", "paid_from")
+        if not doc.get(party_field):  # set_missing_values, only while it is empty
+            doc[party_field] = party_account
+        if not doc.get("reference_no") or not doc.get("reference_date"):
+            message = "Reference No and Reference Date is mandatory for Bank transaction"
+            return _refused(417, "ValidationError", message)
+        accounts = self.docs.get("Account", {})
+        for side in ("paid_from", "paid_to"):
+            known = accounts.get(doc[side], {})
+            doc[f"{side}_account_currency"] = known.get("account_currency", "EUR")
+        references = _rows(doc, "references")
+        for number, row in enumerate(references, start=1):
+            invoice = self.docs.get(invoice_type, {}).get(row.get("reference_name", ""))
+            if invoice is None:
+                message = f"{invoice_type} {row.get('reference_name')} does not exist"
+                return _refused(417, "ValidationError", message)
+            if invoice.get(party_type.lower()) != doc["party"]:
+                message = (
+                    f"{invoice_type} {invoice['name']} is not associated with {party_type} "
+                    f"{doc['party']}"
+                )
+                return _refused(417, "ValidationError", message)
+            if row["allocated_amount"] > invoice["outstanding_amount"]:
+                message = (
+                    f"Row #{number}: Allocated Amount cannot be greater than outstanding amount."
+                )
+                return _refused(417, "ValidationError", message)
+            row.update(
+                doctype="Payment Entry Reference",
+                reference_doctype=invoice_type,
+                allocated_amount=float(row["allocated_amount"]),
+                outstanding_amount=invoice["outstanding_amount"],
+                total_amount=invoice["grand_total"],
+            )
+        # The amounts as given, the totals rounded to the currency's precision
+        paid = float(doc["paid_amount"])
+        allocated = round(sum(r["allocated_amount"] for r in references), 2)
+        self.saves += 1
+        doc.update(
+            references=references,
+            party_name=party[f"{party_type.lower()}_name"],
+            paid_amount=paid,
+            received_amount=float(doc["received_amount"]),
+            total_allocated_amount=allocated,
+            unallocated_amount=max(round(paid - allocated, 2), 0.0),
+            difference_amount=min(round(paid - allocated, 2), 0.0),
+            title=doc["party"],
+            status="Draft",
+            docstatus=0,
+            modified=f"2026-10-28 12:00:00.{self.saves:06d}",
+        )
+        doc.setdefault(bank_field, None)
+        self.add("Payment Entry", doc)
         return httpx2.Response(200, json={"data": doc})
 
     def _same_bill(self, doc: dict[str, Any]) -> str | None:
@@ -1068,6 +1148,7 @@ def purchase_invoice(name: str = "ACC-PINV-2026-00001", **overrides: Any) -> dic
         "docstatus": 1,
         "is_return": 0,
         "update_stock": 0,
+        "on_hold": 0,
         "owner": AGENT,
         "modified": "2026-10-01 09:00:00.000000",
         "taxes_and_charges": "Input VAT 19% - EX",
