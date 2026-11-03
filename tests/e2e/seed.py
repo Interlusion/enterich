@@ -106,6 +106,19 @@ RIGHTS = (
     Rights(("list_bank_accounts",), {"Bank Account": ("read",)}),
     Rights(("list_bank_transactions", "get_bank_transaction"), {"Bank Transaction": ("read",)}),
     Rights(("list_payment_entries", "get_payment_entry"), {"Payment Entry": ("read",)}),
+    Rights(
+        ("create_draft_payment_entry", "update_draft_payment_entry"),
+        # Customer and Sales Invoice for a customer's payment, Supplier and Purchase
+        # Invoice for a supplier's
+        {
+            "Payment Entry": ("read", "create", OWN_WRITE),
+            "Account": ("select",),
+            **dict.fromkeys(
+                ("Bank Account", "Customer", "Sales Invoice", "Supplier", "Purchase Invoice"),
+                ("read",),
+            ),
+        },
+    ),
 )
 
 

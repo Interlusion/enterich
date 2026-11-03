@@ -23,7 +23,7 @@ This spec holds the product's personas, user stories and terms, and the rules ev
 
 - **Role**: Owns the company's books in ERPNext and decides what the agent may do there: which operations, for which company; connects the agent.
 - **Expectations**: Asks the agent about the books and gets drafts that need only a check; can see from Enterich's configuration and tool list what the agent can do.
-- **Pain points**: Invoices and journal entries typed by hand; open items looked up across several lists.
+- **Pain points**: Invoices, journal entries and payments typed by hand; open items looked up across several lists.
 - **Underlying fear**: An agent that posts, cancels or deletes something, manipulated by text from outside or by its own mistake; access that can't be stopped quickly; a person's sign-in that hands the agent's tools to someone else.
 
 ### REQ-001-P2. The auditor
