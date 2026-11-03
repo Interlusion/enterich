@@ -166,7 +166,7 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 
 **Definition of Done**:
 
-- Starting without each required variable stops Enterich with its name; an invalid URL, leeway, algorithm, time zone or operation name, an empty scope list or an empty or invalid ERPNext Host, stops it with name and rule.
+- Starting without each required variable stops Enterich with its name; an invalid URL, leeway, algorithm, time zone, operation name or limit of drafts per hour, an empty scope list or an empty or invalid ERPNext Host, stops it with name and rule.
 - `http://id.example.com/…` as issuer or JWKS URL, and `https://ERP.example.com/mcp/` or `https://erp.example.com` as resource URL, stop Enterich.
 - `http://erp.internal` as ERPNext URL, and a variable `ENTERICH_TOOL`, each start Enterich with a warning in the `start` line.
 - The message for an invalid API secret doesn't contain the secret.
