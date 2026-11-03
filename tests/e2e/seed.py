@@ -19,6 +19,8 @@ COMPANY = "Example GmbH"
 ABBR = "EX"
 TIMEZONE = "Europe/Berlin"  # the site's and Enterich's, so both have the same today
 ROLE = "Enterich Agent"
+# The second role, for write only if creator: one rule per DocType with Only If Creator
+OWN_ROLE = "Enterich Agent Own Drafts"
 AGENT = "enterich-agent@example.com"
 
 
@@ -36,6 +38,9 @@ class Rights:
     reports: tuple[str, ...] = ()
 
 
+# Write in OWN_ROLE's rule, which has Only If Creator set (REQ-001 Terms)
+OWN_WRITE = "write only if creator"
+
 # The area specs' Rights sections, row by row (REQ-002-PRS-NF013). "select" alone means
 # select without read.
 RIGHTS = (
@@ -51,7 +56,7 @@ RIGHTS = (
     Rights(
         ("create_draft_sales_invoice", "update_draft_sales_invoice"),
         {
-            "Sales Invoice": ("read", "create", "write"),
+            "Sales Invoice": ("read", "create", OWN_WRITE),
             **dict.fromkeys(
                 ("Address", "Item", "Account", "Sales Taxes and Charges Template"), ("read",)
             ),
@@ -69,7 +74,7 @@ RIGHTS = (
     Rights(
         ("create_draft_purchase_invoice", "update_draft_purchase_invoice"),
         {
-            "Purchase Invoice": ("read", "create", "write"),
+            "Purchase Invoice": ("read", "create", OWN_WRITE),
             **dict.fromkeys(
                 ("Supplier", "Address", "Item", "Account", "Purchase Taxes and Charges Template"),
                 ("read",),
@@ -97,7 +102,7 @@ RIGHTS = (
     ),
     Rights(
         ("create_draft_journal_entry", "update_draft_journal_entry"),
-        {"Journal Entry": ("read", "create", "write")},
+        {"Journal Entry": ("read", "create", OWN_WRITE)},
     ),
     Rights(("list_bank_accounts",), {"Bank Account": ("read",)}),
     Rights(("list_bank_transactions", "get_bank_transaction"), {"Bank Transaction": ("read",)}),
@@ -244,13 +249,15 @@ def fiscal_year(site: Site, year: int) -> None:
 
 
 def agent(site: Site) -> None:
-    """The agent user with one role, whose rights are made to equal RIGHTS on each run: a
-    kept site follows changes to RIGHTS, and a run that removed a right is undone."""
-    ensure(site, "Role", {"role_name": ROLE}, desk_access=1)
+    """The agent user with its two roles, whose rights are made to equal RIGHTS on each
+    run: a kept site follows changes to RIGHTS, and a run that removed a right is undone."""
+    for role in (ROLE, OWN_ROLE):
+        ensure(site, "Role", {"role_name": role}, desk_access=1)
     permissions(site)
     for report in sorted({r for row in RIGHTS for r in row.reports}):
         report_role(site, report)
-    ensure(
+    roles = [{"role": ROLE}, {"role": OWN_ROLE}]
+    name = ensure(
         site,
         "User",
         {"email": AGENT},
@@ -258,8 +265,11 @@ def agent(site: Site) -> None:
         last_name="Agent",
         user_type="System User",
         send_welcome_email=0,
-        roles=[{"role": ROLE}],
+        roles=roles,
     )
+    held = site.call("frappe.client.get", doctype="User", name=name)["roles"]
+    if {r["role"] for r in held} != {r["role"] for r in roles}:
+        site.update("User", name, {"roles": roles})
 
 
 MANAGER = "frappe.core.page.permission_manager.permission_manager"
@@ -284,32 +294,46 @@ PERMISSION_TYPES = (
 
 
 def permissions(site: Site, wanted: dict[str, set[str]] | None = None) -> None:
-    """The role's rules, those of RIGHTS unless `wanted` says otherwise, set as the role
-    permission manager does; one call when they match."""
+    """The roles' rules, those of RIGHTS unless `wanted` says otherwise: ROLE's with every
+    right but write only if creator, OWN_ROLE's with write and Only If Creator alone."""
     wanted = granted() if wanted is None else wanted
+    rules(site, ROLE, {d: rights - {OWN_WRITE} for d, rights in wanted.items()})
+    own = {d: {"write", "if_owner"} for d, rights in wanted.items() if OWN_WRITE in rights}
+    rules(site, OWN_ROLE, own)
+
+
+def rules(site: Site, role: str, wanted: dict[str, set[str]]) -> None:
+    """The role's one rule per DocType set as the role permission manager does; one call
+    when they match. A new rule starts with read: rights are granted before others go,
+    so that no rule is ever empty, which the manager refuses."""
     held = {
         rule["parent"]: rule
-        for rule in site.call(f"{MANAGER}.get_permissions", role=ROLE)
+        for rule in site.call(f"{MANAGER}.get_permissions", role=role)
         if rule["permlevel"] == 0
     }
-    for doctype in held.keys() - wanted.keys():
-        site.call(f"{MANAGER}.remove", doctype=doctype, role=ROLE, permlevel=0)
+    for doctype in sorted(held.keys() - wanted.keys()):
+        # The manager removes only a rule whose Only If Creator matches
+        if_owner = held[doctype].get("if_owner") or 0
+        site.call(f"{MANAGER}.remove", doctype=doctype, role=role, permlevel=0, if_owner=if_owner)
     for doctype, rights in wanted.items():
         rule = held.get(doctype)
         if rule is None:
-            site.call(f"{MANAGER}.add", parent=doctype, role=ROLE, permlevel=0)
+            site.call(f"{MANAGER}.add", parent=doctype, role=role, permlevel=0)
             rule = {"read": 1}
-        for ptype in PERMISSION_TYPES:
-            value = int(ptype in rights)
-            if int(rule.get(ptype) or 0) != value:
-                site.call(
-                    f"{MANAGER}.update",
-                    doctype=doctype,
-                    role=ROLE,
-                    permlevel=0,
-                    ptype=ptype,
-                    value=value,
-                )
+        changes = [
+            (ptype, int(ptype in rights))
+            for ptype in (*PERMISSION_TYPES, "if_owner")
+            if int(rule.get(ptype) or 0) != int(ptype in rights)
+        ]
+        for ptype, value in sorted(changes, key=lambda change: -change[1]):
+            site.call(
+                f"{MANAGER}.update",
+                doctype=doctype,
+                role=role,
+                permlevel=0,
+                ptype=ptype,
+                value=value,
+            )
 
 
 def report_role(site: Site, report: str) -> None:

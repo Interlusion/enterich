@@ -1,8 +1,9 @@
 """The ceiling: what ERPNext's role allows the agent user's key, called directly as anyone
 holding the key could, not through Enterich (REQ-001-URS-F003, ADR-001).
 
-The role refuses submit, cancel and delete, and any change to a submitted document. Two
-doors stay open, as REQ-001-URS-F003 says: a draft is discarded with write alone, and a
+The role refuses submit, cancel and delete, any change to a submitted document, and with
+write only if creator any change to a draft a person created. Two doors stay open, as
+REQ-001-URS-F003 says: the agent user's own draft is discarded with write alone, and a
 cancelled document is amended with create alone. Only Enterich's fixed operations close
 them (REQ-001-PRS-F006).
 
@@ -117,6 +118,22 @@ def test_the_agents_key_cannot_cancel_or_change_a_submitted_document(
     assert refused(agent.put(resource(doctype, name), json={"docstatus": 2}))
     assert refused(agent.put(resource(doctype, name), json={"title": "Changed"}))
     assert site.get_list(doctype, {"name": name}, ["docstatus", "modified"]) == before
+
+
+@pytest.mark.parametrize("doctype", DRAFTED)
+def test_the_agents_key_cannot_change_or_discard_a_persons_draft(
+    agent: httpx2.Client, seeded: Seed, site: Site, doctype: str
+) -> None:
+    theirs = site.insert(
+        {"doctype": doctype, "company": COMPANY, **draft_body(seeded, doctype, 36)}
+    )
+    remark = "user_remark" if doctype == "Journal Entry" else "remarks"
+    change = {remark: "Changed", "modified": theirs["modified"]}
+    assert refused(agent.put(resource(doctype, theirs["name"]), json=change))
+    by_name = {"doctype": doctype, "name": theirs["name"]}
+    assert refused(agent.post("/api/method/frappe.desk.form.save.discard", data=by_name))
+    after = site.get_list(doctype, {"name": theirs["name"]}, ["docstatus", "modified"])
+    assert after == [{"docstatus": 0, "modified": theirs["modified"]}]
 
 
 @pytest.mark.parametrize("doctype", DRAFTED)

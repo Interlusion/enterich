@@ -19,6 +19,7 @@ import pytest
 
 from tests.e2e.seed import (
     DEBTORS,
+    OWN_WRITE,
     RIGHTS,
     ROLE,
     Rights,
@@ -76,11 +77,11 @@ UNREFUSED: dict[tuple[str, str | None, str], Callable[[Result], None]] = {
     ("list_suppliers", "Address", "read"): works,
     ("get_supplier", "Address", "read"): without_addresses,
     # Creating needs no write, and updating no create
-    ("create_draft_sales_invoice", "Sales Invoice", "write"): works,
+    ("create_draft_sales_invoice", "Sales Invoice", OWN_WRITE): works,
     ("update_draft_sales_invoice", "Sales Invoice", "create"): works,
-    ("create_draft_purchase_invoice", "Purchase Invoice", "write"): works,
+    ("create_draft_purchase_invoice", "Purchase Invoice", OWN_WRITE): works,
     ("update_draft_purchase_invoice", "Purchase Invoice", "create"): works,
-    ("create_draft_journal_entry", "Journal Entry", "write"): works,
+    ("create_draft_journal_entry", "Journal Entry", OWN_WRITE): works,
     ("update_draft_journal_entry", "Journal Entry", "create"): works,
 }
 
