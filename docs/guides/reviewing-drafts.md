@@ -25,6 +25,12 @@ When something about a draft looks wrong, Enterich adds a comment to it, in the 
 
 Each area spec lists the warnings of its operations ([specs index](../specs/README.md)).
 
+## Returns
+
+The agent drafts credit notes and debit notes from ERPNext's own return of the invoice, as the invoice's **Return / Credit Note** (or **Return / Debit Note**) action does: they are sales or purchase invoices with **Is Return** set, in the same lists. ERPNext leaves **Update Outstanding for Self** ticked, so the return keeps its own outstanding amount, to be reconciled with the invoice or paid back; untick it before submitting if the invoice's outstanding amount should be lowered instead. On a debit note, check that **Supplier Invoice No** is the supplier's credit note number, not the invoice's.
+
+The agent drafts no partial return of an invoice with a fixed discount or charge, such as freight: ERPNext's return would credit those amounts in full. Make such a return in ERPNext and adjust the discount and charges by hand. A credit note doesn't take back stock that a delivery note delivered; for that, make a return of the delivery note.
+
 Read the timeline before submitting.
 
 ## Correcting a draft

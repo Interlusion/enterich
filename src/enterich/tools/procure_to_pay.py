@@ -19,7 +19,7 @@ from enterich.shapes import (
     in_order,
     today,
 )
-from enterich.tools import Context, Operation, drafts, get_named, invoicing
+from enterich.tools import Context, Operation, drafts, get_named, invoicing, returns
 from enterich.tools.invoicing import AgeingBasedOn
 
 PURCHASE = invoicing.Side(
@@ -107,6 +107,13 @@ DRAFT_FIELDS = (
 DRAFT_ROW_FIELDS = ("item_code", "qty", "rate", "amount", "expense_account", "is_free_item")
 DRAFT_MATCH = "supplier, posting date and items"
 BILL_MATCH = "supplier and bill_no"
+RETURN_FIELDS = (*DRAFT_FIELDS, "bill_no", "bill_date", "return_against")
+DEBIT_NOTES = returns.Side(
+    invoice="Purchase Invoice",
+    refused={"is_paid": "was paid on entry", "on_hold": "is on hold"},
+    invoice_update="update_draft_purchase_invoice",
+    return_update="update_draft_purchase_return",
+)
 
 # The supplier's invoice number as printed: free text, not a name (ERPNext's Data field);
 # surrounding whitespace would defeat the duplicate check
@@ -187,6 +194,24 @@ class UpdateDraftPurchaseInvoice(drafts.DraftUpdate):
     due_date: Day | None = None
     items: PurchaseInvoiceItems | None = None
     taxes_and_charges: Name | Literal[""] | None = None
+    remarks: Remarks | None = None
+
+
+class CreateDraftPurchaseReturn(Inputs):
+    return_against: Name
+    items: returns.ReturnItems | None = None
+    bill_no: BillNo | None = None
+    bill_date: Day | None = None
+    posting_date: Day | None = None
+    remarks: Remarks | None = None
+    allow_duplicate: Flag = False
+
+
+class UpdateDraftPurchaseReturn(drafts.DraftUpdate):
+    items: returns.ReturnItems | None = None
+    bill_no: BillNo | Literal[""] | None = None
+    bill_date: Day | None = None
+    posting_date: Day | None = None
     remarks: Remarks | None = None
 
 
@@ -343,6 +368,7 @@ async def update_draft_purchase_invoice(
     stored = await drafts.editable(
         context, "Purchase Invoice", inputs.name, inputs.modified, "the purchase invoice"
     )
+    returns.not_a_return(DEBIT_NOTES, stored)
     taxes = None
     if inputs.taxes_and_charges:
         taxes = await drafts.tax_rows(context, PURCHASE.template, inputs.taxes_and_charges)
@@ -362,6 +388,82 @@ async def update_draft_purchase_invoice(
     warnings += drafts.row_warnings(saved, doc.get("items"), account="expense_account")
     return await drafts.result(
         context, "Purchase Invoice", saved, DRAFT_FIELDS, warnings, DRAFT_ROW_FIELDS
+    )
+
+
+def _return_fields(inputs: CreateDraftPurchaseReturn | UpdateDraftPurchaseReturn) -> dict[str, Any]:
+    """The catalogue's given fields of a debit note, `items` apart."""
+    doc: dict[str, Any] = {}
+    if inputs.bill_no is not None:
+        doc["bill_no"] = inputs.bill_no
+    if inputs.bill_date is not None:
+        doc["bill_date"] = inputs.bill_date.isoformat()
+    if inputs.posting_date is not None:
+        doc |= {"posting_date": inputs.posting_date.isoformat(), "set_posting_time": 1}
+    if inputs.remarks is not None:
+        doc["remarks"] = inputs.remarks
+    return doc
+
+
+async def create_draft_purchase_return(
+    inputs: CreateDraftPurchaseReturn, context: Context
+) -> dict[str, Any]:
+    posting_date = inputs.posting_date or today(context.settings.timezone)
+    fields = {
+        **_return_fields(inputs),
+        "posting_date": posting_date.isoformat(),
+        "set_posting_time": 1,
+    }
+
+    async def same_bill(invoice: dict[str, Any]) -> returns.Match | None:
+        if inputs.bill_no is None:
+            return None
+        names = await _same_bill(context, str(invoice.get("supplier")), inputs.bill_no)
+        return returns.Match(names, BILL_MATCH, "purchase invoice")
+
+    saved, warnings = await returns.create(
+        DEBIT_NOTES,
+        context,
+        inputs.return_against,
+        inputs.items,
+        fields,
+        inputs.allow_duplicate,
+        also=same_bill,
+    )
+    return await drafts.result(
+        context,
+        "Purchase Invoice",
+        saved,
+        RETURN_FIELDS,
+        warnings,
+        DRAFT_ROW_FIELDS,
+        outside={"bill_no"},
+    )
+
+
+async def update_draft_purchase_return(
+    inputs: UpdateDraftPurchaseReturn, context: Context
+) -> dict[str, Any]:
+    stored = await returns.editable(DEBIT_NOTES, context, inputs.name, inputs.modified)
+    doc = await returns.update(DEBIT_NOTES, context, stored, inputs.items, _return_fields(inputs))
+    matches: list[str] = []
+    if inputs.bill_no:
+        supplier = str(stored.get("supplier"))
+        matches = await _same_bill(context, supplier, inputs.bill_no, draft=inputs.name)
+    saved = await drafts.save_update(
+        context, "Purchase Invoice", inputs.name, {**doc, "modified": inputs.modified}
+    )
+    warnings = (
+        [drafts.duplicate_warning(matches, BILL_MATCH, "purchase invoice")] if matches else []
+    )
+    return await drafts.result(
+        context,
+        "Purchase Invoice",
+        saved,
+        RETURN_FIELDS,
+        warnings,
+        DRAFT_ROW_FIELDS,
+        outside={"bill_no"},
     )
 
 
@@ -475,5 +577,40 @@ OPERATIONS: list[Operation[Any]] = [
         kind="update",
         inputs=UpdateDraftPurchaseInvoice,
         run=update_draft_purchase_invoice,
+    ),
+    Operation(
+        name="create_draft_purchase_return",
+        title="Create draft purchase return",
+        description=(
+            "Create a draft return (debit note) against a submitted purchase invoice of the "
+            "assigned company (`return_against`); a person reviews and submits it in ERPNext. "
+            "The supplier, rates, accounts and taxes come from the invoice. Without `items`, "
+            "everything not yet returned is; with `items`, only the given quantities of those "
+            "items (positive numbers), at most what is left to return of each. An invoice "
+            "with a fixed discount or charge is returned only whole. Give the supplier's "
+            "credit note number and date as `bill_no` and `bill_date`; without them the "
+            "invoice's `bill_no` stays. `posting_date` defaults to today. A draft return "
+            "against the same invoice, or a `bill_no` already recorded for the supplier, is "
+            "refused unless `allow_duplicate` is true. "
+            "After an error or a timeout, list the drafts (`list_purchase_invoices` with "
+            "`state` draft) before creating again: the first may have been saved."
+        ),
+        kind="create",
+        inputs=CreateDraftPurchaseReturn,
+        run=create_draft_purchase_return,
+    ),
+    Operation(
+        name="update_draft_purchase_return",
+        title="Update draft purchase return",
+        description=(
+            "Change a draft return (debit note) of the assigned company that the agent user "
+            "created. Give its `name` and its `modified` as last read; a draft changed since "
+            "is refused. Give only what changes: `items` replace all rows, at most what is "
+            "left to return of each item; an empty `remarks` or `bill_no` clears it. The "
+            "invoice it returns stays; for another invoice, create a new draft."
+        ),
+        kind="update",
+        inputs=UpdateDraftPurchaseReturn,
+        run=update_draft_purchase_return,
     ),
 ]

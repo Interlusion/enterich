@@ -23,7 +23,7 @@ An MCP server for ERPNext with hard limits: a short, fixed list of tools, tokens
 
 <!-- tools:start -->
 
-Enterich offers 33 tools. A deployment may offer fewer ([`ENTERICH_TOOLS`](docs/guides/configuration.md)); every tool works on one company, within the rights ERPNext gives the agent user.
+Enterich offers 37 tools. A deployment may offer fewer ([`ENTERICH_TOOLS`](docs/guides/configuration.md)); every tool works on one company, within the rights ERPNext gives the agent user.
 
 ### Master data ([REQ-003](docs/specs/req-003-master-data.md))
 
@@ -48,6 +48,8 @@ Customers, sales invoices, receivables.
 | `report_accounts_receivable` | Accounts receivable | read |
 | `create_draft_sales_invoice` | Create draft sales invoice | create draft |
 | `update_draft_sales_invoice` | Update draft sales invoice | update draft |
+| `create_draft_sales_return` | Create draft sales return | create draft |
+| `update_draft_sales_return` | Update draft sales return | update draft |
 
 ### Procure to pay ([REQ-005](docs/specs/req-005-procure-to-pay.md))
 
@@ -63,6 +65,8 @@ Suppliers, purchase invoices, payables.
 | `report_accounts_payable` | Accounts payable | read |
 | `create_draft_purchase_invoice` | Create draft purchase invoice | create draft |
 | `update_draft_purchase_invoice` | Update draft purchase invoice | update draft |
+| `create_draft_purchase_return` | Create draft purchase return | create draft |
+| `update_draft_purchase_return` | Update draft purchase return | update draft |
 
 ### Record to report ([REQ-006](docs/specs/req-006-record-to-report.md))
 

@@ -7,10 +7,16 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 ### Added
 
 - **Payment entry drafts:** `create_draft_payment_entry` and `update_draft_payment_entry` draft a payment received from a customer or made to a supplier through one of the company's bank accounts, allocated to the party's open invoices. Enterich refuses an allocation to an invoice that isn't the party's, submitted and open, or above what is outstanding or paid, and a bank reference (`reference_no`) already recorded for the party unless the agent allows it. A part not allocated, which ERPNext books as an advance, and a bank account in another currency than the party's account are named in `warnings`. Cash accounts, internal transfers, refunds and deductions such as a discount aren't drafted. The limit of drafts per hour counts payment entries on their own.
+- **Return drafts:** `create_draft_sales_return` and `update_draft_sales_return` draft a credit note against a submitted sales invoice, `create_draft_purchase_return` and `update_draft_purchase_return` a debit note against a submitted purchase invoice, with the supplier's credit note number as `bill_no`. ERPNext's own return of the invoice gives the party, rates, accounts and taxes; the agent returns everything not yet returned or chosen items and quantities, never more than is left. A second draft return against the same invoice, or a credit note number already recorded for the supplier, is refused unless the agent allows it. An invoice with a fixed discount or charge (such as freight) is returned only whole, as ERPNext's return credits those amounts in full. Returns of POS invoices, of invoices that updated stock, were paid on entry or are on hold, and credit notes without returned items aren't drafted. Returns count towards the limit of drafts per hour with their invoices.
+
+### Changed
+
+- `update_draft_sales_invoice` and `update_draft_purchase_invoice` refuse a return draft, naming the return's update operation: their rows would break the return's link to the invoice.
 
 ### Rights
 
 - **Payment Entry:** read, create and write only if creator for the new operations, with select on Account, read on Bank Account, and read on Customer and Sales Invoice for a customer's payment, Supplier and Purchase Invoice for a supplier's (REQ-007). Write only if creator goes on Payment Entry too, in the second role of the configuration guide.
+- **Returns:** the return operations need the rights of the invoice drafts on Sales Invoice or Purchase Invoice (read, create, write only if creator), with read on Address and Item, select on Account, and select on Customer for a credit note or read on Supplier for a debit note (REQ-004, REQ-005). No tax template right is needed.
 - Fewer rights: the sales and purchase drafts need only select on Account, not read.
 
 ## [0.3.0] - 2026-11-03

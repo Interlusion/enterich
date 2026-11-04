@@ -406,6 +406,8 @@ class FakeErpnext:
                 return _missing(params["master_doctype"], params["master_name"])
             rows = [{k: v for k, v in r.items() if k != "doctype"} for r in template["taxes"]]
             return httpx2.Response(200, json={"message": rows})
+        if request.url.path in RETURN_METHODS:
+            return self._return_of(RETURN_METHODS[request.url.path], params.get("source_name", ""))
         if request.url.path == COMMENT_METHOD and request.method in ("POST", "PUT"):
             comment = cast("dict[str, Any]", body)
             self.comments.append(comment)
@@ -475,6 +477,8 @@ class FakeErpnext:
             return self._save_journal(doc)
         if doctype == "Payment Entry":
             return self._save_payment(doc)
+        if doc.get("is_return"):
+            return self._save_return(doctype, doc)
         party_type, _ = INVOICES[doctype]
         party_field = party_type.lower()
         party = self.docs.get(party_type, {}).get(doc.get(party_field, ""))
@@ -524,6 +528,166 @@ class FakeErpnext:
             total_taxes_and_charges=total_taxes,
             grand_total=round(net_total + total_taxes, 2),
             outstanding_amount=round(net_total + total_taxes, 2),
+            status="Draft",
+            docstatus=0,
+            modified=f"2026-10-28 12:00:00.{self.saves:06d}",
+        )
+        self.add(doctype, doc)
+        return httpx2.Response(200, json={"data": doc})
+
+    def _returned(self, doctype: str, invoice: str) -> dict[str, float]:
+        """Invoice row -> the quantity submitted returns took back (get_already_returned_items);
+        draft returns don't count."""
+        link = RETURN_LINKS[doctype]
+        taken: dict[str, float] = {}
+        for other in self.docs.get(doctype, {}).values():
+            mine = other.get("is_return") and other.get("return_against") == invoice
+            if mine and other.get("docstatus") == 1:
+                for row in _rows(other, "items"):
+                    taken[row[link]] = taken.get(row[link], 0.0) + abs(row["qty"])
+        return taken
+
+    def _return_of(self, doctype: str, name: str) -> httpx2.Response:
+        """make_sales_return or make_debit_note: the unsaved return of a submitted invoice,
+        each row at what is left to return, negative, linked to its invoice row."""
+        invoice = self.docs.get(doctype, {}).get(name)
+        if invoice is None:  # make_return_doc reads the company of a missing invoice
+            message = "TypeError: cannot unpack non-iterable NoneType object"
+            return httpx2.Response(500, json={"exc_type": "TypeError", "exception": message})
+        if invoice["docstatus"] != 1:
+            message = "Cannot map because following condition fails: docstatus=1"
+            return _refused(417, "ValidationError", message)
+        return httpx2.Response(200, json={"message": self.mapped_return(doctype, name)})
+
+    def mapped_return(self, doctype: str, name: str) -> dict[str, Any]:
+        """The return make_return_doc maps of a submitted invoice: what is left in floating
+        point, a debit note's received and rejected quantities at what is left of the
+        invoice row's, the whole fixed discount and charges negated, the mapping's time."""
+        invoice = self.docs[doctype][name]
+        link = RETURN_LINKS[doctype]
+        taken = self._returned(doctype, name)
+        items: list[dict[str, Any]] = []
+        for number, row in enumerate(_rows(invoice, "items"), start=1):
+            row_name = row.get("name") or f"{name}-{number}"
+            left = row["qty"] - taken.get(row_name, 0.0)
+            item = {k: v for k, v in row.items() if k not in ("amount", "pricing_rules")}
+            item.update(
+                {"name": None, "__islocal": 1, "parent": None, "qty": -left, link: row_name}
+            )
+            if "stock_qty" in row:
+                item["stock_qty"] = -left * row.get("conversion_factor", 1.0)
+            if doctype == "Purchase Invoice":
+                item.update(received_qty=-left, rejected_qty=0.0)
+            items.append(item)
+        doc = {
+            **{k: v for k, v in invoice.items() if k not in ("modified", "creation", "status")},
+            "name": None,
+            "__islocal": 1,
+            "__unsaved": 1,
+            "owner": self.agent_user,
+            "docstatus": 0,
+            "is_return": 1,
+            "return_against": name,
+            "ignore_pricing_rule": 1,
+            "update_outstanding_for_self": 1,
+            "set_posting_time": 1,
+            "posting_time": self.now.split(" ")[1],  # no_copy: the time of the mapping
+            "remarks": None,
+            "items": items,
+            "taxes": [
+                {
+                    **t,
+                    "name": None,
+                    "__islocal": 1,
+                    **(
+                        {"tax_amount": -t["tax_amount"]} if t.get("charge_type") == "Actual" else {}
+                    ),
+                }
+                for t in _rows(invoice, "taxes")
+            ],
+        }
+        if invoice.get("discount_amount"):
+            doc["discount_amount"] = -invoice["discount_amount"]
+        if doctype == "Sales Invoice":
+            doc["posting_date"] = self.today
+        else:  # the debit note keeps the invoice's posting date and bill_no
+            doc["bill_date"] = None
+        return copy.deepcopy(doc)
+
+    def _save_return(self, doctype: str, doc: dict[str, Any]) -> httpx2.Response:
+        """Save a return draft as v16's validate_return does: the invoice's party, a posting
+        date and time not before its, each row linked to an invoice row, negative, at most
+        what is left at the field's precision and at most the invoice's rate; then the
+        totals, negative, a charge of type Actual as given, and no payment schedule."""
+        party_type, _ = INVOICES[doctype]
+        party_field = party_type.lower()
+        invoice = self.docs.get(doctype, {}).get(doc.get("return_against", ""))
+        if invoice is None:
+            return _refused(
+                417, "ValidationError", f"Invalid Return Against: {doc.get('return_against')}"
+            )
+        if invoice[party_field] != doc.get(party_field):
+            message = (
+                f"The {party_type} {doc.get(party_field)} does not match with the {party_type} "
+                f"{invoice[party_field]} in the {doctype} {invoice['name']}"
+            )
+            return _refused(417, "ValidationError", message)
+        posted = (invoice["posting_date"], invoice.get("posting_time") or "00:00:00")
+        if (doc["posting_date"], doc.get("posting_time") or "00:00:00") < posted:
+            message = f"Posting timestamp must be after {posted[0]} {posted[1]}"
+            return _refused(417, "ValidationError", message)
+        link = RETURN_LINKS[doctype]
+        originals = {
+            r.get("name") or f"{invoice['name']}-{n}": r
+            for n, r in enumerate(_rows(invoice, "items"), start=1)
+        }
+        taken = self._returned(doctype, invoice["name"])
+        rows = _rows(doc, "items")
+        for number, row in enumerate(rows, start=1):
+            original = originals.get(row.get(link, ""))
+            if original is None:
+                message = (
+                    f"Row # {number}: Returned Item {row['item_code']} does not exist in "
+                    f"{doctype} {invoice['name']}"
+                )
+                return _refused(417, "ValidationError", message)
+            if row["qty"] > 0:
+                return _refused(417, "ValidationError", "Qty must be negative in return document")
+            left = round(original["qty"] - taken.get(row[link], 0.0), 3)
+            if round(-row["qty"], 3) > left:
+                message = (
+                    f"Row # {number}: Cannot return more than {left} for Item {row['item_code']}"
+                )
+                return _refused(417, "StockOverReturnError", message)
+            if doctype == "Sales Invoice" and row["rate"] > original["rate"]:
+                message = (
+                    f"Row # {number}: Rate cannot be greater than the rate used in {doctype} "
+                    f"{invoice['name']}"
+                )
+                return _refused(417, "ValidationError", message)
+            row.update(doctype=f"{doctype} Item", amount=float(round(row["qty"] * row["rate"], 2)))
+            row.setdefault("is_free_item", 0)
+        if not any(row["qty"] < 0 for row in rows):
+            message = (
+                "At least one item should be entered with negative quantity in return document"
+            )
+            return _refused(417, "ValidationError", message)
+        net_total = float(round(sum(r["amount"] for r in rows), 2))
+        taxes = _rows(doc, "taxes")
+        for tax in taxes:
+            if tax.get("charge_type") != "Actual":
+                tax["tax_amount"] = float(round(net_total * tax["rate"] / 100, 2))
+        total_taxes = float(round(sum(t["tax_amount"] for t in taxes), 2))
+        grand_total = round(net_total + total_taxes, 2)
+        self.saves += 1
+        doc.update(
+            items=rows,
+            taxes=taxes,
+            net_total=net_total,
+            total_taxes_and_charges=total_taxes,
+            grand_total=grand_total,
+            outstanding_amount=grand_total,  # update_outstanding_for_self
+            payment_schedule=[],
             status="Draft",
             docstatus=0,
             modified=f"2026-10-28 12:00:00.{self.saves:06d}",
@@ -769,6 +933,16 @@ def _rows(doc: dict[str, Any], table: str) -> list[dict[str, Any]]:
 TAXES_METHOD = "/api/method/erpnext.controllers.accounts_controller.get_taxes_and_charges"
 COMMENT_METHOD = "/api/method/frappe.desk.form.utils.add_comment"
 LOGGED_USER_METHOD = "/api/method/frappe.auth.get_logged_user"
+SALES_RETURN_METHOD = (
+    "/api/method/erpnext.accounts.doctype.sales_invoice.sales_invoice.make_sales_return"
+)
+DEBIT_NOTE_METHOD = (
+    "/api/method/erpnext.accounts.doctype.purchase_invoice.purchase_invoice.make_debit_note"
+)
+# method -> the invoice DocType it maps a return of
+RETURN_METHODS = {SALES_RETURN_METHOD: "Sales Invoice", DEBIT_NOTE_METHOD: "Purchase Invoice"}
+# invoice DocType -> its rows' link to the invoice row a return row takes back
+RETURN_LINKS = {"Sales Invoice": "sales_invoice_item", "Purchase Invoice": "purchase_invoice_item"}
 
 
 # REQ-001-PRS-F006's doors: methods that post, cancel, delete, discard or run a document's

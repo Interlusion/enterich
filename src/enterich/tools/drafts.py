@@ -3,7 +3,7 @@ duplicate check, the update checks, the warnings and their comment, the result."
 
 import html
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, Sequence, Set
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Self
@@ -280,11 +280,14 @@ async def result(
     fields: Sequence[str],
     warnings: list[str],
     row_fields: Sequence[str] = ROW_FIELDS,
+    outside: Set[str] = frozenset(),
 ) -> dict[str, Any]:
     """The draft as REQ-001's Results say, after its warnings went on the draft; its rows
-    cut as a get cuts them (REQ-001-PRS-NF003)."""
+    cut as a get cuts them (REQ-001-PRS-NF003), its `outside` fields under `outside_text`."""
     name = str(saved.get("name"))
-    record = shape(saved, ("name", "modified", "status", "docstatus", "company", *fields))
+    record = shape(
+        saved, ("name", "modified", "status", "docstatus", "company", *fields), outside=outside
+    )
     taxes, taxes_cut = cut_rows(rows_of(saved, "taxes"))
     items, items_cut = cut_rows(rows_of(saved, "items"))
     return {

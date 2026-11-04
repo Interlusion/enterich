@@ -30,6 +30,13 @@ MAX_MESSAGE = 300
 TAXES_METHOD = "erpnext.controllers.accounts_controller.get_taxes_and_charges"
 COMMENT_METHOD = "frappe.desk.form.utils.add_comment"
 LOGGED_USER_METHOD = "frappe.auth.get_logged_user"
+# invoice DocType -> ERPNext's method that maps a return of one (REQ-004, REQ-005)
+RETURN_METHODS = {
+    "Sales Invoice": "erpnext.accounts.doctype.sales_invoice.sales_invoice.make_sales_return",
+    "Purchase Invoice": (
+        "erpnext.accounts.doctype.purchase_invoice.purchase_invoice.make_debit_note"
+    ),
+}
 # A tag starts with its name right after `<` or `</`; `qty < 0 and rate > 5` has none.
 _TAG = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?/?>")
 
@@ -148,6 +155,12 @@ class Erpnext:
         if not all(isinstance(row, dict) for row in rows):
             raise ErpnextError("ERPNext's answer has tax rows that aren't records.")
         return cast("list[dict[str, Any]]", rows)
+
+    async def return_of(self, doctype: str, name: str) -> dict[str, Any]:
+        """ERPNext's return of a submitted invoice, unsaved, as the form gets it."""
+        path = f"/api/method/{RETURN_METHODS[doctype]}"
+        answer = await self._call("GET", path, {"source_name": name})
+        return cast("dict[str, Any]", _expect(answer, "message", dict))
 
     async def insert(self, doctype: str, doc: dict[str, Any]) -> dict[str, Any]:
         """Insert a document; the answer is the document as saved."""
