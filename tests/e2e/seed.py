@@ -62,6 +62,14 @@ RIGHTS = (
             "Customer": ("select",),
         },
     ),
+    Rights(
+        ("create_draft_sales_return", "update_draft_sales_return"),
+        {
+            "Sales Invoice": ("read", "create", OWN_WRITE),
+            **dict.fromkeys(("Address", "Item"), ("read",)),
+            **dict.fromkeys(("Account", "Customer"), ("select",)),
+        },
+    ),
     Rights(("list_suppliers", "get_supplier"), {"Supplier": ("read",), "Address": ("read",)}),
     Rights(("list_purchase_invoices", "get_purchase_invoice"), {"Purchase Invoice": ("read",)}),
     Rights(("list_purchase_tax_templates",), {"Purchase Taxes and Charges Template": ("read",)}),
@@ -77,6 +85,14 @@ RIGHTS = (
             **dict.fromkeys(
                 ("Supplier", "Address", "Item", "Purchase Taxes and Charges Template"), ("read",)
             ),
+            "Account": ("select",),
+        },
+    ),
+    Rights(
+        ("create_draft_purchase_return", "update_draft_purchase_return"),
+        {
+            "Purchase Invoice": ("read", "create", OWN_WRITE),
+            **dict.fromkeys(("Supplier", "Address", "Item"), ("read",)),
             "Account": ("select",),
         },
     ),
