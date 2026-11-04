@@ -19,7 +19,7 @@ from enterich.shapes import (
     in_order,
     today,
 )
-from enterich.tools import Context, Operation, drafts, invoicing
+from enterich.tools import Context, Operation, drafts, invoicing, returns
 from enterich.tools.invoicing import AgeingBasedOn
 
 SALES = invoicing.Side(
@@ -93,6 +93,13 @@ DRAFT_FIELDS = (
     "grand_total",
 )
 DRAFT_MATCH = "customer, posting date and items"
+RETURN_FIELDS = (*DRAFT_FIELDS, "return_against")
+CREDIT_NOTES = returns.Side(
+    invoice="Sales Invoice",
+    refused={"is_pos": "is a POS invoice"},
+    invoice_update="update_draft_sales_invoice",
+    return_update="update_draft_sales_return",
+)
 
 
 class ListCustomers(Inputs):
@@ -165,6 +172,20 @@ class UpdateDraftSalesInvoice(drafts.DraftUpdate):
     due_date: Day | None = None
     items: SalesInvoiceItems | None = None
     taxes_and_charges: Name | Literal[""] | None = None
+    remarks: Remarks | None = None
+
+
+class CreateDraftSalesReturn(Inputs):
+    return_against: Name
+    items: returns.ReturnItems | None = None
+    posting_date: Day | None = None
+    remarks: Remarks | None = None
+    allow_duplicate: Flag = False
+
+
+class UpdateDraftSalesReturn(drafts.DraftUpdate):
+    items: returns.ReturnItems | None = None
+    posting_date: Day | None = None
     remarks: Remarks | None = None
 
 
@@ -276,6 +297,7 @@ async def update_draft_sales_invoice(
     stored = await drafts.editable(
         context, "Sales Invoice", inputs.name, inputs.modified, "the sales invoice"
     )
+    returns.not_a_return(CREDIT_NOTES, stored)
     taxes = None
     if inputs.taxes_and_charges:
         taxes = await drafts.tax_rows(context, SALES.template, inputs.taxes_and_charges)
@@ -287,6 +309,40 @@ async def update_draft_sales_invoice(
     warnings = drafts.tax_warning(saved, inputs.taxes_and_charges)
     warnings += drafts.row_warnings(saved, doc.get("items"))
     return await drafts.result(context, "Sales Invoice", saved, DRAFT_FIELDS, warnings)
+
+
+async def create_draft_sales_return(
+    inputs: CreateDraftSalesReturn, context: Context
+) -> dict[str, Any]:
+    posting_date = inputs.posting_date or today(context.settings.timezone)
+    fields: dict[str, Any] = {"posting_date": posting_date.isoformat(), "set_posting_time": 1}
+    if inputs.remarks is not None:
+        fields["remarks"] = inputs.remarks
+    saved, warnings = await returns.create(
+        CREDIT_NOTES,
+        context,
+        inputs.return_against,
+        inputs.items,
+        fields,
+        inputs.allow_duplicate,
+    )
+    return await drafts.result(context, "Sales Invoice", saved, RETURN_FIELDS, warnings)
+
+
+async def update_draft_sales_return(
+    inputs: UpdateDraftSalesReturn, context: Context
+) -> dict[str, Any]:
+    stored = await returns.editable(CREDIT_NOTES, context, inputs.name, inputs.modified)
+    fields: dict[str, Any] = {}
+    if inputs.posting_date is not None:
+        fields |= {"posting_date": inputs.posting_date.isoformat(), "set_posting_time": 1}
+    if inputs.remarks is not None:
+        fields["remarks"] = inputs.remarks
+    doc = await returns.update(CREDIT_NOTES, context, stored, inputs.items, fields)
+    saved = await drafts.save_update(
+        context, "Sales Invoice", inputs.name, {**doc, "modified": inputs.modified}
+    )
+    return await drafts.result(context, "Sales Invoice", saved, RETURN_FIELDS, [])
 
 
 OPERATIONS: list[Operation[Any]] = [
@@ -393,5 +449,38 @@ OPERATIONS: list[Operation[Any]] = [
         kind="update",
         inputs=UpdateDraftSalesInvoice,
         run=update_draft_sales_invoice,
+    ),
+    Operation(
+        name="create_draft_sales_return",
+        title="Create draft sales return",
+        description=(
+            "Create a draft return (credit note) against a submitted sales invoice of the "
+            "assigned company (`return_against`); a person reviews and submits it in ERPNext. "
+            "The customer, rates, accounts and taxes come from the invoice. Without `items`, "
+            "everything not yet returned is; with `items`, only the given quantities of those "
+            "items (positive numbers), at most what is left to return of each. An invoice "
+            "with a fixed discount or charge is returned only whole. `posting_date` defaults "
+            "to today. A draft return against the same invoice is refused unless "
+            "`allow_duplicate` is true. After an error or a timeout, list the drafts "
+            "(`list_sales_invoices` with `state` draft) before creating again: the first may "
+            "have been saved."
+        ),
+        kind="create",
+        inputs=CreateDraftSalesReturn,
+        run=create_draft_sales_return,
+    ),
+    Operation(
+        name="update_draft_sales_return",
+        title="Update draft sales return",
+        description=(
+            "Change a draft return (credit note) of the assigned company that the agent user "
+            "created. Give its `name` and its `modified` as last read; a draft changed since "
+            "is refused. Give only what changes: `items` replace all rows, at most what is "
+            "left to return of each item; an empty `remarks` clears it. The invoice it returns "
+            "stays; for another invoice, create a new draft."
+        ),
+        kind="update",
+        inputs=UpdateDraftSalesReturn,
+        run=update_draft_sales_return,
     ),
 ]
