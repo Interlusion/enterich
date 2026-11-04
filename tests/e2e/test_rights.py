@@ -81,6 +81,9 @@ UNREFUSED: dict[tuple[str, str | None, str], Callable[[Result], None]] = {
     ("update_draft_sales_invoice", "Sales Invoice", "create"): works,
     ("create_draft_purchase_invoice", "Purchase Invoice", OWN_WRITE): works,
     ("update_draft_purchase_invoice", "Purchase Invoice", "create"): works,
+    # An update of a return's items needs create: ERPNext maps the return as a new document
+    ("create_draft_sales_return", "Sales Invoice", OWN_WRITE): works,
+    ("create_draft_purchase_return", "Purchase Invoice", OWN_WRITE): works,
     ("create_draft_journal_entry", "Journal Entry", OWN_WRITE): works,
     ("update_draft_journal_entry", "Journal Entry", "create"): works,
     ("create_draft_payment_entry", "Payment Entry", OWN_WRITE): works,
@@ -130,6 +133,11 @@ def purchase(seeded: Seed) -> dict[str, Any]:
         ],
         "taxes_and_charges": seeded.purchase_template,
     }
+
+
+def one(seeded: Seed) -> dict[str, Any]:
+    """One of the seeded invoice's item returned: the seeded invoices hold two and one."""
+    return {"items": [{"item_code": seeded.item, "qty": 1}]}
 
 
 def journal(seeded: Seed) -> dict[str, Any]:
@@ -186,6 +194,8 @@ def creates(seeded: Seed, removal: Removal | None) -> dict[str, dict[str, Any]]:
     return {
         "create_draft_sales_invoice": {"customer": seeded.customer, **sales(seeded)},
         "create_draft_purchase_invoice": {"supplier": seeded.supplier, **purchase(seeded)},
+        "create_draft_sales_return": {"return_against": seeded.sales_invoice, **one(seeded)},
+        "create_draft_purchase_return": {"return_against": seeded.purchase_invoice, **one(seeded)},
         "create_draft_journal_entry": journal(seeded),
         "create_draft_payment_entry": {
             **party,
@@ -207,6 +217,8 @@ def arguments(
         changes = {
             "update_draft_sales_invoice": sales(seeded),
             "update_draft_purchase_invoice": purchase(seeded),
+            "update_draft_sales_return": {**one(seeded), "remarks": "Rights"},
+            "update_draft_purchase_return": {**one(seeded), "remarks": "Rights"},
             "update_draft_journal_entry": journal(seeded),
             "update_draft_payment_entry": payment(seeded, removal),
         }[operation]

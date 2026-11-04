@@ -1,7 +1,7 @@
 """The drafts against the seeded site: create and update as the agent user, the warnings
 as a comment on the draft, and the duplicate check with drafts and invoices people made
-(REQ-001 Drafts, REQ-004-PRS-F005, REQ-004-PRS-F006, REQ-005-PRS-F005 to
-REQ-005-PRS-F007, REQ-006-PRS-F005 to REQ-006-PRS-F008, REQ-007-PRS-F004 to
+(REQ-001 Drafts, REQ-004-PRS-F005 to REQ-004-PRS-F008, REQ-005-PRS-F005 to
+REQ-005-PRS-F009, REQ-006-PRS-F005 to REQ-006-PRS-F008, REQ-007-PRS-F004 to
 REQ-007-PRS-F007), and the limit of drafts per hour (REQ-001-PRS-F019).
 
 The seed removes earlier runs' drafts; within a run, each test uses its own quantities
@@ -389,6 +389,85 @@ def test_only_journal_entries_of_its_own_voucher_type_are_updated(
         f"name: the journal entry {theirs['name']!r} doesn't exist, or the agent user isn't "
         "permitted to read it.",
     )
+
+
+# Returns
+
+
+def test_create_and_update_draft_sales_return(mcp: Session, seeded: Seed, site: Site) -> None:
+    one = [{"item_code": seeded.item, "qty": 1}]
+    arguments = {"return_against": seeded.sales_invoice, "items": one, "allow_duplicate": True}
+    draft = mcp.call("create_draft_sales_return", arguments).data
+    assert (draft["return_against"], draft["docstatus"]) == (seeded.sales_invoice, 0)
+    assert (draft["net_total"], draft["grand_total"]) == (-50, -59.5)
+    assert [(r["item_code"], r["qty"]) for r in draft["items"]] == [(seeded.item, -1)]
+    doc = stored(site, "Sales Invoice", draft["name"])
+    invoice = stored(site, "Sales Invoice", seeded.sales_invoice)
+    assert (doc["is_return"], doc["owner"]) == (1, AGENT)
+    assert doc["items"][0]["sales_invoice_item"] == invoice["items"][0]["name"]
+    again = mcp.call("create_draft_sales_return", {**arguments, "allow_duplicate": False})
+    assert again.error
+    assert again.text.startswith("allow_duplicate: ")
+    assert draft["name"] in again.text
+    updated = mcp.call(
+        "update_draft_sales_return",
+        {
+            "name": draft["name"],
+            "modified": draft["modified"],
+            "items": [{"item_code": seeded.item, "qty": 2}],
+        },
+    ).data
+    assert updated["grand_total"] == -119
+    refused = mcp.call(
+        "update_draft_sales_invoice",
+        {"name": draft["name"], "modified": updated["modified"], "remarks": "Changed"},
+    )
+    assert refused.error
+    assert "update_draft_sales_return" in refused.text
+
+
+def test_a_return_above_what_is_left_is_refused(mcp: Session, seeded: Seed) -> None:
+    refused = mcp.call(
+        "create_draft_sales_return",
+        {"return_against": seeded.sales_invoice, "items": [{"item_code": seeded.item, "qty": 3}]},
+    )
+    assert refused.error
+    assert refused.text.startswith("items: ")
+    assert "2 left" in refused.text
+
+
+def test_a_return_on_the_invoices_day_takes_its_posting_time(
+    mcp: Session, seeded: Seed, site: Site
+) -> None:
+    invoice = stored(site, "Sales Invoice", seeded.sales_invoice)
+    arguments = {
+        "return_against": seeded.sales_invoice,
+        "items": [{"item_code": seeded.item, "qty": 1}],
+        "posting_date": invoice["posting_date"],
+        "allow_duplicate": True,
+    }
+    draft = mcp.call("create_draft_sales_return", arguments)
+    assert not draft.error, draft.text
+    doc = stored(site, "Sales Invoice", draft.data["name"])
+    assert (doc["posting_date"], doc["posting_time"]) == (
+        invoice["posting_date"],
+        invoice["posting_time"],
+    )
+
+
+def test_a_debit_note_with_the_credit_notes_number(mcp: Session, seeded: Seed, site: Site) -> None:
+    draft = mcp.call(
+        "create_draft_purchase_return",
+        {
+            "return_against": seeded.purchase_invoice,
+            "bill_no": "E2E-CN-1",
+            "allow_duplicate": True,
+        },
+    ).data
+    assert (draft["outside_text"]["bill_no"], draft["supplier"]) == ("E2E-CN-1", seeded.supplier)
+    assert (draft["grand_total"], draft["posting_date"]) == (-47.6, site_today().isoformat())
+    doc = stored(site, "Purchase Invoice", draft["name"])
+    assert (doc["is_return"], doc["return_against"]) == (1, seeded.purchase_invoice)
 
 
 # Payment entries
