@@ -6,7 +6,7 @@ Diagrams are Mermaid, rendered by GitHub.
 
 ## 1. Introduction and goals
 
-Enterich is an MCP server for ERPNext with hard limits. It lets one AI agent read an ERPNext company's books and prepare drafts of sales invoices, purchase invoices, journal entries and payment entries, which a person reviews and submits. Requirements: the [requirement specifications](../specs/README.md), REQ-001 for the core, REQ-002 for the service and one spec per accounting area.
+Enterich is an MCP server for ERPNext with hard limits. It lets one AI agent read an ERPNext company's books and prepare drafts of sales and purchase invoices and their returns, journal entries and payment entries, which a person reviews and submits. Requirements: the [requirement specifications](../specs/README.md), REQ-001 for the core, REQ-002 for the service and one spec per accounting area.
 
 ### Quality goals
 

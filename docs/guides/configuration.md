@@ -43,7 +43,7 @@ Enterich ignores proxy settings from the environment (`HTTP_PROXY`, `HTTPS_PROXY
 | Variable | Required | Default | Meaning |
 | :- | :- | :- | :- |
 | `ENTERICH_TOOLS` | no | all operations | Comma-separated operation names to offer; an unknown name stops Enterich. When set, operations added in later versions stay off until added here |
-| `ENTERICH_MAX_DRAFTS_PER_HOUR` | no | no limit | The most drafts of each type (sales invoice, purchase invoice, journal entry, payment entry) the agent user may create in an hour, from 1 to 1000; a create beyond it is refused, so a misled agent can't bury the reviewers in drafts. Documents a person created don't count |
+| `ENTERICH_MAX_DRAFTS_PER_HOUR` | no | no limit | The most drafts of each type (sales invoice, purchase invoice, journal entry, payment entry; a return counts as its invoice's type) the agent user may create in an hour, from 1 to 1000; a create beyond it is refused, so a misled agent can't bury the reviewers in drafts. Documents a person created don't count |
 | `ENTERICH_TIMEZONE` | no | `UTC` | IANA time zone name, e.g. `Europe/Berlin`; defines "today" for defaults and the overdue state; set it to the site's time zone (System Settings), which ERPNext uses for a draft's posting date and for the time a document was created, from which the limit of drafts per hour counts |
 | `ENTERICH_HOST` | no | `0.0.0.0` | Listen address |
 | `ENTERICH_PORT` | no | `8000` | Listen port |

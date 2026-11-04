@@ -7,7 +7,6 @@ Quick items. Items with detail have their own file (`item-NNN-*.md`); done or re
 - [ ] Signed commits or tags: should the organisation require them?
 - [ ] OpenSSF Scorecard as a CI job, now that the repository is public.
 - [ ] When the organisation gets a second member: members' base permission read; only owners may change repository visibility or create public packages; `CODEOWNERS` names an organisation team instead of `@loxy`, with write access to the repository.
-- [ ] Drafts of returns (credit notes) against submitted invoices.
 - [ ] Several agent identities in one instance, each with its own ERPNext key (ADR-003 trigger 3).
 - [ ] Guide for several people: one instance per group, each with its own ERPNext agent user, agent identity and `ENTERICH_TOOLS` (for example a read-only instance for most people, a draft instance for bookkeeping), since everyone on one instance shares its identity and sees all the agent user reads ([analysis 001](../analysis/analysis-001-excessive-agency-review.md#32-identity-and-rights), finding 2).
 - [ ] Outside-text fields cut to 500 characters in list and report records too, named in `truncated`, as a get cuts them; a change to REQ-001-PRS-NF003 ([analysis 001](../analysis/analysis-001-excessive-agency-review.md#34-outside-data-in-results), finding 7).
