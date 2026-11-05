@@ -1,7 +1,7 @@
 # Build, runtime and test stages (ADR-005). The runtime image is the last
 # stage, so a plain `docker build` produces it.
 
-FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b981e1334471a90c4a1d93bb490 AS uv
 
 FROM python:3.14-slim@sha256:82abc9f53600280b0757126f83c5a7d47088592d2acb6b4c0b9e97f76865508c AS build
 COPY --from=uv /uv /bin/uv
