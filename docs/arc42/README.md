@@ -68,7 +68,7 @@ flowchart LR
 | `/.well-known/oauth-protected-resource<path>` | client → Enterich | RFC 9728 metadata, no token |
 | `/healthz` | deployment → Enterich | Liveness, no token |
 | JWKS URL | Enterich → authorization server | Signing keys over HTTPS, cached 5 min |
-| ERPNext REST | Enterich → ERPNext | `/api/resource/<fixed DocType>`, `frappe.client.get`, `frappe.desk.query_report.run` with fixed reports, `get_taxes_and_charges`, `frappe.desk.form.utils.add_comment`, `frappe.auth.get_logged_user`; `Authorization: token key:secret` and the configured Host |
+| ERPNext REST | Enterich → ERPNext | `/api/resource/<fixed DocType>`, `frappe.client.get`, `frappe.desk.query_report.run` with fixed reports, `get_taxes_and_charges`, `frappe.desk.form.utils.add_comment`, `frappe.auth.get_logged_user`; `Authorization: token key:secret`, the configured Host and `Accept-Language: en` |
 
 **Out of scope:** signing in and second factors (the authorization server), network policy and rate limits (the deployment), the agent user's role (the site), browser-based clients calling Enterich directly (no CORS), everything the person does in ERPNext.
 
@@ -112,7 +112,7 @@ flowchart TB
 | `auth` | The token verifier of ADR-003; returns the SDK's `AccessToken` with `sub`, `sid` and `expires_at = exp + leeway` |
 | `tools/` | One module per accounting area, named like its spec (`master_data`, `order_to_cash`, `procure_to_pay`, `record_to_report`, `bank_and_cash`): each operation with its input model, ERPNext call and result shape; `drafts` holds what every draft operation shares (tax rows, duplicate check, update checks, warnings), the package itself the run of each operation with its log line and, for a write, its comment on the draft, `invoicing` the reads the sales and purchase side share (parties, invoices, tax templates, the aged report) |
 | `shapes` | Shared input types (names, dates, decimals, limits, keys) with extra properties forbidden, list paging, child-table cutting, the `outside_text` split |
-| `erpnext` | One `httpx2` client with `trust_env=False`: base URL, Host, token header, 30 s per call, 10 MiB per response, no redirects; maps refusals to [REQ-001-PRS-F008](../specs/req-001-core.md#req-001-prs-f008-refusals-reported) messages; encodes name inputs |
+| `erpnext` | One `httpx2` client with `trust_env=False`: base URL, Host, token header, `Accept-Language: en`, 30 s per call, 10 MiB per response, no redirects; maps refusals to [REQ-001-PRS-F008](../specs/req-001-core.md#req-001-prs-f008-refusals-reported) messages; encodes name inputs |
 | `log` | JSON-lines logging for Enterich's events and the SDK's and uvicorn's loggers |
 
 Repository layout: [development guide](../guides/development.md).

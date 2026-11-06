@@ -85,6 +85,8 @@ class Erpnext:
                 "authorization": f"token {key}:{secret}",
                 "host": settings.erpnext_host,
                 "accept": "application/json",
+                # With an API key, ERPNext takes the language from the request, not the user
+                "accept-language": "en",
             },
             # A jar that stores nothing: no session cookie ever goes back to ERPNext.
             cookies=CookieJar(policy=DefaultCookiePolicy(allowed_domains=[])),
