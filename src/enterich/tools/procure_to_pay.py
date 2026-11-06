@@ -358,7 +358,13 @@ async def create_draft_purchase_invoice(
     warnings += drafts.tax_warning(saved, inputs.taxes_and_charges)
     warnings += drafts.row_warnings(saved, doc["items"], account="expense_account")
     return drafts.result(
-        context, "Purchase Invoice", saved, DRAFT_FIELDS, warnings, DRAFT_ROW_FIELDS
+        context,
+        "Purchase Invoice",
+        saved,
+        DRAFT_FIELDS,
+        warnings,
+        DRAFT_ROW_FIELDS,
+        tax_fields=drafts.PURCHASE_TAX_FIELDS,
     )
 
 
@@ -387,7 +393,13 @@ async def update_draft_purchase_invoice(
     warnings += drafts.tax_warning(saved, inputs.taxes_and_charges)
     warnings += drafts.row_warnings(saved, doc.get("items"), account="expense_account")
     return drafts.result(
-        context, "Purchase Invoice", saved, DRAFT_FIELDS, warnings, DRAFT_ROW_FIELDS
+        context,
+        "Purchase Invoice",
+        saved,
+        DRAFT_FIELDS,
+        warnings,
+        DRAFT_ROW_FIELDS,
+        tax_fields=drafts.PURCHASE_TAX_FIELDS,
     )
 
 
@@ -438,6 +450,7 @@ async def create_draft_purchase_return(
         warnings,
         DRAFT_ROW_FIELDS,
         outside={"bill_no"},
+        tax_fields=drafts.PURCHASE_TAX_FIELDS,
     )
 
 
@@ -464,6 +477,7 @@ async def update_draft_purchase_return(
         warnings,
         DRAFT_ROW_FIELDS,
         outside={"bill_no"},
+        tax_fields=drafts.PURCHASE_TAX_FIELDS,
     )
 
 
@@ -511,6 +525,7 @@ OPERATIONS: list[Operation[Any]] = [
         description=(
             "Get one purchase invoice of the assigned company by its exact number (`name`), "
             "with its item and tax rows."
+            f" {invoicing.PURCHASE_TAX_RATE_NOTE}"
         ),
         kind="read",
         inputs=GetPurchaseInvoice,
@@ -559,6 +574,7 @@ OPERATIONS: list[Operation[Any]] = [
             "`expense_account` ERPNext replaced, are named in `warnings`. After an error or a "
             "timeout, list the drafts (`list_purchase_invoices` with `state` draft) before "
             "creating again: the first may have been saved."
+            f" {invoicing.PURCHASE_TAX_RATE_NOTE}"
         ),
         kind="create",
         inputs=CreateDraftPurchaseInvoice,
@@ -574,6 +590,7 @@ OPERATIONS: list[Operation[Any]] = [
             "Give only what changes: `items` replace all rows; an empty `bill_no`, `remarks` or "
             "`taxes_and_charges` clears it, and a cleared tax template takes its tax rows with it. "
             "The supplier stays; for another supplier, create a new draft."
+            f" {invoicing.PURCHASE_TAX_RATE_NOTE}"
         ),
         kind="update",
         inputs=UpdateDraftPurchaseInvoice,
@@ -596,6 +613,7 @@ OPERATIONS: list[Operation[Any]] = [
             "refused unless `allow_duplicate` is true. "
             "After an error or a timeout, list the drafts (`list_purchase_invoices` with "
             "`state` draft) before creating again: the first may have been saved."
+            f" {invoicing.PURCHASE_TAX_RATE_NOTE}"
         ),
         kind="create",
         inputs=CreateDraftPurchaseReturn,
@@ -611,6 +629,7 @@ OPERATIONS: list[Operation[Any]] = [
             "is refused. Give only what changes: `items` replace all rows, at most what is "
             "left to return of each item; an empty `remarks` or `bill_no` clears it. The "
             "invoice it returns stays; for another invoice, create a new draft."
+            f" {invoicing.PURCHASE_TAX_RATE_NOTE}"
         ),
         kind="update",
         inputs=UpdateDraftPurchaseReturn,

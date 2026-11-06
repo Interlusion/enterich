@@ -49,6 +49,8 @@ Enterich ignores proxy settings from the environment (`HTTP_PROXY`, `HTTPS_PROXY
 | `ENTERICH_PORT` | no | `8000` | Listen port |
 | `ENTERICH_LOG_LEVEL` | no | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, for the lines of libraries and the HTTP server; Enterich's own events are always written. No level logs secrets or tokens |
 
+On Kubernetes, a Service named `enterich` stops Enterich from starting: Kubernetes sets `ENTERICH_PORT=tcp://<address>:<port>` in the pods of its namespace (service links), which Enterich reads as its listen port and refuses as not a whole number. It sets these variables only for Services that exist when a pod starts, so a first rollout may start and a later restart fail. Any of these prevents it: a Service name that doesn't start with `enterich` (with another such name, Kubernetes' `ENTERICH_…` variables only bring warnings about unknown variables at start), `enableServiceLinks: false` in the pod spec (in a Deployment, under `spec.template.spec`), or `ENTERICH_PORT` set in the container, which Kubernetes doesn't override.
+
 ## What the site must provide
 
 Enterich neither creates nor checks the agent user's rights; ERPNext enforces them. The site provides:

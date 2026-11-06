@@ -18,6 +18,7 @@ from tests.e2e.seed import (
     CAPITAL,
     COMPANY,
     DEBTORS,
+    EU_PURCHASE,
     SALES_VAT,
     Seed,
     advances_apart,
@@ -27,7 +28,7 @@ from tests.e2e.site import Site
 from tests.integration.mcp import Session
 
 # The setup wizard's default sales template: its rates are 0 % and come from item tax
-# templates, which the seeded items don't have.
+# templates, which only the seeded item_taxed_19 has.
 ZERO_TEMPLATE = "Lieferung oder sonstige Leistung im Inland - EX"
 
 
@@ -111,6 +112,39 @@ def test_the_warnings_go_on_the_draft_as_one_comment(
     assert comment["owner"] == AGENT
     assert comment["content"].startswith("Enterich: create_draft_sales_invoice, call ")
     assert comment["content"].endswith("<br>" + "<br>".join(draft["warnings"]))
+
+
+def test_a_tax_row_keeps_its_rate_when_an_item_tax_template_taxes_the_item(
+    mcp: Session, seeded: Seed
+) -> None:
+    draft = mcp.call(
+        "create_draft_sales_invoice",
+        {
+            "customer": seeded.customer,
+            "items": [{"item_code": seeded.item_taxed_19, "qty": 1, "rate": 100}],
+            "taxes_and_charges": ZERO_TEMPLATE,
+        },
+    ).data
+    assert (draft["net_total"], draft["grand_total"], draft["warnings"]) == (100, 119, [])
+    [row] = [r for r in draft["taxes"] if r["account_head"] == SALES_VAT[1]]
+    assert (row["rate"], row["tax_amount"]) == (0, 19)
+
+
+def test_a_reverse_charge_purchase_draft_adds_and_deducts_and_doesnt_warn(
+    mcp: Session, seeded: Seed
+) -> None:
+    draft = mcp.call(
+        "create_draft_purchase_invoice",
+        {
+            "supplier": seeded.supplier,
+            "bill_no": "E2E-EU-1",
+            "items": [{"item_code": seeded.item_taxed_19, "qty": 1, "rate": 100}],
+            "taxes_and_charges": EU_PURCHASE,
+        },
+    ).data
+    taxed = [(t["add_deduct_tax"], t["tax_amount"]) for t in draft["taxes"] if t["tax_amount"]]
+    assert sorted(taxed) == [("Add", 19), ("Deduct", 19)]
+    assert (draft["total_taxes_and_charges"], draft["warnings"]) == (0, [])
 
 
 def test_a_persons_sales_draft_is_a_duplicate(mcp: Session, seeded: Seed, site: Site) -> None:

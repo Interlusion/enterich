@@ -206,7 +206,7 @@ Supplier names are not in report rows; `get_supplier` gives them. `bill_no` and 
 - `bill_no` is the supplier's invoice number as printed: a string of 1–140 characters without leading or trailing whitespace, not a name. Clearable on update: `remarks`, `bill_no`, `taxes_and_charges` (with its rows).
 - The supplier isn't changed by an update: ERPNext would keep the first supplier's address, payment terms, price list and payable account. A draft for another supplier is a new draft.
 - Rates come from the supplier's bill, so `rate` is required. Enterich never sends `ignore_pricing_rule`; REQ-001-PRS-F016 warns where a buying pricing rule replaced a given rate.
-- Results add: `supplier`, `posting_date`, `due_date`, `currency`, `net_total`, `total_taxes_and_charges`, `grand_total`, `taxes` \[`account_head`, `rate`, `tax_amount`\], `items` \[`item_code`, `qty`, `rate`, `amount`, `expense_account`, `is_free_item`\].
+- Results add: `supplier`, `posting_date`, `due_date`, `currency`, `net_total`, `total_taxes_and_charges`, `grand_total`, `taxes` \[`account_head`, `rate`, `tax_amount`, `add_deduct_tax`\], `items` \[`item_code`, `qty`, `rate`, `amount`, `expense_account`, `is_free_item`\].
 
 | Operation | Inputs | Sent to ERPNext |
 | :- | :- | :- |

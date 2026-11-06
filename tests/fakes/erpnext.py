@@ -521,7 +521,7 @@ class FakeErpnext:
         taxes = _rows(doc, "taxes")
         for tax in taxes:
             tax["tax_amount"] = float(round(net_total * tax["rate"] / 100, 2))
-        total_taxes = float(round(sum(t["tax_amount"] for t in taxes), 2))
+        total_taxes = _tax_total(taxes)
         self.saves += 1
         doc.update(
             items=rows,
@@ -681,7 +681,7 @@ class FakeErpnext:
         for tax in taxes:
             if tax.get("charge_type") != "Actual":
                 tax["tax_amount"] = float(round(net_total * tax["rate"] / 100, 2))
-        total_taxes = float(round(sum(t["tax_amount"] for t in taxes), 2))
+        total_taxes = _tax_total(taxes)
         grand_total = round(net_total + total_taxes, 2)
         self.saves += 1
         doc.update(
@@ -1752,3 +1752,12 @@ def payment_entry(name: str = "ACC-PAY-2026-00001", **overrides: Any) -> dict[st
     }
     doc.update(overrides)
     return doc
+
+
+def _tax_total(taxes: list[dict[str, Any]]) -> float:
+    """The rows' tax as ERPNext totals it: a purchase row with add_deduct_tax Deduct keeps
+    a positive tax_amount and is subtracted."""
+    signed = (
+        -t["tax_amount"] if t.get("add_deduct_tax") == "Deduct" else t["tax_amount"] for t in taxes
+    )
+    return float(round(sum(signed), 2))

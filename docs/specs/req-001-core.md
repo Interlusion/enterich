@@ -347,13 +347,14 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-F012: Tax template without tax
 
-**Description**: A create or update result SHOULD carry a warning when a tax template was given and the draft's tax total is zero.
+**Description**: A create or update result SHOULD carry a warning when a tax template was given and every tax row of the draft has a tax amount of zero.
 
 **Related URS**: REQ-001-URS-F002
 
 **Definition of Done**:
 
 - A draft with a template whose rows have rate 0 and items without an item tax template returns the warning.
+- A purchase draft whose Add and Deduct rows cancel out to a tax total of 0, as with a reverse-charge template, doesn't.
 - Verification: test.
 - Evidence: Enterich's test suite.
 
@@ -537,6 +538,7 @@ Numbers are read as decimals, never as binary floating point. Every operation re
 - **Every record and child row** carries an `outside_text` object, empty when it has no such field.
 - **Yes/no fields** (ERPNext's Check fields, stored as 0 and 1) are returned as `true` and `false`.
 - **`url`** is the document's form in ERPNext, built as ERPNext v16 builds it: the public URL, `/desk/`, the DocType in lower case with hyphens for spaces, and the name percent-encoded as one segment (`/desk/sales-invoice/SINV-2026-00001`).
+- **Tax rows** (`taxes`): `rate` is the rate saved on the row and `tax_amount` the row's tax. An item with an item tax template is taxed at that template's rate on the rows whose accounts the template lists, or not by such a row at all, so `rate` need not be the rate any item was taxed at. On a purchase invoice, a row with `add_deduct_tax` Deduct is subtracted from the total. The description of every operation whose result has tax rows says so.
 - **Creates and updates:** the draft's `name`, `modified`, `status`, `docstatus`, `company`, the further fields its area spec lists, `url`, `warnings`, and `truncated`: its child tables are cut to 100 rows each, as in gets.
 
 ### States
@@ -590,6 +592,8 @@ Checked on a real ERPNext v16 site by the end-to-end test:
 
 - ERPNext v16's REST API: `/api/resource` for lists, inserts and updates; `frappe.client.get` for a document with its rows; `frappe.desk.query_report.run` for reports; ERPNext's `get_taxes_and_charges` for a template's rows. Enterich calls these only with fixed DocTypes, reports and methods. Report filters and columns are the ones the area specs' catalogues name, as checked against ERPNext v16.52's source too (area specs).
 - With write only if creator on the draft DocTypes, the agent user's key reads, lists and comments on every draft, child rows included, and changes or discards only the drafts it created, a person's edit of such a draft notwithstanding; a person's draft is refused with 403 `PermissionError`.
+- An item with an item tax template is taxed, on a tax row whose account the template lists, at the template's rate for it, and not by that row if the template marks the account not applicable; on other rows at the row's rate. The row keeps the rate it was saved with (`_get_tax_rate`): with the setup wizard's German sales template, whose rows carry 0 %, and an item taxed at 19 %, the row's `rate` is 0 and its `tax_amount` 19 % of the item's amount.
+- On a purchase invoice, a row with `add_deduct_tax` Deduct keeps a positive `tax_amount`, and the total subtracts it: with a reverse-charge template, an Add and a Deduct row of the same amount make a tax total of 0.
 
 Not checked yet:
 
