@@ -14,7 +14,7 @@ Mark every draft Enterich creates or changes in ERPNext with where it came from:
 
 ## Context
 
-Today a draft shows only the agent user as owner, and ERPNext's version history shows its changes. Session, operation and arguments are in Enterich's `operation` log line ([REQ-002-PRS-NF008](../specs/req-002-service.md#req-002-prs-nf008-log)), which lives on the platform's log store, apart from the books. A comment comes only with warnings ([REQ-001-PRS-F015](../specs/req-001-core.md#req-001-prs-f015-warnings-on-the-draft)). The auditor's expectation is "for every change, who made it and through which connection" ([REQ-001-P2](../specs/req-001-core.md#req-001-p2-the-auditor)).
+Today a draft shows only the agent user as owner, and ERPNext's version history shows its changes. Session, operation and arguments are in Enterich's `operation` log line ([REQ-002-PRS-NF008](../specs/req-002-service.md#req-002-prs-nf008-log)), which lives on the platform's log store, apart from the books. A comment comes only with warnings ([REQ-001-PRS-F015](../specs/req-001-core.md#req-001-prs-f015-origin-and-warnings-on-the-draft)). The auditor's expectation is "for every change, who made it and through which connection" ([REQ-001-P2](../specs/req-001-core.md#req-001-p2-the-auditor)).
 
 ## Conditions
 

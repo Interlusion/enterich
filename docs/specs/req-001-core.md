@@ -167,6 +167,12 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 **Related User Stories**: REQ-001-P1-7 | **Rationale**: Drafts wait for a person, but a reviewer facing a hundred of them checks each less. An agent misled by outside text, or caught in a loop, creates drafts faster than anyone reviews them, and the duplicate check doesn't stop it: the agent can pass `allow_duplicate` itself.
 
+#### REQ-001-URS-F011: Each write traceable from the draft
+
+**Description**: Each draft written through Enterich SHALL show in ERPNext which operation wrote it, and a handle that finds that write in Enterich's log.
+
+**Related User Stories**: REQ-001-P1-6, REQ-001-P2-1, REQ-001-P3-1 | **Rationale**: The owner shows only the agent user, and ERPNext's version history shows what changed, not through which operation or session. The log holds that, apart from the books; the reviewer and the auditor start from the draft.
+
 ## URS — Non-Functional
 
 #### REQ-001-URS-NF001: Safe without client-side approval
@@ -381,20 +387,22 @@ Only a fixed list of operations, without generic method calls, closes these door
 - Verification: test.
 - Evidence: Enterich's test suite.
 
-#### REQ-001-PRS-F015: Warnings on the draft
+#### REQ-001-PRS-F015: Origin and warnings on the draft
 
-**Description**: When a create or update returns warnings, Enterich SHALL also add them to the draft in ERPNext as a comment, as plain text starting with "Enterich:", through `frappe.desk.form.utils.add_comment`. If adding the comment fails, the result SHALL say so; the draft stays as written.
+**Description**: After each create or update that ERPNext answered with the written draft, and whose result Enterich returns, Enterich SHALL add one comment to the draft through `frappe.desk.form.utils.add_comment`, as plain text starting with "Enterich:". It SHALL name the operation and its call ID, the ID of the operation's log line (REQ-002-PRS-NF008); for an update, the inputs given besides `name` and `modified`, after the word "given"; and the result's warnings, each on its own line. It SHALL hold no input values beyond these names and what the warnings name, no outside text, and nothing of the access token or its session. The comment SHALL be added within the operation's 60 seconds (REQ-002-PRS-NF011). If adding it fails or the time runs out, the result's warnings SHALL say so; the draft stays as written.
 
-**Related URS**: REQ-001-URS-F009
+**Related URS**: REQ-001-URS-F009, REQ-001-URS-F011
 
 **Definition of Done**:
 
-- A create with `allow_duplicate: true` that matches an existing draft leaves a comment on the new draft naming the match.
-- A draft with a tax template and zero tax gets the comment of REQ-001-PRS-F012.
+- A create leaves one comment naming the operation and the call ID that its `operation` log line carries; an update giving `items` and `remarks` leaves one naming them too.
+- A create with `allow_duplicate: true` that matches an existing draft leaves one comment, which also names the match.
+- A draft with a tax template and zero tax gets the warning of REQ-001-PRS-F012 in its comment.
+- A refused create or update leaves no comment, and so does a create whose result Enterich refuses as too large.
 - Markup in a warning reaches ERPNext escaped, as text.
-- A failing comment call yields a result with the draft and a note that the comment is missing.
+- A failing comment call yields a result with the draft and a warning that the comment is missing; so does a comment call that would end after the operation's 60 seconds, and the result comes within them.
 - Verification: test.
-- Evidence: Enterich's test suite.
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
 
 #### REQ-001-PRS-F016: Rates ERPNext set
 
@@ -546,7 +554,7 @@ Document `state` inputs map to ERPNext as follows. No `state` means all, unless 
 
 ### ERPNext calls
 
-Lists use `/api/resource/<DocType>` with the fields of their area catalogue; gets use `frappe.client.get`; reports use `frappe.desk.query_report.run` with `are_default_filters` false, so a site's saved report filters never replace Enterich's. Each area spec's ERPNext calls table names, for its reads and duplicate checks, the DocType or report, the fixed filters and the order. Creates and updates make these further calls: `get_taxes_and_charges` for a given tax template's rows, ERPNext's return of an invoice for a return draft (the area specs name the method), `frappe.client.get` for the draft before an update, `frappe.auth.get_logged_user` for the agent user's name, at the first update or counted create and again after a failed answer, which it keeps until it stops, a list of the agent user's documents of the DocType created since an hour ago (`owner`, `creation`) for the limit of REQ-001-PRS-F019, `/api/resource` to write (POST for a create, PUT for an update), and `frappe.desk.form.utils.add_comment` (POST) for warnings (REQ-001-PRS-F015), which needs only read on the draft. Every list of a company's records and every report filters by the assigned company (REQ-001-PRS-F007). Enterich leaves out the total row ERPNext appends to a report's rows and computes the totals its area spec names itself. A site that runs a report as a prepared report, or as a snapshot report on synced data, gets a refusal saying so; Enterich doesn't wait for prepared reports and doesn't take snapshots for current data. ERPNext turns a report into a prepared report for good after one run longer than 15 seconds; the configuration guide says how a site prevents that.
+Lists use `/api/resource/<DocType>` with the fields of their area catalogue; gets use `frappe.client.get`; reports use `frappe.desk.query_report.run` with `are_default_filters` false, so a site's saved report filters never replace Enterich's. Each area spec's ERPNext calls table names, for its reads and duplicate checks, the DocType or report, the fixed filters and the order. Creates and updates make these further calls: `get_taxes_and_charges` for a given tax template's rows, ERPNext's return of an invoice for a return draft (the area specs name the method), `frappe.client.get` for the draft before an update, `frappe.auth.get_logged_user` for the agent user's name, at the first update or counted create and again after a failed answer, which it keeps until it stops, a list of the agent user's documents of the DocType created since an hour ago (`owner`, `creation`) for the limit of REQ-001-PRS-F019, `/api/resource` to write (POST for a create, PUT for an update), and `frappe.desk.form.utils.add_comment` (POST) for the draft's comment (REQ-001-PRS-F015), which needs only read on the draft. Every list of a company's records and every report filters by the assigned company (REQ-001-PRS-F007). Enterich leaves out the total row ERPNext appends to a report's rows and computes the totals its area spec names itself. A site that runs a report as a prepared report, or as a snapshot report on synced data, gets a refusal saying so; Enterich doesn't wait for prepared reports and doesn't take snapshots for current data. ERPNext turns a report into a prepared report for good after one run longer than 15 seconds; the configuration guide says how a site prevents that.
 
 ### Drafts
 

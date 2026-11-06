@@ -220,7 +220,7 @@ ERPNext v16's voucher types: Journal Entry, Inter Company Journal Entry, Bank En
 
 The accounts, cost centres, parties and invoices a journal entry's rows link to need no right: ERPNext checks a link without the user's permissions.
 
-Warnings are added to a draft as a comment, which needs no further right (REQ-001-PRS-F015).
+Enterich's comment on a draft, with its warnings, needs no further right (REQ-001-PRS-F015).
 
 ## Acceptance Criteria Summary
 
