@@ -288,7 +288,7 @@ async def create_draft_sales_invoice(
     warnings = [drafts.duplicate_warning(matches, DRAFT_MATCH)] if matches else []
     warnings += drafts.tax_warning(saved, inputs.taxes_and_charges)
     warnings += drafts.row_warnings(saved, doc["items"])
-    return await drafts.result(context, "Sales Invoice", saved, DRAFT_FIELDS, warnings)
+    return drafts.result(context, "Sales Invoice", saved, DRAFT_FIELDS, warnings)
 
 
 async def update_draft_sales_invoice(
@@ -308,7 +308,7 @@ async def update_draft_sales_invoice(
     )
     warnings = drafts.tax_warning(saved, inputs.taxes_and_charges)
     warnings += drafts.row_warnings(saved, doc.get("items"))
-    return await drafts.result(context, "Sales Invoice", saved, DRAFT_FIELDS, warnings)
+    return drafts.result(context, "Sales Invoice", saved, DRAFT_FIELDS, warnings)
 
 
 async def create_draft_sales_return(
@@ -326,7 +326,7 @@ async def create_draft_sales_return(
         fields,
         inputs.allow_duplicate,
     )
-    return await drafts.result(context, "Sales Invoice", saved, RETURN_FIELDS, warnings)
+    return drafts.result(context, "Sales Invoice", saved, RETURN_FIELDS, warnings)
 
 
 async def update_draft_sales_return(
@@ -342,7 +342,7 @@ async def update_draft_sales_return(
     saved = await drafts.save_update(
         context, "Sales Invoice", inputs.name, {**doc, "modified": inputs.modified}
     )
-    return await drafts.result(context, "Sales Invoice", saved, RETURN_FIELDS, [])
+    return drafts.result(context, "Sales Invoice", saved, RETURN_FIELDS, [])
 
 
 OPERATIONS: list[Operation[Any]] = [
@@ -435,6 +435,7 @@ OPERATIONS: list[Operation[Any]] = [
         kind="create",
         inputs=CreateDraftSalesInvoice,
         run=create_draft_sales_invoice,
+        doctype="Sales Invoice",
     ),
     Operation(
         name="update_draft_sales_invoice",
@@ -449,6 +450,7 @@ OPERATIONS: list[Operation[Any]] = [
         kind="update",
         inputs=UpdateDraftSalesInvoice,
         run=update_draft_sales_invoice,
+        doctype="Sales Invoice",
     ),
     Operation(
         name="create_draft_sales_return",
@@ -468,6 +470,7 @@ OPERATIONS: list[Operation[Any]] = [
         kind="create",
         inputs=CreateDraftSalesReturn,
         run=create_draft_sales_return,
+        doctype="Sales Invoice",
     ),
     Operation(
         name="update_draft_sales_return",
@@ -482,5 +485,6 @@ OPERATIONS: list[Operation[Any]] = [
         kind="update",
         inputs=UpdateDraftSalesReturn,
         run=update_draft_sales_return,
+        doctype="Sales Invoice",
     ),
 ]

@@ -468,10 +468,8 @@ def _payment_warnings(saved: dict[str, Any]) -> list[str]:
     return warnings
 
 
-async def _payment_result(
-    context: Context, saved: dict[str, Any], warnings: list[str]
-) -> dict[str, Any]:
-    """The draft as REQ-001's Results say, after its warnings went on the draft."""
+def _payment_result(context: Context, saved: dict[str, Any], warnings: list[str]) -> dict[str, Any]:
+    """The draft as REQ-001's Results say."""
     name = str(saved.get("name"))
     record = shape(
         saved,
@@ -484,7 +482,7 @@ async def _payment_result(
         **record,
         "references": [shape(r, DRAFT_REFERENCE_FIELDS) for r in references],
         "url": form_url(context.settings.erpnext_public_url, "Payment Entry", name),
-        "warnings": await drafts.comment(context, "Payment Entry", name, warnings),
+        "warnings": warnings,
         "truncated": ["references"] if cut else [],
         "outside_text": outside_text,
     }
@@ -521,7 +519,7 @@ async def create_draft_payment_entry(
     warnings = (
         [drafts.duplicate_warning(matches, PAYMENT_MATCH, "payment entry")] if matches else []
     )
-    return await _payment_result(context, saved, warnings + _payment_warnings(saved))
+    return _payment_result(context, saved, warnings + _payment_warnings(saved))
 
 
 async def update_draft_payment_entry(
@@ -581,7 +579,7 @@ async def update_draft_payment_entry(
     warnings = (
         [drafts.duplicate_warning(matches, PAYMENT_MATCH, "payment entry")] if matches else []
     )
-    return await _payment_result(context, saved, warnings + _payment_warnings(saved))
+    return _payment_result(context, saved, warnings + _payment_warnings(saved))
 
 
 OPERATIONS: list[Operation[Any]] = [
@@ -673,6 +671,7 @@ OPERATIONS: list[Operation[Any]] = [
         kind="create",
         inputs=CreateDraftPaymentEntry,
         run=create_draft_payment_entry,
+        doctype="Payment Entry",
     ),
     Operation(
         name="update_draft_payment_entry",
@@ -687,5 +686,6 @@ OPERATIONS: list[Operation[Any]] = [
         kind="update",
         inputs=UpdateDraftPaymentEntry,
         run=update_draft_payment_entry,
+        doctype="Payment Entry",
     ),
 ]

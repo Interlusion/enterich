@@ -6,7 +6,9 @@ and the error names the input (REQ-001-PRS-F008, REQ-002-PRS-NF008). It
 returns errors as results, so the agent gets Enterich's text unchanged.
 """
 
+import html
 import logging
+import secrets
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from collections.abc import Set as AbstractSet
@@ -16,6 +18,7 @@ from typing import Any, Literal, cast
 
 import anyio
 from mcp.server.auth.middleware.auth_context import get_access_token
+from mcp.server.mcpserver import Context as Request
 from mcp.server.mcpserver.tools import Tool
 from mcp.server.mcpserver.utilities.func_metadata import ArgModelBase, FuncMetadata
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
@@ -39,6 +42,9 @@ OPERATION_TIMEOUT = 60.0
 MAX_LOGGED_STRING = 200
 MAX_LOGGED_ITEMS = 100
 UNEXPECTED = "Enterich failed unexpectedly; the operator finds the details in Enterich's log."
+# The keyword the SDK hands a tool its request under; the client's arguments come in one
+# dict beside it, so a client argument of that name stays an argument
+REQUEST = "enterich_request"
 
 type Kind = Literal["read", "create", "update"]
 
@@ -61,6 +67,7 @@ class Operation[I: Inputs]:
     kind: Kind
     inputs: type[I]
     run: Callable[[I, Context], Awaitable[dict[str, Any]]]
+    doctype: str | None = None  # the DocType a create or update writes
 
 
 def operations() -> list[Operation[Any]]:
@@ -93,13 +100,52 @@ def build(settings: Settings, client: Erpnext) -> list[Tool]:
     return [_tool(op, context) for op in operations() if op.name in offered]
 
 
+def _origin(op: Operation[Any], call: str, inputs: Inputs) -> str:
+    """REQ-001-PRS-F015: the operation, its call, and an update's given inputs by name."""
+    origin = f"{op.name}, call {call}"
+    if op.kind == "update":
+        given = inputs.model_dump(exclude_none=True)
+        named = [
+            f for f in type(inputs).model_fields if f in given and f not in ("name", "modified")
+        ]
+        origin += f"; given {', '.join(named)}"
+    return origin + "."
+
+
+async def _comment(
+    context: Context,
+    op: Operation[Any],
+    name: str,
+    origin: str,
+    warnings: list[str],
+    deadline: float,
+) -> list[str]:
+    """REQ-001-PRS-F015: one comment with the origin and the warnings, as plain text, by the
+    operation's deadline; a failure is one more warning."""
+    # The content is HTML: each line escaped, one per line
+    lines = [origin, *warnings]
+    content = "Enterich: " + "<br>".join(html.escape(line, quote=False) for line in lines)
+    with anyio.move_on_after(deadline - time.monotonic()) as scope:
+        try:
+            await context.erpnext.add_comment(str(op.doctype), name, content)
+        except ErpnextError as exc:
+            return [*warnings, f"Enterich's comment couldn't be added to the draft: {exc}"]
+    if scope.cancelled_caught:
+        return [
+            *warnings,
+            f"Enterich's comment couldn't be added to the draft within the operation's "
+            f"{OPERATION_TIMEOUT:g} seconds; it may be missing.",
+        ]
+    return warnings
+
+
 class _AnyArguments(ArgModelBase):
     """Hands every argument through; the operation's own model validates them."""
 
     model_config = ConfigDict(extra="allow")
 
     def model_dump_one_level(self) -> dict[str, Any]:
-        return dict(self.model_extra or {})
+        return {"arguments": dict(self.model_extra or {})}
 
 
 def _annotations(op: Operation[Any]) -> ToolAnnotations:
@@ -116,8 +162,11 @@ def _annotations(op: Operation[Any]) -> ToolAnnotations:
 
 
 def _tool(op: Operation[Any], context: Context) -> Tool:
-    async def handler(**arguments: Any) -> CallToolResult:
-        return await _run(op, context, arguments)
+    async def handler(
+        arguments: dict[str, Any], enterich_request: Request[Any, Any] | None = None
+    ) -> CallToolResult:
+        request_id = enterich_request.request_id if enterich_request else None
+        return await _run(op, context, arguments, request_id)
 
     return Tool(
         fn=handler,
@@ -127,7 +176,7 @@ def _tool(op: Operation[Any], context: Context) -> Tool:
         parameters=op.inputs.model_json_schema(),
         fn_metadata=FuncMetadata(arg_model=_AnyArguments),
         is_async=True,
-        context_kwarg=None,
+        context_kwarg=REQUEST,
         annotations=_annotations(op),
     )
 
@@ -213,28 +262,32 @@ async def report_rows(
     return [cast("dict[str, Any]", row) for row in listed if isinstance(row, dict)]
 
 
-async def _run(op: Operation[Any], context: Context, arguments: dict[str, Any]) -> CallToolResult:
+async def _run(
+    op: Operation[Any], context: Context, arguments: dict[str, Any], request_id: str | None
+) -> CallToolResult:
     """Run one operation; the result goes back as it is, so no SDK prefix lengthens an error."""
     started = time.monotonic()
+    call = secrets.token_hex(6)  # REQ-002-PRS-NF008
     with erpnext.metered() as meter:
         try:
-            text, outcome = await _attempt(op, context, arguments)
+            text, outcome = await _attempt(op, context, arguments, call)
         except Exception as exc:  # noqa: BLE001 - logged here with the operation
-            log.failure(exc, context.settings.secrets, operation=op.name)
+            log.failure(exc, context.settings.secrets, operation=op.name, call=call)
             text, outcome = UNEXPECTED, {"refusal": UNEXPECTED}
-        _log(op, arguments, started, meter, outcome)
+        _log(op, arguments, started, meter, outcome, call, request_id)
     return CallToolResult(
         content=[TextContent(type="text", text=text)], is_error="refusal" in outcome
     )
 
 
 async def _attempt(
-    op: Operation[Any], context: Context, arguments: dict[str, Any]
+    op: Operation[Any], context: Context, arguments: dict[str, Any], call: str
 ) -> tuple[str, dict[str, Any]]:
     try:
         inputs = op.inputs.model_validate(arguments)
     except ValidationError as exc:
         return _refused(_validation_text(exc))
+    deadline = time.monotonic() + OPERATION_TIMEOUT
     try:
         with anyio.fail_after(OPERATION_TIMEOUT):
             result = await op.run(inputs, context)
@@ -248,6 +301,13 @@ async def _attempt(
             "The result would exceed 100,000 characters: narrow a list or report (a search, "
             "a filter or a smaller limit); a single document this large is too large to return."
         )
+    if op.kind != "read":
+        origin = _origin(op, call, inputs)
+        result["warnings"] = await _comment(
+            context, op, str(result["name"]), origin, result["warnings"], deadline
+        )
+        # A warning about the comment that takes the result over the limit is left out
+        text = to_text(result) or text
     return text, _outcome(op, result)
 
 
@@ -278,6 +338,8 @@ def _log(
     started: float,
     meter: erpnext.Meter,
     outcome: dict[str, Any],
+    call: str,
+    request_id: str | None,
 ) -> None:
     access = get_access_token()
     claims = access.claims if access and access.claims else {}
@@ -285,6 +347,8 @@ def _log(
         "operation",
         logging.WARNING if "refusal" in outcome else logging.INFO,
         operation=op.name,
+        call=call,
+        request_id=_cut(request_id),
         arguments=_cut(arguments),
         sub=access.subject if access else None,
         sid=claims.get("sid"),
