@@ -389,6 +389,7 @@ OPERATIONS: list[Operation[Any]] = [
         description=(
             "Get one sales invoice of the assigned company by its exact number (`name`), with "
             "its item and tax rows."
+            f" {invoicing.TAX_RATE_NOTE}"
         ),
         kind="read",
         inputs=GetSalesInvoice,
@@ -431,6 +432,7 @@ OPERATIONS: list[Operation[Any]] = [
             "and items is refused unless `allow_duplicate` is true. After an error or a "
             "timeout, list the drafts (`list_sales_invoices` with `state` draft) before "
             "creating again: the first may have been saved."
+            f" {invoicing.TAX_RATE_NOTE}"
         ),
         kind="create",
         inputs=CreateDraftSalesInvoice,
@@ -446,6 +448,7 @@ OPERATIONS: list[Operation[Any]] = [
             "Give only what changes: `items` replace all rows; an empty `remarks` or "
             "`taxes_and_charges` clears it, and a cleared tax template takes its tax rows with it. "
             "The customer stays; for another customer, create a new draft."
+            f" {invoicing.TAX_RATE_NOTE}"
         ),
         kind="update",
         inputs=UpdateDraftSalesInvoice,
@@ -466,6 +469,7 @@ OPERATIONS: list[Operation[Any]] = [
             "`allow_duplicate` is true. After an error or a timeout, list the drafts "
             "(`list_sales_invoices` with `state` draft) before creating again: the first may "
             "have been saved."
+            f" {invoicing.TAX_RATE_NOTE}"
         ),
         kind="create",
         inputs=CreateDraftSalesReturn,
@@ -481,6 +485,7 @@ OPERATIONS: list[Operation[Any]] = [
             "is refused. Give only what changes: `items` replace all rows, at most what is "
             "left to return of each item; an empty `remarks` clears it. The invoice it returns "
             "stays; for another invoice, create a new draft."
+            f" {invoicing.TAX_RATE_NOTE}"
         ),
         kind="update",
         inputs=UpdateDraftSalesReturn,

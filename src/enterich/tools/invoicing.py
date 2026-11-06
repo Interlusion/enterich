@@ -41,6 +41,15 @@ TEMPLATE_FIELDS = ("name", "title", "is_default", "tax_category", "disabled")
 AGEING = tuple(f"range{i}" for i in range(6))  # range0: not yet due; then ERPNext's 30, 60, 90, 120
 AGEING_BASED_ON = {"due_date": "Due Date", "posting_date": "Posting Date"}
 MAX_ADDRESSES = 100
+# For each operation whose result has tax rows (REQ-001 Results)
+TAX_RATE_NOTE = (
+    "A tax row's `rate` is the rate saved on it; an item with an item tax template is taxed "
+    "at that template's rate on the rows whose accounts it lists, or not by such a row, so "
+    "`rate` need not be any item's rate: take the tax from `tax_amount`."
+)
+PURCHASE_TAX_RATE_NOTE = (
+    f"{TAX_RATE_NOTE} A row with `add_deduct_tax` Deduct is subtracted from the total."
+)
 
 AgeingBasedOn = Literal["due_date", "posting_date"]  # inlined in the schema, unlike `type`
 

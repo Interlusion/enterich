@@ -33,6 +33,7 @@ STALE = (
 DOCSTATUS = {1: "submitted", 2: "cancelled"}
 ROW_FIELDS = ("item_code", "qty", "rate", "amount", "is_free_item")
 TAX_FIELDS = ("account_head", "rate", "tax_amount")
+PURCHASE_TAX_FIELDS = (*TAX_FIELDS, "add_deduct_tax")
 # The documents a create counts towards the limit of drafts per hour, by DocType
 COUNTED = {
     "Sales Invoice": "sales invoices",
@@ -250,8 +251,8 @@ def _folded(value: Any) -> str:
 
 
 def tax_warning(saved: dict[str, Any], template: str | None) -> list[str]:
-    """REQ-001-PRS-F012."""
-    if template and decimal(saved.get("total_taxes_and_charges")) == 0:
+    """REQ-001-PRS-F012: every row without tax, not a total that Deduct rows bring to 0."""
+    if template and all(decimal(r.get("tax_amount")) == 0 for r in rows_of(saved, "taxes")):
         return [
             f"Tax template {template} was given, but the tax total is 0; check the template "
             "and the items' tax templates."
@@ -267,6 +268,7 @@ def result(
     warnings: list[str],
     row_fields: Sequence[str] = ROW_FIELDS,
     outside: Set[str] = frozenset(),
+    tax_fields: Sequence[str] = TAX_FIELDS,
 ) -> dict[str, Any]:
     """The draft as REQ-001's Results say; its rows
     cut as a get cuts them (REQ-001-PRS-NF003), its `outside` fields under `outside_text`."""
@@ -278,7 +280,7 @@ def result(
     items, items_cut = cut_rows(rows_of(saved, "items"))
     return {
         **record,
-        "taxes": [shape(r, TAX_FIELDS) for r in taxes],
+        "taxes": [shape(r, tax_fields) for r in taxes],
         "items": [shape(r, row_fields, flags={"is_free_item"}) for r in items],
         "url": form_url(context.settings.erpnext_public_url, doctype, name),
         "warnings": warnings,
