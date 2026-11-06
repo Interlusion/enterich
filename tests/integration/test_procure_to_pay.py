@@ -191,6 +191,7 @@ def test_get_purchase_invoice_returns_rows_with_outside_text_apart(mcp: Session)
                 "charge_type": "On Net Total",
                 "account_head": "1576 - Input VAT 19% - EX",
                 "add_deduct_tax": "Add",
+                "category": "Total",
                 "rate": 19.0,
                 "tax_amount": 38.0,
                 "description": "Input VAT 19%",

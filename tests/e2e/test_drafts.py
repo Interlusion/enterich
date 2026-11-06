@@ -2,7 +2,8 @@
 as a comment on the draft, and the duplicate check with drafts and invoices people made
 (REQ-001 Drafts, REQ-004-PRS-F005 to REQ-004-PRS-F008, REQ-005-PRS-F005 to
 REQ-005-PRS-F009, REQ-006-PRS-F005 to REQ-006-PRS-F008, REQ-007-PRS-F004 to
-REQ-007-PRS-F007), and the limit of drafts per hour (REQ-001-PRS-F019).
+REQ-007-PRS-F007), the limit of drafts per hour (REQ-001-PRS-F019), and the tax rows
+ERPNext adds from item tax templates (REQ-001-PRS-F020).
 
 The seed removes earlier runs' drafts; within a run, each test uses its own quantities
 or amounts, so no test's draft is another's duplicate by party, date and items or rows,
@@ -19,6 +20,7 @@ from tests.e2e.seed import (
     COMPANY,
     DEBTORS,
     EU_PURCHASE,
+    INPUT_VAT,
     SALES_VAT,
     Seed,
     advances_apart,
@@ -128,6 +130,58 @@ def test_a_tax_row_keeps_its_rate_when_an_item_tax_template_taxes_the_item(
     assert (draft["net_total"], draft["grand_total"], draft["warnings"]) == (100, 119, [])
     [row] = [r for r in draft["taxes"] if r["account_head"] == SALES_VAT[1]]
     assert (row["rate"], row["tax_amount"]) == (0, 19)
+
+
+def test_without_a_tax_template_erpnext_adds_rows_from_the_item_tax_template(
+    mcp: Session, seeded: Seed, site: Site
+) -> None:
+    draft = mcp.call(
+        "create_draft_sales_invoice",
+        {
+            "customer": seeded.customer,
+            "items": [{"item_code": seeded.item_taxed_19, "qty": 2, "rate": 100}],
+        },
+    ).data
+    rows = draft["taxes"]
+    # Every VAT account of the chart, input VAT among them; 7 of them at 19 %
+    assert (len(rows), {r["rate"] for r in rows}) == (13, {0})
+    assert INPUT_VAT[1] in {r["account_head"] for r in rows}
+    assert [r["tax_amount"] for r in rows if r["account_head"] == SALES_VAT[1]] == [38]
+    assert draft["total_taxes_and_charges"] == 266
+    warning = (
+        "The draft has 13 tax rows, with 266.00 of tax, that ERPNext added from the items' "
+        "item tax templates when it was saved without tax rows; check them in `taxes`, or "
+        "give `taxes_and_charges` to replace them."
+    )
+    assert draft["warnings"] == [warning]
+    # No default template either, unlike the desk's form
+    assert not stored(site, "Sales Invoice", draft["name"])["taxes_and_charges"]
+    # The rows keep their mark through an update of the remarks
+    again = mcp.call(
+        "update_draft_sales_invoice",
+        {"name": draft["name"], "modified": draft["modified"], "remarks": "Checked"},
+    ).data
+    assert again["warnings"] == [warning]
+    replaced = mcp.call(
+        "update_draft_sales_invoice",
+        {"name": draft["name"], "modified": again["modified"], "taxes_and_charges": ZERO_TEMPLATE},
+    ).data
+    assert (len(replaced["taxes"]), replaced["total_taxes_and_charges"]) == (2, 38)
+    assert replaced["warnings"] == []
+
+
+def test_a_purchase_draft_without_a_tax_template_gets_no_default(
+    mcp: Session, seeded: Seed, site: Site
+) -> None:
+    draft = mcp.call(
+        "create_draft_purchase_invoice",
+        {
+            "supplier": seeded.supplier,
+            "bill_no": "E2E-NOTAX-1",
+            "items": [{"item_code": seeded.item, "qty": 1, "rate": 13}],
+        },
+    ).data
+    assert not stored(site, "Purchase Invoice", draft["name"])["taxes_and_charges"]
 
 
 def test_a_reverse_charge_purchase_draft_adds_and_deducts_and_doesnt_warn(

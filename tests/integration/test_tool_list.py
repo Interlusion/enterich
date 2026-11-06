@@ -52,3 +52,16 @@ def test_each_tool_with_tax_rows_says_what_their_rate_is(
         assert "`tax_amount`" in listed[name], name
         if "purchase" in name:
             assert "`add_deduct_tax` Deduct" in listed[name], name
+            assert "`category` Valuation" in listed[name], name
+
+
+def test_invoice_creates_say_to_give_a_tax_template(
+    jwks: FakeJwks, signer: Signer, erpnext: FakeErpnext
+) -> None:
+    with client(jwks, erpnext=erpnext) as c:
+        listed = {t["name"]: t["description"] for t in Session(c, token(signer)).tools()}
+    for side in ("sales", "purchase"):
+        description = listed[f"create_draft_{side}_invoice"]
+        assert "Give `taxes_and_charges`" in description
+        assert "no tax rows from a default template or a Tax Rule" in description
+        assert f"`list_{side}_tax_templates`" in description
