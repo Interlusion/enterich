@@ -465,6 +465,33 @@ Only a fixed list of operations, without generic method calls, closes these door
 - Verification: test.
 - Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
 
+#### REQ-001-PRS-F020: Tax rows from item tax templates
+
+**Description**: An invoice create or update result, other than a return's, SHOULD carry a warning while the saved draft has tax rows that ERPNext added from its items' item tax templates (`set_by_item_tax_template`), as it does to a draft saved without tax rows, naming how many and the tax they carry, and that a tax template given replaces them. The rows keep their mark until they are replaced, so every update of such a draft warns again.
+
+**Related URS**: REQ-001-URS-F002
+
+**Definition of Done**:
+
+- A sales invoice draft created without a tax template, of an item with an item tax template, on a site that adds such rows, returns the warning with the count and the tax; with a tax template given, it doesn't.
+- An update clearing the tax template of such a draft, and an update of only its remarks, return the warning; an update giving a tax template doesn't.
+- A purchase invoice draft does the same; one row is named in the singular.
+- Verification: test.
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
+
+#### REQ-001-PRS-F021: Tax template without its rows
+
+**Description**: An invoice create or update result, other than a return's, SHOULD carry a warning when the saved draft has a tax template (`taxes_and_charges`) that the operation didn't give and no tax row other than those of REQ-001-PRS-F020, as when ERPNext sets a matching Tax Rule's template without its rows, naming the template and that giving it adds them.
+
+**Related URS**: REQ-001-URS-F002
+
+**Definition of Done**:
+
+- With a Tax Rule for the customer, a sales invoice draft created without a tax template returns the warning naming the rule's template; with a tax template given, it doesn't.
+- An update of a draft whose template came with its rows doesn't warn.
+- Verification: test.
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
+
 ## PRS — Non-Functional
 
 #### REQ-001-PRS-NF001: Outside text marked
@@ -538,7 +565,7 @@ Numbers are read as decimals, never as binary floating point. Every operation re
 - **Every record and child row** carries an `outside_text` object, empty when it has no such field.
 - **Yes/no fields** (ERPNext's Check fields, stored as 0 and 1) are returned as `true` and `false`.
 - **`url`** is the document's form in ERPNext, built as ERPNext v16 builds it: the public URL, `/desk/`, the DocType in lower case with hyphens for spaces, and the name percent-encoded as one segment (`/desk/sales-invoice/SINV-2026-00001`).
-- **Tax rows** (`taxes`): `rate` is the rate saved on the row and `tax_amount` the row's tax. An item with an item tax template is taxed at that template's rate on the rows whose accounts the template lists, or not by such a row at all, so `rate` need not be the rate any item was taxed at. On a purchase invoice, a row with `add_deduct_tax` Deduct is subtracted from the total. The description of every operation whose result has tax rows says so.
+- **Tax rows** (`taxes`): `rate` is the rate saved on the row and `tax_amount` the row's tax. An item with an item tax template is taxed at that template's rate on the rows whose accounts the template lists, or not by such a row at all, so `rate` need not be the rate any item was taxed at. On a purchase invoice, a row with `add_deduct_tax` Deduct is subtracted from the total, and the tax of a row with `category` Valuation goes into the items' valuation, not into the total. The description of every operation whose result has tax rows says so.
 - **Creates and updates:** the draft's `name`, `modified`, `status`, `docstatus`, `company`, the further fields its area spec lists, `url`, `warnings`, and `truncated`: its child tables are cut to 100 rows each, as in gets.
 
 ### States
@@ -561,7 +588,8 @@ Lists use `/api/resource/<DocType>` with the fields of their area catalogue; get
 ### Drafts
 
 - Before a create, the duplicate check of REQ-001-PRS-F005 runs, with the match its area spec defines, and then the count of REQ-001-PRS-F019 when the limit is set. Each create operation's description tells the agent, after an error or a timeout, to list the drafts (`state: draft`) before creating again.
-- On update, an empty string clears a field only if its area spec names it as clearable (a cleared tax template takes its rows with it); no other field can be cleared.
+- On update, an empty string clears a field only if its area spec names it as clearable (a cleared tax template takes its rows with it, though ERPNext may add rows from the items' item tax templates, REQ-001-PRS-F020); no other field can be cleared.
+- The create descriptions of sales and purchase invoice drafts say to give `taxes_and_charges`, and which tool shows the default template: through its API, unlike its desk, ERPNext adds no tax rows to a draft from a default template or a Tax Rule.
 
 ## Acceptance Criteria Summary
 
@@ -587,6 +615,7 @@ Checked against Frappe and ERPNext v16.52 source:
 - ERPNext fills tax rows from a template on insert only when a site setting says so (`add_taxes_from_taxes_and_charges_template`); Enterich therefore fills them itself.
 - A list leaves out of every row the fields the user may not read (`get_permitted_fields`): with only the select right on a DocType, all but its standard fields (such as `name` and `modified`) and its search fields, a child table's fields among them; with read, those of a permission level the user lacks. The operations need read (configuration guide).
 - A get returns a field of a permission level the user lacks as null, as if it were empty (`apply_fieldlevel_read_permissions`). A field marked to be masked comes as a placeholder such as `XXXXXXXX`, in lists and gets alike (`mask_fields`).
+- On a purchase invoice, a tax row with `category` Valuation keeps its `tax_amount` and adds nothing to the tax total (`get_tax_amount_if_for_valuation_or_deduction`); one with Valuation and Total adds it. Without a stock item among the items, ERPNext makes both Total (`validate_stock_or_nonstock_items`).
 
 Checked on a real ERPNext v16 site by the end-to-end test:
 
@@ -594,6 +623,8 @@ Checked on a real ERPNext v16 site by the end-to-end test:
 - With write only if creator on the draft DocTypes, the agent user's key reads, lists and comments on every draft, child rows included, and changes or discards only the drafts it created, a person's edit of such a draft notwithstanding; a person's draft is refused with 403 `PermissionError`.
 - An item with an item tax template is taxed, on a tax row whose account the template lists, at the template's rate for it, and not by that row if the template marks the account not applicable; on other rows at the row's rate. The row keeps the rate it was saved with (`_get_tax_rate`): with the setup wizard's German sales template, whose rows carry 0 %, and an item taxed at 19 %, the row's `rate` is 0 and its `tax_amount` 19 % of the item's amount.
 - On a purchase invoice, a row with `add_deduct_tax` Deduct keeps a positive `tax_amount`, and the total subtracts it: with a reverse-charge template, an Add and a Deduct row of the same amount make a tax total of 0.
+- A draft saved without tax rows gets one row at rate 0 for each account of its items' item tax templates, marked `set_by_item_tax_template`, when Accounts Settings say so (`add_taxes_from_item_tax_template`, on by default; `append_taxes_from_item_tax_template`); the items are then taxed at their templates' rates on those rows. With the setup wizard's German item tax templates, which list every VAT account of the chart, input VAT among them, a sales invoice of an item taxed at 19 % gets 13 rows, 7 of them taxed at 19 %. The rows keep their mark through later saves, as ERPNext adds no rows to a draft that has some.
+- A sales or purchase invoice inserted through the API without `taxes_and_charges` gets no tax rows from a template: without a Tax Rule it keeps no template, not even the company's default, which only the desk's form fills in; a matching Tax Rule's template ERPNext sets as `taxes_and_charges`, but without its rows (`set_missing_values` with `for_validate`, `set_taxes` of the party).
 
 Not checked yet:
 
