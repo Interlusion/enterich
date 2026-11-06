@@ -11,6 +11,7 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ### Changed
 
+- **Each write leaves its origin on the draft:** every create and update adds one comment starting with "Enterich:" that names the operation and a call ID, for an update also the inputs it was given, followed by any warnings. Before, a draft got a comment only with warnings. The `operation` log line carries the same `call`, and the client's JSON-RPC `request_id`, so the comment leads to the log line and its session; an `error` line carries the `call` too (REQ-001-PRS-F015, REQ-002-PRS-NF008).
 - `update_draft_sales_invoice` and `update_draft_purchase_invoice` refuse a return draft, naming the return's update operation: their rows would break the return's link to the invoice.
 
 ### Rights

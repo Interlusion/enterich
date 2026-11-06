@@ -1,7 +1,6 @@
 """What every draft operation shares (REQ-001 Drafts): tax rows from a template, the
-duplicate check, the update checks, the warnings and their comment, the result."""
+duplicate check, the update checks, the warnings, the result."""
 
-import html
 from collections import Counter
 from collections.abc import Mapping, Sequence, Set
 from datetime import date, datetime, timedelta
@@ -10,7 +9,7 @@ from typing import Any, Self
 
 from pydantic import model_validator
 
-from enterich.erpnext import ErpnextError, Refused
+from enterich.erpnext import Refused
 from enterich.shapes import (
     Inputs,
     Modified,
@@ -260,20 +259,7 @@ def tax_warning(saved: dict[str, Any], template: str | None) -> list[str]:
     return []
 
 
-async def comment(context: Context, doctype: str, name: str, warnings: list[str]) -> list[str]:
-    """REQ-001-PRS-F015: the warnings on the draft as plain text; a failure is one more."""
-    if not warnings:
-        return warnings
-    # The content is HTML: each warning escaped, one per line
-    content = "Enterich: " + "<br>".join(html.escape(w, quote=False) for w in warnings)
-    try:
-        await context.erpnext.add_comment(doctype, name, content)
-    except ErpnextError as exc:
-        return [*warnings, f"These warnings couldn't be added to the draft as a comment: {exc}"]
-    return warnings
-
-
-async def result(
+def result(
     context: Context,
     doctype: str,
     saved: dict[str, Any],
@@ -282,7 +268,7 @@ async def result(
     row_fields: Sequence[str] = ROW_FIELDS,
     outside: Set[str] = frozenset(),
 ) -> dict[str, Any]:
-    """The draft as REQ-001's Results say, after its warnings went on the draft; its rows
+    """The draft as REQ-001's Results say; its rows
     cut as a get cuts them (REQ-001-PRS-NF003), its `outside` fields under `outside_text`."""
     name = str(saved.get("name"))
     record = shape(
@@ -295,6 +281,6 @@ async def result(
         "taxes": [shape(r, TAX_FIELDS) for r in taxes],
         "items": [shape(r, row_fields, flags={"is_free_item"}) for r in items],
         "url": form_url(context.settings.erpnext_public_url, doctype, name),
-        "warnings": await comment(context, doctype, name, warnings),
+        "warnings": warnings,
         "truncated": [t for t, cut in (("items", items_cut), ("taxes", taxes_cut)) if cut],
     }

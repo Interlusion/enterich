@@ -29,6 +29,6 @@ Limiting the agent further would leave it unable to do its work. A check of its 
 - Where it runs: inside Enterich (as warnings at create, like REQ-001-PRS-F015), beside it as its own service, or as a scheduled agent?
 - What it may do: comment only, or also hold a draft (a workflow state)? It never submits.
 - What it sees: the draft and the books only, or also the source the agent worked from (an incoming invoice, a bank line), which Enterich doesn't have?
-- How findings reach the reviewer: a comment on the draft like Enterich's warnings ([ITEM-006](item-006-provenance-on-every-write.md)'s comment could carry them), or a list of its own?
+- How findings reach the reviewer: a comment on the draft like Enterich's warnings (the comment of [ITEM-006](archive/item-006-provenance-on-every-write.md) could carry them), or a list of its own?
 - How to tell it works: [ITEM-009](item-009-agent-eval-suite.md)'s cases, with drafts that are wrong on purpose, and its false alarms per week.
 - Cost: one model call or more per draft.

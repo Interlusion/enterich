@@ -15,9 +15,11 @@ The agent works as its own ERPNext user, so its drafts carry that user as owner.
 - In any list (Sales Invoice, Purchase Invoice, Journal Entry, Payment Entry), filter by **Status: Draft** and **Owner: the agent user**, and save the filter.
 - The agent also gives a link to each draft it prepares, if you follow the conversation.
 
-## Warnings
+## Enterich's comments
 
-When something about a draft looks wrong, Enterich adds a comment to it, in the draft's timeline, starting with "Enterich:" ([REQ-001-PRS-F015](../specs/req-001-core.md#req-001-prs-f015-warnings-on-the-draft)). For example:
+Each time the agent creates or changes a draft, Enterich adds a comment to it, in the draft's timeline, starting with "Enterich:" ([REQ-001-PRS-F015](../specs/req-001-core.md#req-001-prs-f015-origin-and-warnings-on-the-draft)). It names the operation and a call ID, for a change also the inputs the agent gave, for example `Enterich: update_draft_sales_invoice, call 7f3c9a1e2b4d; given items, remarks.` The operator finds the call ID in Enterich's log, in the line with the session and the arguments.
+
+When something about the draft looks wrong, the same comment carries a warning on each further line. For example:
 
 - **Possible duplicate:** a matching document existed, and the agent created the draft anyway. The comment names the match.
 - **A value ERPNext set differently:** a rate a pricing rule changed, an expense account ERPNext replaced, or journal totals that differ after ERPNext rounded each row. The comment names the row and both values.

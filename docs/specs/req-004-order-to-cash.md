@@ -227,7 +227,7 @@ The DocTypes a draft only links to, such as its company, currency, units, price 
 
 A return update giving `items` needs create on Sales Invoice too: ERPNext maps the return of the invoice as a new document (`get_mapped_doc`).
 
-Warnings are added to a draft as a comment, which needs no further right (REQ-001-PRS-F015).
+Enterich's comment on a draft, with its warnings, needs no further right (REQ-001-PRS-F015).
 
 ## Acceptance Criteria Summary
 

@@ -204,7 +204,7 @@ A bank transaction's `party_type` and `party` are the party set on the line, by 
 
 ERPNext lists a payment's accounts with the user's permissions when it reads their currency and type (`get_account_details`), hence select on Account; the party's receivable or payable account and the invoices' accounts need nothing more.
 
-Warnings are added to a draft as a comment, which needs no further right (REQ-001-PRS-F015).
+Enterich's comment on a draft, with its warnings, needs no further right (REQ-001-PRS-F015).
 
 ## Acceptance Criteria Summary
 

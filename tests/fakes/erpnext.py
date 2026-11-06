@@ -311,6 +311,8 @@ class FakeErpnext:
     # path -> (status, JSON body): the next request to that path gets it
     failures: dict[str, tuple[int, Any]] = field(default_factory=dict[str, tuple[int, Any]])
     delay: float = 0.0
+    # path -> seconds: every request to that path waits that long
+    slow: dict[str, float] = field(default_factory=dict[str, float])
     set_cookie: bool = False
     redirect: bool = False
     huge_response: bool = False
@@ -377,6 +379,8 @@ class FakeErpnext:
             return httpx2.Response(403, json=error(403, "PermissionError", door))
         if self.delay:
             await anyio.sleep(self.delay)
+        if pause := self.slow.get(request.url.path):
+            await anyio.sleep(pause)
         headers = {"set-cookie": "sid=abc; Path=/"} if self.set_cookie else {}
         if self.redirect:
             return httpx2.Response(302, headers={"location": "https://elsewhere.example.net/"})

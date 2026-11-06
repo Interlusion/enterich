@@ -568,16 +568,14 @@ def _rounding_warning(saved: dict[str, Any]) -> list[str]:
     ]
 
 
-async def _journal_result(
-    context: Context, saved: dict[str, Any], warnings: list[str]
-) -> dict[str, Any]:
+def _journal_result(context: Context, saved: dict[str, Any], warnings: list[str]) -> dict[str, Any]:
     name = str(saved.get("name"))
     record = shape(saved, ("name", "modified", "docstatus", "company", *JOURNAL_DRAFT_FIELDS))
     return {
         **record,
         "row_count": len(rows_of(saved, "accounts")),
         "url": form_url(context.settings.erpnext_public_url, "Journal Entry", name),
-        "warnings": await drafts.comment(context, "Journal Entry", name, warnings),
+        "warnings": warnings,
         "truncated": [],
     }
 
@@ -596,7 +594,7 @@ async def create_draft_journal_entry(
     )
     warnings = [drafts.duplicate_warning(matches, JOURNAL_MATCH)] if matches else []
     warnings += _rounding_warning(saved)
-    return await _journal_result(context, saved, warnings)
+    return _journal_result(context, saved, warnings)
 
 
 async def update_draft_journal_entry(
@@ -644,7 +642,7 @@ async def update_draft_journal_entry(
         inputs.name,
         {**_journal_body(inputs), "modified": inputs.modified},
     )
-    return await _journal_result(context, saved, _rounding_warning(saved))
+    return _journal_result(context, saved, _rounding_warning(saved))
 
 
 OPERATIONS: list[Operation[Any]] = [
@@ -750,6 +748,7 @@ OPERATIONS: list[Operation[Any]] = [
         kind="create",
         inputs=CreateDraftJournalEntry,
         run=create_draft_journal_entry,
+        doctype="Journal Entry",
     ),
     Operation(
         name="update_draft_journal_entry",
@@ -765,5 +764,6 @@ OPERATIONS: list[Operation[Any]] = [
         kind="update",
         inputs=UpdateDraftJournalEntry,
         run=update_draft_journal_entry,
+        doctype="Journal Entry",
     ),
 ]
