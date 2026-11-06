@@ -154,6 +154,25 @@ def test_the_template_rows_come_from_the_purchase_template(mcp: Session, erp: Fa
     }
 
 
+def test_a_reverse_charge_draft_shows_its_deduct_row_and_doesnt_warn(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    add, deduct = (
+        {**VAT_ROWS[0], "account_head": account, "add_deduct_tax": way}
+        for account, way in (("1577 - Input VAT EU - EX", "Add"), ("1777 - VAT EU - EX", "Deduct"))
+    )
+    erp.add(
+        "Purchase Taxes and Charges Template",
+        purchase_tax_template("Reverse charge - EX", taxes=[add, deduct]),
+    )
+    result = create(mcp, taxes_and_charges="Reverse charge - EX").data
+    assert [(t["account_head"], t["tax_amount"], t["add_deduct_tax"]) for t in result["taxes"]] == [
+        ("1577 - Input VAT EU - EX", 38, "Add"),
+        ("1777 - VAT EU - EX", 38, "Deduct"),
+    ]
+    assert (result["total_taxes_and_charges"], result["warnings"]) == (0, [])
+
+
 def test_a_sales_template_answers_as_unknown(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, taxes_and_charges="VAT 19% - EX")
     assert result.error
@@ -183,6 +202,7 @@ def test_a_create_returns_the_draft(mcp: Session, erp: FakeErpnext) -> None:
                 "account_head": "1576 - Input VAT 19% - EX",
                 "rate": 19.0,
                 "tax_amount": 38.0,
+                "add_deduct_tax": "Add",
                 "outside_text": {},
             }
         ],
