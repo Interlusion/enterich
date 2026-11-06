@@ -666,7 +666,7 @@ def test_a_return_dated_the_invoices_day_carries_its_posting_time(
     invoice(erp, doctype, name, [("t1", "SKU-1", 2.0)], posting_date=TODAY, posting_time="09:30:00")
     result = mcp.call(tool(doctype), {"return_against": name})
     assert not result.error, result.text
-    [post] = erp.writes()
+    [post] = erp.writes(f"/api/resource/{doctype}")
     assert (post.body["posting_date"], post.body["posting_time"]) == (TODAY, "09:30:00")
 
 

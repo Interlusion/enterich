@@ -4,10 +4,14 @@ comment, the limit of drafts per hour (REQ-001-PRS-F002, REQ-001-PRS-F003,
 REQ-001-PRS-F004, REQ-001-PRS-F005, REQ-001-PRS-F012, REQ-001-PRS-F015,
 REQ-001-PRS-F016, REQ-001-PRS-F019)."""
 
+import re
+import time
 from typing import Any
 
 import pytest
 
+from enterich import tools
+from tests.conftest import Logs
 from tests.fakes.erpnext import (
     AGENT,
     COMMENT_METHOD,
@@ -213,7 +217,8 @@ def test_a_create_returns_the_draft_with_the_rates_erpnext_set(
         "truncated": [],
         "outside_text": {},
     }
-    assert erp.comments == []
+    [comment] = erp.comments  # the origin only (REQ-001-PRS-F015)
+    assert "<br>" not in comment["content"]
 
 
 def test_the_draft_tools_carry_their_annotations_and_say_how_to_retry(mcp: Session) -> None:
@@ -366,16 +371,18 @@ def test_allow_duplicate_creates_and_leaves_the_warning_on_the_draft(
     second = create(mcp, allow_duplicate=True).data
     [warning] = second["warnings"]
     assert first["name"] in warning
-    [comment] = erp.comments
+    first_comment, comment = erp.comments
+    assert first_comment["reference_name"] == first["name"]
     assert comment == {
         "reference_doctype": "Sales Invoice",
         "reference_name": second["name"],
-        "content": f"Enterich: {warning}",
+        "content": comment["content"],
         "comment_email": "",
         "comment_by": "",
     }
-    [call] = [r for r in erp.received if r.path == COMMENT_METHOD]
-    assert call.method == "POST"
+    assert comment["content"].startswith("Enterich: create_draft_sales_invoice, call ")
+    assert comment["content"].endswith(f"<br>{warning}")
+    assert {r.method for r in erp.received if r.path == COMMENT_METHOD} == {"POST"}
 
 
 # Warnings (REQ-001-PRS-F012, REQ-001-PRS-F015, REQ-001-PRS-F016)
@@ -386,7 +393,7 @@ def test_a_template_without_tax_warns_on_the_draft(mcp: Session, erp: FakeErpnex
     [warning] = result["warnings"]
     assert "VAT 0% - EX" in warning
     [comment] = erp.comments
-    assert comment["content"] == f"Enterich: {warning}"
+    assert comment["content"].endswith(f"<br>{warning}")
 
 
 def test_a_rate_a_pricing_rule_replaced_warns(mcp: Session, erp: FakeErpnext) -> None:
@@ -417,14 +424,14 @@ def test_kept_rates_and_free_items_dont_warn(mcp: Session, erp: FakeErpnext) -> 
         ("GIFT", 0, True),
     ]
     assert result["warnings"] == []
-    assert erp.comments == []
+    assert [c["content"].count("<br>") for c in erp.comments] == [0]
 
 
 def test_a_rate_erpnext_only_rounded_doesnt_warn(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, items=[{"item_code": "SKU-1", "qty": 2, "rate": 12.346}]).data
     assert result["items"][0]["rate"] == 12.35
     assert result["warnings"] == []
-    assert erp.comments == []
+    assert [c["content"].count("<br>") for c in erp.comments] == [0]
 
 
 def test_the_warnings_go_on_the_draft_as_one_comment(mcp: Session, erp: FakeErpnext) -> None:
@@ -432,7 +439,7 @@ def test_the_warnings_go_on_the_draft_as_one_comment(mcp: Session, erp: FakeErpn
     result = create(mcp, items=items, taxes_and_charges="VAT 0% - EX").data
     tax, rate = result["warnings"]
     [comment] = erp.comments
-    assert comment["content"] == f"Enterich: {tax}<br>{rate}"
+    assert comment["content"].endswith(f"<br>{tax}<br>{rate}")
 
 
 def test_markup_in_a_warning_reaches_erpnext_as_text(mcp: Session, erp: FakeErpnext) -> None:
@@ -440,7 +447,7 @@ def test_markup_in_a_warning_reaches_erpnext_as_text(mcp: Session, erp: FakeErpn
     [warning] = result["warnings"]
     assert "<img src=x onerror=alert(1)>" in warning
     [comment] = erp.comments
-    assert "<" not in comment["content"]
+    assert "<img" not in comment["content"]
     assert "&lt;img src=x onerror=alert(1)&gt;" in comment["content"]
 
 
@@ -454,6 +461,104 @@ def test_a_failing_comment_still_returns_the_draft_and_says_so(
     assert "VAT 0% - EX" in tax
     assert "comment" in missing
     assert erp.comments == []
+
+
+# The draft's origin (REQ-001-PRS-F015, REQ-002-PRS-NF008)
+
+
+def test_a_create_leaves_its_origin_on_the_draft(
+    mcp: Session, erp: FakeErpnext, logs: Logs
+) -> None:
+    result = create(mcp).data
+    [line] = logs.events("operation")
+    assert re.fullmatch(r"[0-9a-f]{12}", line["call"])
+    assert line["request_id"] == str(mcp.request_id)
+    [comment] = erp.comments
+    assert (comment["reference_doctype"], comment["reference_name"]) == (
+        "Sales Invoice",
+        result["name"],
+    )
+    assert comment["content"] == f"Enterich: create_draft_sales_invoice, call {line['call']}."
+
+
+def test_an_update_names_the_inputs_it_was_given(
+    mcp: Session, erp: FakeErpnext, logs: Logs
+) -> None:
+    result = update(mcp, items=ONE_ITEM, remarks="")
+    assert not result.error, result.text
+    [line] = logs.events("operation")
+    [comment] = erp.comments
+    assert comment["reference_name"] == DRAFT
+    assert comment["content"] == (
+        f"Enterich: update_draft_sales_invoice, call {line['call']}; given items, remarks."
+    )
+
+
+def test_the_origin_comes_before_the_warnings(mcp: Session, erp: FakeErpnext, logs: Logs) -> None:
+    result = create(mcp, taxes_and_charges="VAT 0% - EX").data
+    [warning] = result["warnings"]
+    [line] = logs.events("operation")
+    [comment] = erp.comments
+    assert comment["content"] == (
+        f"Enterich: create_draft_sales_invoice, call {line['call']}.<br>{warning}"
+    )
+
+
+def test_each_operation_has_its_own_call(mcp: Session, logs: Logs) -> None:
+    create(mcp)
+    mcp.call("list_customers")
+    first, second = logs.events("operation")
+    assert first["call"] != second["call"]
+    assert (first["request_id"], second["request_id"]) == (
+        str(mcp.request_id - 1),
+        str(mcp.request_id),
+    )
+
+
+def test_a_refused_write_leaves_no_comment(mcp: Session, erp: FakeErpnext, logs: Logs) -> None:
+    assert create(mcp, customer="CUST-9999").error
+    assert update(mcp, modified="2026-10-28 10:00:00.000000", remarks="x").error
+    assert erp.comments == []
+    assert all(re.fullmatch(r"[0-9a-f]{12}", line["call"]) for line in logs.events("operation"))
+
+
+def test_a_failing_comment_without_warnings_still_says_so(mcp: Session, erp: FakeErpnext) -> None:
+    erp.fail(COMMENT_METHOD, 403, error(403, "PermissionError", "Not permitted"))
+    result = create(mcp).data
+    assert result["name"] in erp.docs["Sales Invoice"]
+    [missing] = result["warnings"]
+    assert "comment" in missing
+
+
+def test_the_comment_stays_within_the_operation_time(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(tools, "OPERATION_TIMEOUT", 1.0)
+    erp.slow[COMMENT_METHOD] = 3.0
+    started = time.monotonic()
+    result = create(mcp).data
+    assert time.monotonic() - started < 2.0
+    assert result["name"] in erp.docs["Sales Invoice"]
+    [missing] = result["warnings"]
+    assert "comment" in missing
+
+
+@pytest.mark.parametrize("name", ["enterich_request", "other"])
+def test_an_argument_outside_the_schema_is_refused_whatever_its_name(
+    mcp: Session, erp: FakeErpnext, logs: Logs, name: str
+) -> None:
+    result = create(mcp, **{name: "x"})
+    assert result.error
+    assert f"{name}: Extra inputs are not permitted" in result.text
+    assert erp.writes() == []
+    [line] = logs.events("operation")
+    assert line["arguments"][name] == "x"
+
+
+def test_a_long_request_id_is_cut_in_the_log(mcp: Session, logs: Logs) -> None:
+    mcp.call("list_customers", request_id="r" * 10_000)
+    [line] = logs.events("operation")
+    assert line["request_id"] == "r" * 200
 
 
 # update_draft_sales_invoice

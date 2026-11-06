@@ -12,6 +12,7 @@ duplicate check finds too, so those tests expect the seeded invoice first, not a
 
 from typing import Any
 
+from tests.conftest import Logs
 from tests.e2e.seed import (
     AGENT,
     CAPITAL,
@@ -45,7 +46,7 @@ def stored(site: Site, doctype: str, name: str) -> dict[str, Any]:
 # Sales invoices
 
 
-def test_create_draft_sales_invoice(mcp: Session, seeded: Seed, site: Site) -> None:
+def test_create_draft_sales_invoice(mcp: Session, seeded: Seed, site: Site, logs: Logs) -> None:
     draft = mcp.call(
         "create_draft_sales_invoice",
         {
@@ -62,7 +63,10 @@ def test_create_draft_sales_invoice(mcp: Session, seeded: Seed, site: Site) -> N
     assert draft["warnings"] == []
     doc = stored(site, "Sales Invoice", draft["name"])
     assert (doc["owner"], doc["remarks"]) == (AGENT, "Agent's draft")
-    assert comments(site, "Sales Invoice", draft["name"]) == []
+    [line] = logs.events("operation")
+    [comment] = comments(site, "Sales Invoice", draft["name"])
+    assert comment["owner"] == AGENT
+    assert comment["content"] == f"Enterich: create_draft_sales_invoice, call {line['call']}."
 
 
 def test_the_limit_counts_the_hour_in_the_sites_time(
@@ -105,7 +109,8 @@ def test_the_warnings_go_on_the_draft_as_one_comment(
     ]
     [comment] = comments(site, "Sales Invoice", draft["name"])
     assert comment["owner"] == AGENT
-    assert comment["content"] == "Enterich: " + "<br>".join(draft["warnings"])
+    assert comment["content"].startswith("Enterich: create_draft_sales_invoice, call ")
+    assert comment["content"].endswith("<br>" + "<br>".join(draft["warnings"]))
 
 
 def test_a_persons_sales_draft_is_a_duplicate(mcp: Session, seeded: Seed, site: Site) -> None:

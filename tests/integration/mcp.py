@@ -54,12 +54,17 @@ class Session:
         self._c = c
         self._headers = {**bearer(token), "mcp-protocol-version": VERSION}
         self.answers: list[str] = []
+        self.request_id = 0  # the last request's JSON-RPC ID; each request takes the next
 
-    def _rpc(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+    def _rpc(
+        self, method: str, params: dict[str, Any], request_id: str | None = None
+    ) -> dict[str, Any]:
+        self.request_id += 1
+        rpc_id = self.request_id if request_id is None else request_id
         response = self._c.post(
             "/mcp",
             headers=self._headers,
-            json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+            json={"jsonrpc": "2.0", "id": rpc_id, "method": method, "params": params},
         )
         self.answers.append(response.text)
         assert response.status_code == 200, response.text
@@ -68,8 +73,11 @@ class Session:
     def tools(self) -> list[dict[str, Any]]:
         return self._rpc("tools/list", {})["result"]["tools"]
 
-    def call(self, name: str, arguments: dict[str, Any] | None = None) -> Result:
-        answer = self._rpc("tools/call", {"name": name, "arguments": arguments or {}})
+    def call(
+        self, name: str, arguments: dict[str, Any] | None = None, request_id: str | None = None
+    ) -> Result:
+        """Call a tool, under the next request ID or under `request_id`."""
+        answer = self._rpc("tools/call", {"name": name, "arguments": arguments or {}}, request_id)
         if "error" in answer:
             return Result(True, answer["error"]["message"])
         result = answer["result"]

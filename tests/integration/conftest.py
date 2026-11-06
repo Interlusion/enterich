@@ -18,10 +18,13 @@ def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture
 def erpnext() -> Iterator[FakeErpnext]:
     """The fake ERPNext; afterwards Enterich must have used none of its side doors
-    (REQ-001-PRS-F006)."""
+    (REQ-001-PRS-F006), and each of its comments must be on a document of the DocType it
+    names (REQ-001-PRS-F015)."""
     fake = FakeErpnext()
     yield fake
     assert fake.doors == []
+    for comment in fake.comments:
+        assert comment["reference_name"] in fake.docs.get(comment["reference_doctype"], {})
 
 
 @pytest.fixture

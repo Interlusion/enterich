@@ -331,7 +331,7 @@ def test_an_expense_account_not_given_or_kept_doesnt_warn(
         erp.stock_items.add("PAPER")
     result = create(mcp, bill_no="R-7000", items=[row]).data
     assert result["warnings"] == []
-    assert erp.comments == []
+    assert [c["content"].count("<br>") for c in erp.comments] == [0]
 
 
 def test_a_buying_pricing_rule_that_replaced_a_rate_warns(mcp: Session, erp: FakeErpnext) -> None:

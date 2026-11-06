@@ -31,13 +31,20 @@ async def call(
     run: Any,
     kind: Kind = "read",
     arguments: dict[str, Any] | None = None,
+    erp: FakeErpnext | None = None,
 ) -> tuple[bool, str]:
     op = Operation(
-        name="try_it", title="Try it", description="A test.", kind=kind, inputs=Nothing, run=run
+        name="try_it",
+        title="Try it",
+        description="A test.",
+        kind=kind,
+        inputs=Nothing,
+        run=run,
+        doctype=None if kind == "read" else "Sales Invoice",
     )
     monkeypatch.setattr(tools, "operations", lambda: [op])
     s = settings(tools="try_it")
-    [tool] = tools.build(s, Erpnext(s, FakeErpnext().transport()))
+    [tool] = tools.build(s, Erpnext(s, (erp or FakeErpnext()).transport()))
     result = await tool.run(arguments or {}, context=None, convert_result=True)  # pyright: ignore[reportArgumentType]
     assert isinstance(result, CallToolResult)
     [content] = result.content
@@ -61,6 +68,7 @@ async def test_a_crash_writes_an_error_line_and_tells_the_agent_nothing_of_it(
     assert "RuntimeError" in line["traceback"]
     [operation] = logs.events("operation")
     assert operation["outcome"] == {"refusal": text}
+    assert line["call"] == operation["call"]
 
 
 async def test_a_validation_error_inside_an_operation_is_a_crash_not_invalid_input(
@@ -104,11 +112,31 @@ async def test_a_read_counts_rows_whatever_the_result_holds(
 
 async def test_a_create_names_the_document(monkeypatch: pytest.MonkeyPatch, logs: Logs) -> None:
     async def create(inputs: Nothing, context: Context) -> dict[str, Any]:
-        return {"name": "SINV-0001", "records": []}
+        return {"name": "SINV-0001", "warnings": []}
 
     error, _ = await call(monkeypatch, create, kind="create")
     assert not error
     assert logs.events("operation")[0]["outcome"] == {"document": "SINV-0001"}
+
+
+async def test_a_write_whose_result_is_too_large_leaves_no_comment(
+    monkeypatch: pytest.MonkeyPatch, logs: Logs
+) -> None:
+    async def create(inputs: Nothing, context: Context) -> dict[str, Any]:
+        return {"name": "SINV-0001", "warnings": [], "remarks": "x" * 200_000}
+
+    erp = FakeErpnext()
+    error, text = await call(monkeypatch, create, kind="create", erp=erp)
+    assert error
+    assert "100,000" in text
+    assert erp.received == []
+
+
+def test_each_write_names_the_doctype_it_comments_on() -> None:
+    writes = [op for op in tools.operations() if op.kind != "read"]
+    assert writes
+    assert all(op.doctype for op in writes)
+    assert all(op.doctype is None for op in tools.operations() if op.kind == "read")
 
 
 async def test_long_keys_and_lists_are_cut_in_the_line(
