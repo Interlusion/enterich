@@ -33,7 +33,7 @@ STALE = (
 DOCSTATUS = {1: "submitted", 2: "cancelled"}
 ROW_FIELDS = ("item_code", "qty", "rate", "amount", "is_free_item")
 TAX_FIELDS = ("account_head", "rate", "tax_amount")
-PURCHASE_TAX_FIELDS = (*TAX_FIELDS, "add_deduct_tax")
+PURCHASE_TAX_FIELDS = (*TAX_FIELDS, "add_deduct_tax", "category")
 # The documents a create counts towards the limit of drafts per hour, by DocType
 COUNTED = {
     "Sales Invoice": "sales invoices",
@@ -251,13 +251,34 @@ def _folded(value: Any) -> str:
 
 
 def tax_warning(saved: dict[str, Any], template: str | None) -> list[str]:
-    """REQ-001-PRS-F012: every row without tax, not a total that Deduct rows bring to 0."""
-    if template and all(decimal(r.get("tax_amount")) == 0 for r in rows_of(saved, "taxes")):
-        return [
+    """The warnings on an invoice draft's taxes, `template` the tax template given if any:
+    REQ-001-PRS-F012, every row without tax, not a total that Deduct rows bring to 0;
+    REQ-001-PRS-F020, rows ERPNext added from the items' item tax templates;
+    REQ-001-PRS-F021, a template ERPNext set without its rows."""
+    taxes = rows_of(saved, "taxes")
+    added = [r for r in taxes if r.get("set_by_item_tax_template")]
+    warnings: list[str] = []
+    if template and all(decimal(r.get("tax_amount")) == 0 for r in taxes):
+        warnings.append(
             f"Tax template {template} was given, but the tax total is 0; check the template "
             "and the items' tax templates."
-        ]
-    return []
+        )
+    if added:
+        tax = sum((decimal(r.get("tax_amount")) for r in added), Decimal(0))
+        rows = "1 tax row" if len(added) == 1 else f"{len(added)} tax rows"
+        warnings.append(
+            f"The draft has {rows}, with {tax:.2f} of tax, that ERPNext added from the items' "
+            "item tax templates when it was saved without tax rows; check them in `taxes`, or "
+            "give `taxes_and_charges` to replace them."
+        )
+    saved_template = saved.get("taxes_and_charges")
+    if saved_template and not template and len(added) == len(taxes):
+        warnings.append(
+            f"ERPNext set the tax template {saved_template} on the draft without its tax rows, "
+            "as it does for a matching Tax Rule; give `taxes_and_charges` "
+            f"{saved_template} to add them, or another template."
+        )
+    return warnings
 
 
 def result(

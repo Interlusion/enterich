@@ -432,6 +432,9 @@ OPERATIONS: list[Operation[Any]] = [
             "and items is refused unless `allow_duplicate` is true. After an error or a "
             "timeout, list the drafts (`list_sales_invoices` with `state` draft) before "
             "creating again: the first may have been saved."
+            " Give `taxes_and_charges`: unlike its desk, ERPNext adds no tax rows from a "
+            "default template or a Tax Rule to a draft made through its API; "
+            "`list_sales_tax_templates` shows the default."
             f" {invoicing.TAX_RATE_NOTE}"
         ),
         kind="create",
@@ -446,7 +449,8 @@ OPERATIONS: list[Operation[Any]] = [
             "Change a draft sales invoice of the assigned company that the agent user created. "
             "Give its `name` and its `modified` as last read; a draft changed since is refused. "
             "Give only what changes: `items` replace all rows; an empty `remarks` or "
-            "`taxes_and_charges` clears it, and a cleared tax template takes its tax rows with it. "
+            "`taxes_and_charges` clears it, and a cleared tax template takes its tax rows with it "
+            "(ERPNext may then add rows from the items' item tax templates, named in `warnings`). "
             "The customer stays; for another customer, create a new draft."
             f" {invoicing.TAX_RATE_NOTE}"
         ),
