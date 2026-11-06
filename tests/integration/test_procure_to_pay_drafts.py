@@ -2,7 +2,7 @@
 REQ-005-PRS-F007). REQ-001's draft rules are tested through the sales drafts; these tests
 show the buying side's bodies, its duplicate match by supplier invoice number, its
 warnings, and that the limit of drafts per hour counts purchase invoices on their own
-(REQ-001-PRS-F019)."""
+(REQ-001-PRS-F019, REQ-001-PRS-F020)."""
 
 from datetime import date, timedelta
 from typing import Any
@@ -173,6 +173,33 @@ def test_a_reverse_charge_draft_shows_its_deduct_row_and_doesnt_warn(
     assert (result["total_taxes_and_charges"], result["warnings"]) == (0, [])
 
 
+def test_a_valuation_row_shows_its_category_and_stays_out_of_the_total(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    erp.stock_items.add("PAPER")
+    freight = {**VAT_ROWS[0], "account_head": "5800 - Freight - EX", "category": "Valuation"}
+    erp.add(
+        "Purchase Taxes and Charges Template",
+        purchase_tax_template("Freight - EX", taxes=[VAT_ROWS[0], freight]),
+    )
+    result = create(mcp, taxes_and_charges="Freight - EX").data
+    assert [(t["account_head"], t["tax_amount"], t["category"]) for t in result["taxes"]] == [
+        ("1576 - Input VAT 19% - EX", 38, "Total"),
+        ("5800 - Freight - EX", 38, "Valuation"),
+    ]
+    assert result["total_taxes_and_charges"] == 38
+
+
+def test_a_purchase_draft_warns_of_item_tax_rows(mcp: Session, erp: FakeErpnext) -> None:
+    erp.item_taxes["PAPER"] = {"1576 - Input VAT 19% - EX": 19.0}
+    [warning] = create(mcp).data["warnings"]
+    assert warning == (
+        "The draft has 1 tax row, with 38.00 of tax, that ERPNext added from the items' item "
+        "tax templates when it was saved without tax rows; check them in `taxes`, or give "
+        "`taxes_and_charges` to replace them."
+    )
+
+
 def test_a_sales_template_answers_as_unknown(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, taxes_and_charges="VAT 19% - EX")
     assert result.error
@@ -203,6 +230,7 @@ def test_a_create_returns_the_draft(mcp: Session, erp: FakeErpnext) -> None:
                 "rate": 19.0,
                 "tax_amount": 38.0,
                 "add_deduct_tax": "Add",
+                "category": "Total",
                 "outside_text": {},
             }
         ],

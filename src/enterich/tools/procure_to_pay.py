@@ -72,6 +72,7 @@ PURCHASE = invoicing.Side(
         "charge_type",
         "account_head",
         "add_deduct_tax",
+        "category",
         "rate",
         "tax_amount",
         "description",
@@ -574,6 +575,9 @@ OPERATIONS: list[Operation[Any]] = [
             "`expense_account` ERPNext replaced, are named in `warnings`. After an error or a "
             "timeout, list the drafts (`list_purchase_invoices` with `state` draft) before "
             "creating again: the first may have been saved."
+            " Give `taxes_and_charges`: unlike its desk, ERPNext adds no tax rows from a "
+            "default template or a Tax Rule to a draft made through its API; "
+            "`list_purchase_tax_templates` shows the default."
             f" {invoicing.PURCHASE_TAX_RATE_NOTE}"
         ),
         kind="create",
@@ -588,7 +592,8 @@ OPERATIONS: list[Operation[Any]] = [
             "Change a draft purchase invoice of the assigned company that the agent user created. "
             "Give its `name` and its `modified` as last read; a draft changed since is refused. "
             "Give only what changes: `items` replace all rows; an empty `bill_no`, `remarks` or "
-            "`taxes_and_charges` clears it, and a cleared tax template takes its tax rows with it. "
+            "`taxes_and_charges` clears it, and a cleared tax template takes its tax rows with it "
+            "(ERPNext may then add rows from the items' item tax templates, named in `warnings`). "
             "The supplier stays; for another supplier, create a new draft."
             f" {invoicing.PURCHASE_TAX_RATE_NOTE}"
         ),

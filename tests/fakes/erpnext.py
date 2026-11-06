@@ -345,6 +345,13 @@ class FakeErpnext:
     stock_items: set[str] = field(default_factory=set[str])
     # Accounts Settings' check_supplier_invoice_uniqueness
     unique_bills: bool = False
+    # item code -> {tax account: rate} of the item's item tax template; a draft saved
+    # without tax rows gets a row per account (add_taxes_from_item_tax_template, on by
+    # default), and an item is taxed at its rate on that account's row (_get_tax_rate)
+    item_taxes: dict[str, dict[str, float]] = field(default_factory=dict[str, dict[str, float]])
+    # party -> the tax template of its Tax Rule, which a draft without one gets as
+    # taxes_and_charges on save, without the template's rows (set_missing_values)
+    tax_rules: dict[str, str] = field(default_factory=dict[str, str])
     comments: list[dict[str, Any]] = field(default_factory=list[dict[str, Any]])
     saves: int = 0
     # The user the API key belongs to: the owner of every document inserted
@@ -518,9 +525,18 @@ class FakeErpnext:
                 if row["item_code"] in self.stock_items and not doc.get("update_stock"):
                     row["expense_account"] = STOCK_NOT_BILLED
         net_total = float(round(sum(r["amount"] for r in rows), 2))
-        taxes = _rows(doc, "taxes")
+        if not doc.get("taxes_and_charges") and doc.get(party_field) in self.tax_rules:
+            doc["taxes_and_charges"] = self.tax_rules[doc[party_field]]
+        taxes = _rows(doc, "taxes") or self._item_tax_rows(rows)
+        if doctype == "Purchase Invoice" and not any(
+            r["item_code"] in self.stock_items for r in rows
+        ):
+            # validate_stock_or_nonstock_items: no valuation without a stock item
+            for tax in taxes:
+                if tax.get("category") in ("Valuation", "Valuation and Total"):
+                    tax["category"] = "Total"
         for tax in taxes:
-            tax["tax_amount"] = float(round(net_total * tax["rate"] / 100, 2))
+            tax["tax_amount"] = self._tax_amount(tax, rows, net_total)
         total_taxes = _tax_total(taxes)
         self.saves += 1
         doc.update(
@@ -617,6 +633,36 @@ class FakeErpnext:
         else:  # the debit note keeps the invoice's posting date and bill_no
             doc["bill_date"] = None
         return copy.deepcopy(doc)
+
+    def _item_tax_rows(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """append_taxes_from_item_tax_template: a row at rate 0 per account of the items'
+        item tax templates."""
+        accounts = dict.fromkeys(a for r in rows for a in self.item_taxes.get(r["item_code"], {}))
+        return [
+            {
+                "charge_type": "On Net Total",
+                "account_head": account,
+                "rate": 0.0,
+                "description": account,
+                "set_by_item_tax_template": 1,
+                "category": "Total",
+                "add_deduct_tax": "Add",
+            }
+            for account in accounts
+        ]
+
+    def _tax_amount(
+        self, tax: dict[str, Any], rows: list[dict[str, Any]], net_total: float
+    ) -> float:
+        """A row's tax: each item at its item tax template's rate for the row's account, if
+        the template lists it, else at the row's rate."""
+        account = tax["account_head"]
+        if not any(account in self.item_taxes.get(r["item_code"], {}) for r in rows):
+            return float(round(net_total * tax["rate"] / 100, 2))
+        rates = [self.item_taxes.get(r["item_code"], {}).get(account, tax["rate"]) for r in rows]
+        return float(
+            round(sum(r["amount"] * rate / 100 for r, rate in zip(rows, rates, strict=True)), 2)
+        )
 
     def _save_return(self, doctype: str, doc: dict[str, Any]) -> httpx2.Response:
         """Save a return draft as v16's validate_return does: the invoice's party, a posting
@@ -1756,7 +1802,8 @@ def payment_entry(name: str = "ACC-PAY-2026-00001", **overrides: Any) -> dict[st
 
 def _tax_total(taxes: list[dict[str, Any]]) -> float:
     """The rows' tax as ERPNext totals it: a purchase row with add_deduct_tax Deduct keeps
-    a positive tax_amount and is subtracted."""
+    a positive tax_amount and is subtracted, one with category Valuation counts nothing."""
+    taxes = [t for t in taxes if t.get("category") != "Valuation"]
     signed = (
         -t["tax_amount"] if t.get("add_deduct_tax") == "Deduct" else t["tax_amount"] for t in taxes
     )

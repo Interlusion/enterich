@@ -2,7 +2,7 @@
 REQ-001's draft rules: bodies, duplicates, stale updates, clearing, warnings and their
 comment, the limit of drafts per hour (REQ-001-PRS-F002, REQ-001-PRS-F003,
 REQ-001-PRS-F004, REQ-001-PRS-F005, REQ-001-PRS-F012, REQ-001-PRS-F015,
-REQ-001-PRS-F016, REQ-001-PRS-F019)."""
+REQ-001-PRS-F016, REQ-001-PRS-F019, REQ-001-PRS-F020, REQ-001-PRS-F021)."""
 
 import re
 import time
@@ -385,7 +385,8 @@ def test_allow_duplicate_creates_and_leaves_the_warning_on_the_draft(
     assert {r.method for r in erp.received if r.path == COMMENT_METHOD} == {"POST"}
 
 
-# Warnings (REQ-001-PRS-F012, REQ-001-PRS-F015, REQ-001-PRS-F016)
+# Warnings (REQ-001-PRS-F012, REQ-001-PRS-F015, REQ-001-PRS-F016, REQ-001-PRS-F020,
+# REQ-001-PRS-F021)
 
 
 def test_a_template_without_tax_warns_on_the_draft(mcp: Session, erp: FakeErpnext) -> None:
@@ -394,6 +395,75 @@ def test_a_template_without_tax_warns_on_the_draft(mcp: Session, erp: FakeErpnex
     assert "VAT 0% - EX" in warning
     [comment] = erp.comments
     assert comment["content"].endswith(f"<br>{warning}")
+
+
+ITEM_TAX = {"1776 - VAT 19% - EX": 19.0, "1777 - VAT 7% - EX": 0.0}
+ITEM_TAX_WARNING = (
+    "The draft has 2 tax rows, with 19.00 of tax, that ERPNext added from the items' item "
+    "tax templates when it was saved without tax rows; check them in `taxes`, or give "
+    "`taxes_and_charges` to replace them."
+)
+TAX_RULE_WARNING = (
+    "ERPNext set the tax template VAT 19% - EX on the draft without its tax rows, as it does "
+    "for a matching Tax Rule; give `taxes_and_charges` VAT 19% - EX to add them, or another "
+    "template."
+)
+
+
+def test_rows_erpnext_added_from_item_tax_templates_warn(mcp: Session, erp: FakeErpnext) -> None:
+    erp.item_taxes["SKU-1"] = ITEM_TAX
+    result = create(mcp).data
+    assert [(t["account_head"], t["rate"], t["tax_amount"]) for t in result["taxes"]] == [
+        ("1776 - VAT 19% - EX", 0, 19),
+        ("1777 - VAT 7% - EX", 0, 0),
+    ]
+    assert result["warnings"] == [ITEM_TAX_WARNING]
+
+
+def test_one_row_erpnext_added_is_named_in_the_singular(mcp: Session, erp: FakeErpnext) -> None:
+    erp.item_taxes["SKU-1"] = {"1776 - VAT 19% - EX": 19.0}
+    [warning] = create(mcp).data["warnings"]
+    assert warning.startswith("The draft has 1 tax row, with 19.00 of tax, that ERPNext ")
+
+
+def test_a_given_template_takes_the_place_of_item_tax_rows(mcp: Session, erp: FakeErpnext) -> None:
+    erp.item_taxes["SKU-1"] = ITEM_TAX
+    result = create(mcp, taxes_and_charges="VAT 19% - EX").data
+    assert [t["account_head"] for t in result["taxes"]] == ["1776 - VAT 19% - EX"]
+    assert result["warnings"] == []
+
+
+def test_clearing_the_template_warns_of_item_tax_rows(mcp: Session, erp: FakeErpnext) -> None:
+    erp.item_taxes["SKU-1"] = ITEM_TAX
+    result = update(mcp, taxes_and_charges="").data
+    assert len(result["taxes"]) == 2
+    # The fixture draft holds SKU-1 once, at 50
+    assert result["warnings"] == [ITEM_TAX_WARNING.replace("19.00", "9.50")]
+
+
+def test_item_tax_rows_warn_again_until_a_template_replaces_them(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    erp.item_taxes["SKU-1"] = ITEM_TAX
+    draft = create(mcp).data
+    again = update(mcp, draft["name"], draft["modified"], remarks="Checked").data
+    assert again["warnings"] == [ITEM_TAX_WARNING]
+    replaced = update(mcp, draft["name"], again["modified"], taxes_and_charges="VAT 19% - EX").data
+    assert replaced["warnings"] == []
+
+
+def test_a_tax_rules_template_without_its_rows_warns(mcp: Session, erp: FakeErpnext) -> None:
+    erp.tax_rules["CUST-0001"] = "VAT 19% - EX"
+    result = create(mcp).data
+    assert (result["taxes"], result["total_taxes_and_charges"]) == ([], 0)
+    assert result["warnings"] == [TAX_RULE_WARNING]
+    given = create(mcp, items=[{"item_code": "SKU-1", "qty": 3}], taxes_and_charges="VAT 19% - EX")
+    assert given.data["warnings"] == []
+
+
+def test_a_template_with_its_rows_doesnt_warn_on_update(mcp: Session, erp: FakeErpnext) -> None:
+    erp.tax_rules["CUST-0001"] = "VAT 0% - EX"
+    assert update(mcp, remarks="Checked").data["warnings"] == []
 
 
 def test_a_rate_a_pricing_rule_replaced_warns(mcp: Session, erp: FakeErpnext) -> None:

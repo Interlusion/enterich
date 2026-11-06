@@ -48,7 +48,8 @@ TAX_RATE_NOTE = (
     "`rate` need not be any item's rate: take the tax from `tax_amount`."
 )
 PURCHASE_TAX_RATE_NOTE = (
-    f"{TAX_RATE_NOTE} A row with `add_deduct_tax` Deduct is subtracted from the total."
+    f"{TAX_RATE_NOTE} A row with `add_deduct_tax` Deduct is subtracted from the total, and "
+    "the tax of one with `category` Valuation isn't in it."
 )
 
 AgeingBasedOn = Literal["due_date", "posting_date"]  # inlined in the schema, unlike `type`
