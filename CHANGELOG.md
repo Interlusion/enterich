@@ -4,6 +4,8 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-06
+
 ### Added
 
 - **Payment entry drafts:** `create_draft_payment_entry` and `update_draft_payment_entry` draft a payment received from a customer or made to a supplier through one of the company's bank accounts, allocated to the party's open invoices. Enterich refuses an allocation to an invoice that isn't the party's, submitted and open, or above what is outstanding or paid, and a bank reference (`reference_no`) already recorded for the party unless the agent allows it. A part not allocated, which ERPNext books as an advance, and a bank account in another currency than the party's account are named in `warnings`. Cash accounts, internal transfers, refunds and deductions such as a discount aren't drafted. The limit of drafts per hour counts payment entries on their own.
@@ -103,4 +105,5 @@ The first release.
 [0.2.0]: https://github.com/Interlusion/enterich/compare/v0.1.0...v0.2.0
 [0.2.1]: https://github.com/Interlusion/enterich/compare/v0.2.0...v0.2.1
 [0.3.0]: https://github.com/Interlusion/enterich/compare/v0.2.1...v0.3.0
-[unreleased]: https://github.com/Interlusion/enterich/compare/v0.3.0...HEAD
+[0.4.0]: https://github.com/Interlusion/enterich/compare/v0.3.0...v0.4.0
+[unreleased]: https://github.com/Interlusion/enterich/compare/v0.4.0...HEAD
