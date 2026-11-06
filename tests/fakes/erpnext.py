@@ -1569,7 +1569,7 @@ def ledger(
     currency: str | None = None,
 ) -> list[dict[str, Any]]:
     """General Ledger's rows without categorize_by: opening, the entries with a running
-    balance, total and closing, the summary rows labelled in the user's language. With
+    balance, total and closing, the summary rows labelled in the request's language. With
     `currency`, the account's or party's currency ERPNext switched the amounts to; without,
     every row names the company's."""
     presentation = currency or "EUR"

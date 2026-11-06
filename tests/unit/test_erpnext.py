@@ -35,7 +35,7 @@ def test_the_limits_are_those_of_the_spec() -> None:
     assert erpnext.MAX_RESPONSE_BYTES == 10 * 1024 * 1024
 
 
-async def test_every_call_carries_the_agent_key_and_the_host(fake: FakeErpnext) -> None:
+async def test_every_call_carries_the_agent_key_the_host_and_english(fake: FakeErpnext) -> None:
     client = Erpnext(settings(erpnext_host="erp.internal"), fake.transport())
     await client.get_doc("Item", "SKU-1")
     await client.get_list(
@@ -45,6 +45,7 @@ async def test_every_call_carries_the_agent_key_and_the_host(fake: FakeErpnext) 
     for received in fake.received:
         assert received.headers["authorization"] == f"token {API_KEY}:{API_SECRET}"
         assert received.headers["host"] == "erp.internal"
+        assert received.headers["accept-language"] == "en"
 
 
 async def test_the_host_defaults_to_the_url_host(fake: FakeErpnext) -> None:
