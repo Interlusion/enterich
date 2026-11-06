@@ -53,7 +53,8 @@ Enterich ignores proxy settings from the environment (`HTTP_PROXY`, `HTTPS_PROXY
 
 Enterich neither creates nor checks the agent user's rights; ERPNext enforces them. The site provides:
 
-- **An agent user** used by nothing else, with an API key and secret, and English as its language: ERPNext answers in the user's language, and Enterich reads report rows whose labels and values it translates.
+- **An agent user** used by nothing else, with an API key and secret. Its language doesn't matter: for a request with an API key, ERPNext takes the language from the request, and Enterich asks for English on every call ([REQ-002-PRS-NF006](../specs/req-002-service.md#req-002-prs-nf006-one-erpnext-credential)).
+- **The Language English (`en`) enabled**, as it is by default: ERPNext takes a request's language only if it is enabled, and otherwise answers in the System Settings language. The texts ERPNext writes on the agent's drafts, such as a journal entry's "Reference #… dated …" remark, are then English whatever the site's language, with the site's date and number formats.
 - **A User Permission** on the assigned company, marked as default.
 - **A role without** submit, cancel, amend, delete, share, import or export on any DocType.
 - **Never** give the agent user System Manager, Accounts User, Accounts Manager, write on Item Price or on any Settings DocType, or any right on User, Role, Role Profile, User Permission, DocPerm or Custom DocPerm: each would let it post or change the rules it runs under.

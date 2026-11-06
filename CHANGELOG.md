@@ -14,6 +14,10 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 - **Each write leaves its origin on the draft:** every create and update adds one comment starting with "Enterich:" that names the operation and a call ID, for an update also the inputs it was given, followed by any warnings. Before, a draft got a comment only with warnings. The `operation` log line carries the same `call`, and the client's JSON-RPC `request_id`, so the comment leads to the log line and its session; an `error` line carries the `call` too (REQ-001-PRS-F015, REQ-002-PRS-NF008).
 - `update_draft_sales_invoice` and `update_draft_purchase_invoice` refuse a return draft, naming the return's update operation: their rows would break the return's link to the invoice.
 
+### Fixed
+
+- **ERPNext answers in English on every site:** Enterich sends `Accept-Language: en` on each call. For a request with an API key, ERPNext takes the language from the request or System Settings, not from the agent user, so a site with another system language answered in it: messages, the General Ledger's `party_type` and other translated report values, and the texts ERPNext writes on a draft, such as a journal entry's "Reference #… dated …" remark, which are now English. The site needs the Language English enabled, as it is by default (REQ-002-PRS-NF006).
+
 ### Rights
 
 - **Payment Entry:** read, create and write only if creator for the new operations, with select on Account, read on Bank Account, and read on Customer and Sales Invoice for a customer's payment, Supplier and Purchase Invoice for a supplier's (REQ-007). Write only if creator goes on Payment Entry too, in the second role of the configuration guide.
