@@ -14,7 +14,7 @@ Enterich is an MCP server for ERPNext with hard limits. It lets one AI agent rea
 | :- | :- | :- |
 | 1 | **Containment** | The agent can't do more than read and prepare drafts, even when Enterich, the model or the client misbehave. ERPNext's role is the outer limit, Enterich's fixed operations the inner one. |
 | 2 | **Access control** | Only the configured agent identity gets in; every token is checked; kill switches act within a known time. |
-| 3 | **Traceability** | Every change is the agent user's in ERPNext and is logged in Enterich with session and outcome. |
+| 3 | **Traceability** | Every change is the agent user's in ERPNext, is logged in Enterich with session and outcome, and leaves a comment on the draft that leads to that log line. |
 | 4 | **Agent usability** | Inputs are exact, refusals carry ERPNext's reason, outside text is marked. |
 | 5 | **Maintainability** | Small, deployment-neutral, few dependencies, a stable versioned interface. |
 
@@ -79,7 +79,7 @@ flowchart LR
 | Containment | A separate service holding only the agent user's key; ERPNext role without submit/cancel/delete, with write only on its own drafts, as the outer limit; Enterich offers only fixed operations, drafts only, assigned company only, updates only of the agent user's own drafts, and where the operator sets one, a limit of drafts per hour | [ADR-001](adr/ADR-001-separate-service-fixed-tools.md), [REQ-001-URS-F003](../specs/req-001-core.md#req-001-urs-f003-never-post-cancel-delete-or-discard), [REQ-001-URS-F004](../specs/req-001-core.md#req-001-urs-f004-a-fixed-list-of-operations), [REQ-001-URS-F005](../specs/req-001-core.md#req-001-urs-f005-one-company) |
 | Access control | Local JWT check of issuer, audience, client, subject, type, time; one identity per instance; 5 s leeway | [ADR-003](adr/ADR-003-local-token-check.md) |
 | Protocol | Official SDK, stateless Streamable HTTP, JSON, POST only | [ADR-002](adr/ADR-002-mcp-sdk-stateless-streamable-http.md) |
-| Traceability | One JSON log line per operation with `sub`, `sid`, outcome | [REQ-002-PRS-NF008](../specs/req-002-service.md#req-002-prs-nf008-log) |
+| Traceability | One JSON log line per operation with `sub`, `sid`, outcome and call ID; one comment on each written draft naming the operation and call ID | [REQ-002-PRS-NF008](../specs/req-002-service.md#req-002-prs-nf008-log), [REQ-001-PRS-F015](../specs/req-001-core.md#req-001-prs-f015-origin-and-warnings-on-the-draft) |
 | Stable interface | SemVer over tools, config, logs, rights; tool-list snapshot | [ADR-004](adr/ADR-004-releases-and-image.md) |
 | Supply chain | uv lock with hashes, digests, SHA-pinned Actions, Dependabot | [ADR-005](adr/ADR-005-toolchain-and-dependencies.md) |
 
@@ -110,7 +110,7 @@ flowchart TB
 | `config` | Reads and validates every `ENTERICH_*` variable once at start; secrets kept out of `repr` |
 | `app` | The outer ASGI wrapper (method check, 1 MiB body limit, `/healthz`, `rejection` log from the response status, 503 when no signing keys are available) around the SDK's MCP app with `AuthSettings`; registers only the operations `ENTERICH_TOOLS` allows |
 | `auth` | The token verifier of ADR-003; returns the SDK's `AccessToken` with `sub`, `sid` and `expires_at = exp + leeway` |
-| `tools/` | One module per accounting area, named like its spec (`master_data`, `order_to_cash`, `procure_to_pay`, `record_to_report`, `bank_and_cash`): each operation with its input model, ERPNext call and result shape; `drafts` holds what every draft operation shares (tax rows, duplicate check, update checks, warnings and their comment), `invoicing` the reads the sales and purchase side share (parties, invoices, tax templates, the aged report) |
+| `tools/` | One module per accounting area, named like its spec (`master_data`, `order_to_cash`, `procure_to_pay`, `record_to_report`, `bank_and_cash`): each operation with its input model, ERPNext call and result shape; `drafts` holds what every draft operation shares (tax rows, duplicate check, update checks, warnings), the package itself the run of each operation with its log line and, for a write, its comment on the draft, `invoicing` the reads the sales and purchase side share (parties, invoices, tax templates, the aged report) |
 | `shapes` | Shared input types (names, dates, decimals, limits, keys) with extra properties forbidden, list paging, child-table cutting, the `outside_text` split |
 | `erpnext` | One `httpx2` client with `trust_env=False`: base URL, Host, token header, 30 s per call, 10 MiB per response, no redirects; maps refusals to [REQ-001-PRS-F008](../specs/req-001-core.md#req-001-prs-f008-refusals-reported) messages; encodes name inputs |
 | `log` | JSON-lines logging for Enterich's events and the SDK's and uvicorn's loggers |
@@ -161,7 +161,8 @@ sequenceDiagram
         end
         E->>N: POST /api/resource/Sales Invoice (fields, company, docstatus 0)
         N-->>E: draft
-        E->>E: log operation (sub, sid, number)
+        E->>N: add_comment (Enterich: operation, call ID, warnings)
+        E->>E: log operation (call ID, request ID, sub, sid, number)
         E-->>C: number, modified, totals, taxes, url, warnings
     end
 ```
@@ -269,7 +270,7 @@ The quality goals of section 1, made testable. Each scenario names what happens,
 
 | ID | Scenario | Response and measure | Requirement |
 | :- | :- | :- | :- |
-| QS-11 | The agent creates a draft | Exactly one `operation` line with operation, `sub`, `sid` and the number; ERPNext shows the agent user as owner | [REQ-002-PRS-NF008](../specs/req-002-service.md#req-002-prs-nf008-log) |
+| QS-11 | The agent creates a draft | Exactly one `operation` line with operation, `sub`, `sid`, call ID and the number; the draft has one "Enterich:" comment with the same call ID; ERPNext shows the agent user as owner | [REQ-002-PRS-NF008](../specs/req-002-service.md#req-002-prs-nf008-log), [REQ-001-PRS-F015](../specs/req-001-core.md#req-001-prs-f015-origin-and-warnings-on-the-draft) |
 | QS-12 | Any test run, including every token and ERPNext error case | Neither the key, the secret, nor a token's payload or signature appears in any log line or response | [REQ-002-PRS-NF010](../specs/req-002-service.md#req-002-prs-nf010-nothing-secret-leaves-enterich) |
 
 ### Agent usability
@@ -322,4 +323,5 @@ Terms of the specs: [REQ-001's Terms](../specs/req-001-core.md#terms). In additi
 | Protected resource metadata | RFC 9728 document telling a client which authorization server to use |
 | JWKS | The authorization server's public signing keys |
 | `sid` | The authorization server's session ID in the token (Keycloak and OpenID Connect servers set it; RFC 9068 doesn't require it); ties operations to one connection |
+| Call ID | Enterich's random ID of one operation, in its `operation` log line and in the comment on the draft it wrote; leads from the draft to the session |
 | Tool-list snapshot | The stored `tools/list` answer that tests compare against |
