@@ -176,16 +176,17 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 
 #### REQ-002-PRS-NF006: One ERPNext credential
 
-**Description**: Enterich SHALL authenticate every ERPNext call with the configured API key and secret of the agent user and no other credential, SHALL send the configured Host, SHALL NOT follow redirects from ERPNext and SHALL NOT take a proxy from the environment.
+**Description**: Enterich SHALL authenticate every ERPNext call with the configured API key and secret of the agent user and no other credential, SHALL send the configured Host and `Accept-Language: en`, SHALL NOT follow redirects from ERPNext and SHALL NOT take a proxy from the environment.
 
 **Related URS**: REQ-002-URS-NF003, REQ-002-URS-NF006
 
 **Definition of Done**:
 
-- Every request the fake ERPNext receives carries `Authorization: token <key>:<secret>`, the configured Host and no cookie; a redirect from ERPNext ends as a refusal, not a second request.
+- Every request the fake ERPNext receives carries `Authorization: token <key>:<secret>`, the configured Host, `Accept-Language: en` and no cookie; a redirect from ERPNext ends as a refusal, not a second request.
 - With `HTTPS_PROXY` and `HTTP_PROXY` set, requests still go directly to the configured URL.
+- On a site whose System Settings language is German, the General Ledger's `party_type`, ERPNext's error messages and the remark it writes on a journal entry draft come in English.
 - Verification: test and inspection.
-- Evidence: Enterich's test suite.
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
 
 #### REQ-002-PRS-NF007: No authorization cache
 
@@ -303,6 +304,11 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 Checked against Frappe v16.52 source:
 
 - API key authentication accepts only enabled users, so disabling the agent user stops its key at the next request.
+- ERPNext takes `Accept-Language` only for a Language that is enabled on the site (`get_all_languages`); with English disabled, it answers in the System Settings language again. Dates and amounts in the texts it writes keep the site's formats, which come from System Settings while the English Language sets none.
+
+Checked on a real ERPNext v16 site by the end-to-end test:
+
+- For a request with an API key, ERPNext takes the language from `Accept-Language`, else from System Settings, never from the agent user: it chooses before it checks the key (`HTTPRequest.set_lang`, `get_language`). Its messages, translated report values and the texts it writes at save, such as a journal entry's "Reference #… dated …" remark, come in that language; Enterich asks for English (REQ-002-PRS-NF006).
 
 Not checked yet:
 
