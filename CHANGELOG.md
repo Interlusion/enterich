@@ -8,6 +8,7 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 - **Payment entry drafts:** `create_draft_payment_entry` and `update_draft_payment_entry` draft a payment received from a customer or made to a supplier through one of the company's bank accounts, allocated to the party's open invoices. Enterich refuses an allocation to an invoice that isn't the party's, submitted and open, or above what is outstanding or paid, and a bank reference (`reference_no`) already recorded for the party unless the agent allows it. A part not allocated, which ERPNext books as an advance, and a bank account in another currency than the party's account are named in `warnings`. Cash accounts, internal transfers, refunds and deductions such as a discount aren't drafted. The limit of drafts per hour counts payment entries on their own.
 - **Return drafts:** `create_draft_sales_return` and `update_draft_sales_return` draft a credit note against a submitted sales invoice, `create_draft_purchase_return` and `update_draft_purchase_return` a debit note against a submitted purchase invoice, with the supplier's credit note number as `bill_no`. ERPNext's own return of the invoice gives the party, rates, accounts and taxes; the agent returns everything not yet returned or chosen items and quantities, never more than is left. A second draft return against the same invoice, or a credit note number already recorded for the supplier, is refused unless the agent allows it. An invoice with a fixed discount or charge (such as freight) is returned only whole, as ERPNext's return credits those amounts in full. Returns of POS invoices, of invoices that updated stock, were paid on entry or are on hold, and credit notes without returned items aren't drafted. Returns count towards the limit of drafts per hour with their invoices.
+- **`add_deduct_tax` in purchase draft results:** the tax rows of the purchase invoice and return drafts say whether a row is added or deducted, as `get_purchase_invoice`'s do (REQ-005).
 
 ### Changed
 
@@ -17,6 +18,8 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 ### Fixed
 
 - **ERPNext answers in English on every site:** Enterich sends `Accept-Language: en` on each call. For a request with an API key, ERPNext takes the language from the request or System Settings, not from the agent user, so a site with another system language answered in it: messages, the General Ledger's `party_type` and other translated report values, and the texts ERPNext writes on a draft, such as a journal entry's "Reference #… dated …" remark, which are now English. The site needs the Language English enabled, as it is by default (REQ-002-PRS-NF006).
+- **VAT rates in tax rows:** the descriptions of the invoice gets and of the invoice and return drafts say that a tax row's `rate` is the rate saved on it: an item with an item tax template is taxed at that template's rate on the rows whose accounts it lists, or not by such a row, so the tax is in `tax_amount`; on purchase invoices, a row with `add_deduct_tax` Deduct is subtracted (REQ-001 Results).
+- **No zero-tax warning for reverse charge:** the warning that a given tax template brought no tax comes only when every tax row is 0, not when Add and Deduct rows cancel out (REQ-001-PRS-F012).
 
 ### Rights
 
