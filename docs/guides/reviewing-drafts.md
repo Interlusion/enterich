@@ -48,4 +48,5 @@ Submit, cancel, amend, delete or discard. Only you do that.
 ## References
 
 - [Specs index](../specs/README.md)
+- [ERPNext taxes 101](erpnext-taxes-101.md): tax lines, item tax templates, and why a tax line can show 0 %
 - [Configuration](configuration.md)

@@ -9,6 +9,7 @@
 | Know why it is built this way | [ADRs](arc42/adr/README.md) |
 | Configure and run it | [Configuration](guides/configuration.md), [Keycloak](guides/keycloak.md) |
 | Review the agent's drafts | [Reviewing drafts](guides/reviewing-drafts.md) |
+| Understand how ERPNext computes VAT, and set it up for mixed rates | [ERPNext taxes 101](guides/erpnext-taxes-101.md) |
 | Contribute or work on it | [Contributing](../CONTRIBUTING.md), [Development](guides/development.md) |
 | Report a vulnerability | [Security policy](../SECURITY.md) |
 | Release it | [Releasing](guides/releasing.md) |
