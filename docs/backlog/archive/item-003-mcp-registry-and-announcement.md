@@ -2,9 +2,9 @@
 
 | Meta | Value |
 | :- | :- |
-| **Status** | IN PROGRESS |
+| **Status** | IMPLEMENTED |
 | **Type** | feature |
-| **Origin** | [ITEM-001](archive/item-001-going-public.md)'s steps after the first release, moved here on 2026-10-30 |
+| **Origin** | [ITEM-001](item-001-going-public.md)'s steps after the first release, moved here on 2026-10-30 |
 | **Created** | 2026-10-30 |
 | **Author** | loxy (drafted with Claude) |
 
@@ -22,7 +22,7 @@ The registry makes Enterich findable for MCP clients and for the directories tha
 
 Enterich isn't a typical entry: it is a service behind an authorization server, not a tool a client starts for itself. A client that installs from the registry would start the image locally, which isn't how Enterich runs; the listing is for finding it, and its description says so.
 
-The announcement follows the listing and the test against a real ERPNext ([ITEM-004](archive/item-004-real-erpnext-test.md)), so that what it points to has been tried on a real site.
+The announcement follows the listing and the test against a real ERPNext ([ITEM-004](item-004-real-erpnext-test.md)), so that what it points to has been tried on a real site.
 
 ## To do
 
@@ -32,8 +32,8 @@ The announcement follows the listing and the test against a real ERPNext ([ITEM-
 - [x] Publishing in the release workflow's tag run, after the image is pushed: the `registry` job, with the key of the environment `mcp-registry`.
 - [x] The key and the DNS record, set up by the operator (releasing guide, "The MCP Registry key").
 - [x] The release that carries it: v0.2.1, the first version listed, on 2026-11-01. v0.2.0's `registry` job got an empty key, because `release.yml` passed no secrets to `image.yml`, and a re-run would have run the tag's workflow files.
-- [ ] How third-party directories that copy the registry describe Enterich, once they have synced.
-- [ ] **Announcement:** planned and done outside this repository, after the entry and the real-ERPNext test.
+- [x] How third-party directories that copy the registry describe Enterich: not followed up; the registry entry is the one Enterich maintains.
+- [x] **Announcement:** done outside this repository, on LinkedIn and in an article on interlusion.dev.
 
 ## Open Questions
 
