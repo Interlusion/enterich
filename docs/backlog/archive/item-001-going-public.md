@@ -52,7 +52,7 @@ After the move:
 - [x] First tag (`v0.1.0`) following the [releasing guide](../../guides/releasing.md); the package linked to the repository and made public. Released on 2026-10-30; the organisation's package settings allow public packages for it.
 - [x] Check the published image pulls on amd64 and arm64 and its attestation verifies (`gh attestation verify`). Checked on 2026-10-30, the pull without a login.
 
-After the first release: the MCP Registry entry and the announcement moved to [ITEM-003](../item-003-mcp-registry-and-announcement.md) on 2026-10-30, since the registry needs a label the v0.1.0 image doesn't carry.
+After the first release: the MCP Registry entry and the announcement moved to [ITEM-003](item-003-mcp-registry-and-announcement.md) on 2026-10-30, since the registry needs a label the v0.1.0 image doesn't carry.
 
 ## Open Questions
 
