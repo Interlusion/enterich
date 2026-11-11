@@ -4,6 +4,10 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+### Added
+
+- **Tax summary in invoice results:** `get_sales_invoice`, `get_purchase_invoice` and the results of the invoice and return drafts carry `tax_summary`: per tax row, each rate the items were taxed at, with the amount taxed (`taxable_amount`) and the tax, in the invoice's currency and after any discount, added up from ERPNext's tax per item row and tax row. With rates per item, as in the German setup, a tax row's `rate` stays 0 %; the summary shows the rates used, such as 7 % on 100 and 19 % on 20 on one bill, and an item a row taxes at 0 % (REQ-001-PRS-F022).
+
 ## [0.4.0] - 2026-11-06
 
 ### Added
