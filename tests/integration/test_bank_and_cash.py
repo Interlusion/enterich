@@ -243,6 +243,21 @@ def test_list_bank_transactions_returns_the_banks_texts_as_outside_text(mcp: Ses
     }
 
 
+def test_a_lists_long_texts_are_cut_to_500(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-001-PRS-NF003: a bank's text can't fill the list."""
+    erp.add(
+        "Bank Transaction",
+        bank_transaction("ACC-BTN-2026-00009", description="d" * 2000, date="2026-10-21"),
+    )
+    result = mcp.call("list_bank_transactions").data
+    assert [len(r["outside_text"]["description"]) for r in result["records"]] == [500, 38]
+    assert result["truncated"] == ["records.description"]
+
+
+def test_a_list_with_nothing_cut_names_nothing(mcp: Session) -> None:
+    assert mcp.call("list_bank_transactions").data["truncated"] == []
+
+
 def test_get_bank_transaction_returns_its_allocations(mcp: Session) -> None:
     result = mcp.call("get_bank_transaction", {"name": TRANSACTION}).data
     assert result == {

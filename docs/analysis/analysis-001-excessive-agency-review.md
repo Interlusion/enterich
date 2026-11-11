@@ -74,7 +74,7 @@ A fixed tool list held as a snapshot; drafts only in two layers, proven against 
 | 4 | Medium | Party IDs carry unmarked outside text | [3.4](#34-outside-data-in-results) | [ITEM-007](../backlog/archive/item-007-party-ids-as-outside-text.md) |
 | 5 | Medium | No ceiling on amounts or on the number of drafts | [3.5](#35-write-operations) | [ITEM-008](../backlog/archive/item-008-write-ceilings.md) |
 | 6 | Medium | No eval suite for a model change | [3.6](#36-quality-in-operation) | [ITEM-009](../backlog/item-009-agent-eval-suite.md) |
-| 7 | Low | Lists and reports don't cut text fields | [3.4](#34-outside-data-in-results) | [backlog](../backlog/backlog.md) |
+| 7 | Low | Lists and reports don't cut text fields | [3.4](#34-outside-data-in-results) | done: [REQ-001-PRS-NF003](../specs/req-001-core.md#req-001-prs-nf003-result-limits) |
 | 8 | Low | The deployment's rights aren't checked | [3.1](#31-drafts-only) | [backlog](../backlog/backlog.md) |
 | 9 | Low | The default scope `openid` gates nothing | [3.2](#32-identity-and-rights) | [backlog](../backlog/backlog.md) |
 | 10 | Info | Error texts name small internals | [3.5](#35-write-operations) | none: kept by design |

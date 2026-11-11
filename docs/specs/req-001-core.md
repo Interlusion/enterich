@@ -382,7 +382,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - An `offset` of 10,001, a quantity with 4 decimal places and a `to_date` before `from_date` are refused naming the input and the rule.
 - A `search` for `50%` matches the text `50%` only, not any text starting with `50`.
 - Debits of 0.1 and 0.2 against a credit of 0.3 are equal: numbers are compared as decimals.
-- List and report results carry `count`, `offset`, `has_more` and `records`; get results carry `modified`, `url` and `truncated`; yes/no fields are booleans.
+- List and report results carry `count`, `offset`, `has_more`, `records` and `truncated`; get results carry `modified`, `url` and `truncated`; yes/no fields are booleans.
 - Each `state` sends exactly the filter of the States table.
 - An update clearing a field its area spec doesn't name as clearable is refused.
 - Verification: test.
@@ -538,7 +538,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-NF003: Result limits
 
-**Description**: Every tool result SHALL stay under 100,000 characters. A get SHALL cut each child table to its first 100 rows and each text field of the record and its rows to 500 characters, and list what it cut in `truncated`; a create or update result SHALL cut its child tables the same way; a list or report whose result would still be larger SHALL be refused with a message to narrow it, and a get with a message that the document is too large.
+**Description**: Every tool result SHALL stay under 100,000 characters. A get SHALL cut each child table to its first 100 rows and each text field of the record and its rows to 500 characters, and list what it cut in `truncated`; a list or report SHALL cut each text field of its records to 500 characters, and name the fields it cut in `truncated` as `records.<field>`; a create or update result SHALL cut its child tables the same way; a list or report whose result would still be larger SHALL be refused with a message to narrow it, and a get with a message that the document is too large.
 
 **Related URS**: REQ-001-URS-NF003
 
@@ -546,6 +546,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 - A get of an invoice with 500 rows returns 100 with `truncated: ["items"]`.
 - A get of an invoice whose 100 rows carry descriptions of 2,000 characters returns them cut to 500, with `truncated: ["items.description"]`.
+- A list of bank transactions, one of whose descriptions has 2,000 characters, returns it cut to 500, with `truncated: ["records.description"]`; a list with nothing cut has `truncated: []`.
 - An update of a draft with 500 rows returns 100 with `truncated: ["items"]`.
 - An oversized report result gives the narrowing message.
 - Verification: test.
@@ -577,7 +578,7 @@ Numbers are read as decimals, never as binary floating point. Every operation re
 
 ### Results
 
-- **Lists:** `{count, offset, has_more, records}`, where `records` holds the records in the fixed order of the area spec's ERPNext calls table and `count` is their number.
+- **Lists:** `{count, offset, has_more, records, truncated}`, where `records` holds the records in the fixed order of the area spec's ERPNext calls table, `count` is their number, and `truncated` (usually empty) names the text fields cut in any record as `records.<field>`.
 - **Reports:** as lists, with the report's rows in `records`, paged by Enterich over all rows, and beside them the totals the area spec names.
 - **Gets:** the record with `modified`, `url`, its child tables of at most 100 rows each, and `truncated` (usually empty): the names of cut tables, and of cut text fields as `<field>` or `<table>.<field>`.
 - **Every record and child row** carries an `outside_text` object, empty when it has no such field.

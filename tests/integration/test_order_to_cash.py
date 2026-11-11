@@ -491,6 +491,7 @@ def test_report_rows_are_records_without_the_total_row(mcp: Session, erp: FakeEr
                 "outside_text": {},
             }
         ],
+        "truncated": [],
         "total_outstanding": 119.0,
     }
 
@@ -547,7 +548,9 @@ def test_a_report_answer_without_rows_is_a_faulty_answer(
 
 def test_an_oversized_report_asks_to_narrow(mcp: Session, erp: FakeErpnext) -> None:
     erp.reports["Accounts Receivable"] = [
-        receivable(f"ACC-SINV-{i:05}-" + "x" * 1100, 1.0) for i in range(100)
+        # Each text cut to 500 (REQ-001-PRS-NF003), two of them still too large
+        receivable(f"ACC-SINV-{i:05}-" + "x" * 1100, 1.0, party="p" * 1100)
+        for i in range(100)
     ]
     result = mcp.call("report_accounts_receivable", {"limit": 100})
     assert result.error
