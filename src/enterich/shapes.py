@@ -163,8 +163,8 @@ def cut_rows(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
 
 
 def cut_texts(record: dict[str, Any]) -> dict[str, Any]:
-    """A get's text fields cut to 500 characters, named in `truncated` as `<field>` or
-    `<table>.<field>` (REQ-001-PRS-NF003)."""
+    """A get's or a page's text fields cut to 500 characters, named in `truncated` as
+    `<field>` or `<table>.<field>`, a page's as `records.<field>` (REQ-001-PRS-NF003)."""
     cut: set[str] = set()
 
     def fit(values: dict[str, Any], prefix: str) -> dict[str, Any]:
@@ -173,11 +173,13 @@ def cut_texts(record: dict[str, Any]) -> dict[str, Any]:
             if isinstance(value, str) and len(value) > MAX_TEXT:
                 value = value[:MAX_TEXT]
                 cut.add(prefix + key)
-            elif key == "outside_text" and isinstance(value, dict):
-                value = fit(cast("dict[str, Any]", value), prefix)
+            elif isinstance(value, dict):
+                # outside_text marks its fields, it isn't one: they keep the record's path
+                inner = prefix if key == "outside_text" else f"{prefix}{key}."
+                value = fit(cast("dict[str, Any]", value), inner)
             elif isinstance(value, list):
                 rows = cast("list[Any]", value)
-                value = [fit(r, f"{key}.") if isinstance(r, dict) else r for r in rows]  # pyright: ignore[reportUnknownArgumentType]
+                value = [fit(r, f"{prefix}{key}.") if isinstance(r, dict) else r for r in rows]  # pyright: ignore[reportUnknownArgumentType]
             fitted[key] = value
         return fitted
 
@@ -187,14 +189,16 @@ def cut_texts(record: dict[str, Any]) -> dict[str, Any]:
 
 
 def page(records: list[dict[str, Any]], offset: int, limit: int) -> dict[str, Any]:
-    """A list result from `limit + 1` fetched records."""
+    """A list or report result from `limit + 1` fetched records, its texts cut."""
     shown = records[:limit]
-    return {
-        "count": len(shown),
-        "offset": offset,
-        "has_more": len(records) > limit,
-        "records": shown,
-    }
+    return cut_texts(
+        {
+            "count": len(shown),
+            "offset": offset,
+            "has_more": len(records) > limit,
+            "records": shown,
+        }
+    )
 
 
 def form_url(public_url: str, doctype: str, name: str) -> str:
