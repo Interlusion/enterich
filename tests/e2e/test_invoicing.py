@@ -1,11 +1,16 @@
 """Both sides of invoicing against the seeded site: parties with their addresses, invoices
 with their rows, tax templates, and the aged reports with the catalogues' filters and
-columns (REQ-004-PRS-F001 to REQ-004-PRS-F004, REQ-005-PRS-F001 to REQ-005-PRS-F004)."""
+columns (REQ-004-PRS-F001 to REQ-004-PRS-F004, REQ-005-PRS-F001 to REQ-005-PRS-F004), and
+the invoices' tax summary (REQ-001-PRS-F022)."""
 
 from datetime import timedelta
 
-from tests.e2e.seed import INPUT_VAT, SALES_VAT, Seed, site_today
+from tests.e2e.seed import COMPANY, INPUT_VAT, SALES_VAT, SALES_VAT_7, Seed, site_today
+from tests.e2e.site import Site
 from tests.integration.mcp import Session
+
+# The setup wizard's default sales template, its rows at 0 %
+ZERO_TEMPLATE = "Lieferung oder sonstige Leistung im Inland - EX"
 
 
 def test_list_customers(mcp: Session, seeded: Seed) -> None:
@@ -75,6 +80,90 @@ def test_get_sales_invoice_with_its_rows(mcp: Session, seeded: Seed) -> None:
     assert [(t["account_head"], t["rate"], t["tax_amount"]) for t in invoice["taxes"]] == [
         (SALES_VAT[1], 19, 19)
     ]
+    assert invoice["tax_summary"] == [
+        {
+            "account_head": SALES_VAT[1],
+            "rate": 19,
+            "taxable_amount": 100,
+            "tax_amount": 19,
+            "outside_text": {},
+        }
+    ]
+
+
+def test_the_tax_summary_is_after_a_discount_on_the_grand_total(
+    mcp: Session, seeded: Seed, site: Site
+) -> None:
+    """A person's draft: Enterich's drafts take no discount."""
+    rows = site.call(
+        "erpnext.controllers.accounts_controller.get_taxes_and_charges",
+        master_doctype="Sales Taxes and Charges Template",
+        master_name=ZERO_TEMPLATE,
+    )
+    draft = site.insert(
+        {
+            "doctype": "Sales Invoice",
+            "company": COMPANY,
+            "customer": seeded.customer,
+            "items": [{"item_code": seeded.item_taxed_19, "qty": 4, "rate": 50}],
+            "taxes_and_charges": ZERO_TEMPLATE,
+            "taxes": rows,
+            "apply_discount_on": "Grand Total",
+            "additional_discount_percentage": 10,
+        }
+    )
+    try:
+        invoice = mcp.call("get_sales_invoice", {"name": draft["name"]}).data
+        [row] = [t for t in invoice["taxes"] if t["tax_amount"]]
+        assert (row["account_head"], row["tax_amount"]) == (SALES_VAT[1], 38)
+        assert [
+            (e["account_head"], e["rate"], e["tax_amount"]) for e in invoice["tax_summary"]
+        ] == [(SALES_VAT[1], 19, 34.2)]
+    finally:
+        site.delete("Sales Invoice", draft["name"])
+
+
+def test_the_tax_summary_is_in_the_invoices_currency(
+    mcp: Session, seeded: Seed, site: Site
+) -> None:
+    """A person's draft: Enterich's drafts take the customer's currency."""
+    rows = site.call(
+        "erpnext.controllers.accounts_controller.get_taxes_and_charges",
+        master_doctype="Sales Taxes and Charges Template",
+        master_name=ZERO_TEMPLATE,
+    )
+    draft = site.insert(
+        {
+            "doctype": "Sales Invoice",
+            "company": COMPANY,
+            "customer": seeded.customer,
+            "currency": "USD",
+            "conversion_rate": 0.9137,
+            "items": [
+                {"item_code": seeded.item_taxed_19, "qty": 4, "rate": 50},
+                {"item_code": seeded.item_taxed_7, "qty": 3, "rate": 33.33},
+            ],
+            "taxes_and_charges": ZERO_TEMPLATE,
+            "taxes": rows,
+        }
+    )
+    try:
+        stored = site.call("frappe.client.get", doctype="Sales Invoice", name=draft["name"])
+        assert sorted(d["amount"] for d in stored["item_wise_tax_details"] if d["amount"]) == [
+            6.4,
+            34.72,
+        ]
+        invoice = mcp.call("get_sales_invoice", {"name": draft["name"]}).data
+        assert invoice["currency"] == "USD"
+        assert [
+            (t["account_head"], t["tax_amount"]) for t in invoice["taxes"] if t["tax_amount"]
+        ] == [(SALES_VAT[1], 38), (SALES_VAT_7, 7)]
+        assert [
+            (e["account_head"], e["rate"], e["taxable_amount"], e["tax_amount"])
+            for e in invoice["tax_summary"]
+        ] == [(SALES_VAT[1], 19, 200, 38), (SALES_VAT_7, 7, 99.99, 7)]
+    finally:
+        site.delete("Sales Invoice", draft["name"])
 
 
 def test_get_purchase_invoice_with_its_rows(mcp: Session, seeded: Seed) -> None:
@@ -88,6 +177,15 @@ def test_get_purchase_invoice_with_its_rows(mcp: Session, seeded: Seed) -> None:
     assert [
         (t["account_head"], t["add_deduct_tax"], t["tax_amount"]) for t in invoice["taxes"]
     ] == [(INPUT_VAT[1], "Add", 7.6)]
+    assert invoice["tax_summary"] == [
+        {
+            "account_head": INPUT_VAT[1],
+            "rate": 19,
+            "taxable_amount": 40,
+            "tax_amount": 7.6,
+            "outside_text": {},
+        }
+    ]
 
 
 def test_list_purchase_invoices(mcp: Session, seeded: Seed) -> None:

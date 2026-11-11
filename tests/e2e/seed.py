@@ -166,6 +166,8 @@ class Seed:
     unpriced_item: str
     # Taxed at 19 % by the setup wizard's item tax template, for the tax rows' rate
     item_taxed_19: str
+    # Taxed at 7 %, for a tax summary of two rates
+    item_taxed_7: str
     customer: str
     supplier: str
     customer_address: str
@@ -210,6 +212,15 @@ def seed(site: Site) -> Seed:
         stock_uom="Nos",
         taxes=[{"item_tax_template": ITEM_TAX_19}],
     )
+    item_taxed_7 = ensure(
+        site,
+        "Item",
+        {"item_code": "SKU-4"},
+        item_name="Widget SKU-4",
+        item_group="Products",
+        stock_uom="Nos",
+        taxes=[{"item_tax_template": ITEM_TAX_7}],
+    )
     customer = ensure(
         site, "Customer", {"customer_name": "Example Customer"}, customer_type="Company"
     )
@@ -236,6 +247,7 @@ def seed(site: Site) -> Seed:
         item=item,
         unpriced_item=unpriced_item,
         item_taxed_19=item_taxed_19,
+        item_taxed_7=item_taxed_7,
         customer=customer,
         supplier=supplier,
         customer_address=customer_address,
@@ -398,6 +410,7 @@ DEBTORS = f"1310 - Debtors - {ABBR}"
 # The item tax template of 19 % that the setup wizard makes for Germany with the chart
 # "Standard with Numbers"; the other German charts name it "19 %"
 ITEM_TAX_19 = f"19% - {ABBR}"
+ITEM_TAX_7 = f"7% - {ABBR}"
 # The setup wizard's German purchase template for goods from the EU: reverse charge, an
 # Add and a Deduct row at 0 % whose rates come from item tax templates
 EU_PURCHASE = f"Lieferung aus der EU - {ABBR}"
@@ -405,6 +418,8 @@ CAPITAL = f"3100 - Capital Stock - {ABBR}"
 CASH = f"1110 - Cash - {ABBR}"
 BANK_GROUP = f"1200 - Bank Accounts - {ABBR}"
 SALES_VAT = ("VAT 19 %", f"2320 - Umsatzsteuer 19 % - {ABBR}")
+# The account the setup wizard's German sales templates charge 7 % on
+SALES_VAT_7 = f"2321 - Umsatzsteuer 7 % - {ABBR}"
 INPUT_VAT = ("Input VAT 19 %", f"1520 - Abziehbare Vorsteuer 19 % - {ABBR}")
 VAT_RATE = 19
 SALES_TERMS = timedelta(days=30)

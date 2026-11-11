@@ -3,7 +3,8 @@ as a comment on the draft, and the duplicate check with drafts and invoices peop
 (REQ-001 Drafts, REQ-004-PRS-F005 to REQ-004-PRS-F008, REQ-005-PRS-F005 to
 REQ-005-PRS-F009, REQ-006-PRS-F005 to REQ-006-PRS-F008, REQ-007-PRS-F004 to
 REQ-007-PRS-F007), the limit of drafts per hour (REQ-001-PRS-F019), and the tax rows
-ERPNext adds from item tax templates (REQ-001-PRS-F020).
+ERPNext adds from item tax templates (REQ-001-PRS-F020), and the tax summary
+(REQ-001-PRS-F022).
 
 The seed removes earlier runs' drafts; within a run, each test uses its own quantities
 or amounts, so no test's draft is another's duplicate by party, date and items or rows,
@@ -22,6 +23,7 @@ from tests.e2e.seed import (
     EU_PURCHASE,
     INPUT_VAT,
     SALES_VAT,
+    SALES_VAT_7,
     Seed,
     advances_apart,
     site_today,
@@ -44,6 +46,13 @@ def comments(site: Site, doctype: str, name: str) -> list[dict[str, Any]]:
 
 def stored(site: Site, doctype: str, name: str) -> dict[str, Any]:
     return site.call("frappe.client.get", doctype=doctype, name=name)
+
+
+def summary(result: dict[str, Any]) -> list[tuple[str, float, float, float]]:
+    return [
+        (e["account_head"], e["rate"], e["taxable_amount"], e["tax_amount"])
+        for e in result["tax_summary"]
+    ]
 
 
 # Sales invoices
@@ -148,6 +157,9 @@ def test_without_a_tax_template_erpnext_adds_rows_from_the_item_tax_template(
     assert INPUT_VAT[1] in {r["account_head"] for r in rows}
     assert [r["tax_amount"] for r in rows if r["account_head"] == SALES_VAT[1]] == [38]
     assert draft["total_taxes_and_charges"] == 266
+    # The 7 rows that tax the item, none at 0 % on 0 for the others
+    taxed = [r["account_head"] for r in rows if r["tax_amount"]]
+    assert summary(draft) == [(account, 19, 200, 38) for account in taxed]
     warning = (
         "The draft has 13 tax rows, with 266.00 of tax, that ERPNext added from the items' "
         "item tax templates when it was saved without tax rows; check them in `taxes`, or "
@@ -199,6 +211,37 @@ def test_a_reverse_charge_purchase_draft_adds_and_deducts_and_doesnt_warn(
     taxed = [(t["add_deduct_tax"], t["tax_amount"]) for t in draft["taxes"] if t["tax_amount"]]
     assert sorted(taxed) == [("Add", 19), ("Deduct", 19)]
     assert (draft["total_taxes_and_charges"], draft["warnings"]) == (0, [])
+    # Both rows, each positive as its tax_amount; none for the 7 % rows the item's
+    # template marks not applicable
+    accounts = [t["account_head"] for t in draft["taxes"] if t["tax_amount"]]
+    assert summary(draft) == [(account, 19, 100, 19) for account in accounts]
+
+
+def test_the_tax_summary_gives_each_rate_with_what_it_taxed(mcp: Session, seeded: Seed) -> None:
+    items = [
+        {"item_code": seeded.item_taxed_19, "qty": 2, "rate": 100},
+        {"item_code": seeded.item_taxed_7, "qty": 1, "rate": 100},
+    ]
+    draft = mcp.call(
+        "create_draft_sales_invoice",
+        {"customer": seeded.customer, "items": items, "taxes_and_charges": ZERO_TEMPLATE},
+    ).data
+    assert {t["rate"] for t in draft["taxes"]} == {0}
+    assert summary(draft) == [(SALES_VAT[1], 19, 200, 38), (SALES_VAT_7, 7, 100, 7)]
+    got = mcp.call("get_sales_invoice", {"name": draft["name"]}).data
+    assert got["tax_summary"] == draft["tax_summary"]
+    # An item without an item tax template is taxed at the rows' 0 %
+    untaxed = {"item_code": seeded.item, "qty": 1, "rate": 50}
+    updated = mcp.call(
+        "update_draft_sales_invoice",
+        {"name": draft["name"], "modified": draft["modified"], "items": [*items, untaxed]},
+    ).data
+    assert summary(updated) == [
+        (SALES_VAT[1], 19, 200, 38),
+        (SALES_VAT[1], 0, 50, 0),
+        (SALES_VAT_7, 7, 100, 7),
+        (SALES_VAT_7, 0, 50, 0),
+    ]
 
 
 def test_a_persons_sales_draft_is_a_duplicate(mcp: Session, seeded: Seed, site: Site) -> None:
@@ -493,6 +536,7 @@ def test_create_and_update_draft_sales_return(mcp: Session, seeded: Seed, site: 
     draft = mcp.call("create_draft_sales_return", arguments).data
     assert (draft["return_against"], draft["docstatus"]) == (seeded.sales_invoice, 0)
     assert (draft["net_total"], draft["grand_total"]) == (-50, -59.5)
+    assert summary(draft) == [(SALES_VAT[1], 19, -50, -9.5)]
     assert [(r["item_code"], r["qty"]) for r in draft["items"]] == [(seeded.item, -1)]
     doc = stored(site, "Sales Invoice", draft["name"])
     invoice = stored(site, "Sales Invoice", seeded.sales_invoice)

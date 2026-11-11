@@ -345,10 +345,13 @@ class FakeErpnext:
     stock_items: set[str] = field(default_factory=set[str])
     # Accounts Settings' check_supplier_invoice_uniqueness
     unique_bills: bool = False
-    # item code -> {tax account: rate} of the item's item tax template; a draft saved
-    # without tax rows gets a row per account (add_taxes_from_item_tax_template, on by
-    # default), and an item is taxed at its rate on that account's row (_get_tax_rate)
-    item_taxes: dict[str, dict[str, float]] = field(default_factory=dict[str, dict[str, float]])
+    # item code -> {tax account: rate, or NOT_APPLICABLE} of the item's item tax template; a
+    # draft saved without tax rows gets a row per account (add_taxes_from_item_tax_template,
+    # on by default), and an item is taxed at its rate on that account's row, or not by it
+    # (_get_tax_rate)
+    item_taxes: dict[str, dict[str, float | str]] = field(
+        default_factory=dict[str, dict[str, float | str]]
+    )
     # party -> the tax template of its Tax Rule, which a draft without one gets as
     # taxes_and_charges on save, without the template's rows (set_missing_values)
     tax_rules: dict[str, str] = field(default_factory=dict[str, str])
@@ -539,9 +542,9 @@ class FakeErpnext:
             tax["tax_amount"] = self._tax_amount(tax, rows, net_total)
         total_taxes = _tax_total(taxes)
         self.saves += 1
+        doc.update(items=rows, taxes=taxes)
+        set_item_wise_tax(doc, self.item_taxes)
         doc.update(
-            items=rows,
-            taxes=taxes,
             **{f"{party_field}_name": party[f"{party_field}_name"]},
             currency="EUR",
             net_total=net_total,
@@ -659,9 +662,16 @@ class FakeErpnext:
         account = tax["account_head"]
         if not any(account in self.item_taxes.get(r["item_code"], {}) for r in rows):
             return float(round(net_total * tax["rate"] / 100, 2))
-        rates = [self.item_taxes.get(r["item_code"], {}).get(account, tax["rate"]) for r in rows]
+        rates = [_item_rate(self.item_taxes, r, tax) for r in rows]
         return float(
-            round(sum(r["amount"] * rate / 100 for r, rate in zip(rows, rates, strict=True)), 2)
+            round(
+                sum(
+                    r["amount"] * rate / 100
+                    for r, rate in zip(rows, rates, strict=True)
+                    if rate != NOT_APPLICABLE
+                ),
+                2,
+            )
         )
 
     def _save_return(self, doctype: str, doc: dict[str, Any]) -> httpx2.Response:
@@ -726,13 +736,13 @@ class FakeErpnext:
         taxes = _rows(doc, "taxes")
         for tax in taxes:
             if tax.get("charge_type") != "Actual":
-                tax["tax_amount"] = float(round(net_total * tax["rate"] / 100, 2))
+                tax["tax_amount"] = self._tax_amount(tax, rows, net_total)
         total_taxes = _tax_total(taxes)
         grand_total = round(net_total + total_taxes, 2)
         self.saves += 1
+        doc.update(items=rows, taxes=taxes)
+        set_item_wise_tax(doc, self.item_taxes)
         doc.update(
-            items=rows,
-            taxes=taxes,
             net_total=net_total,
             total_taxes_and_charges=total_taxes,
             grand_total=grand_total,
@@ -1234,6 +1244,7 @@ def sales_invoice(name: str = "ACC-SINV-2026-00001", **overrides: Any) -> dict[s
         "posting_date": "2026-10-01",
         "due_date": "2026-10-31",
         "currency": "EUR",
+        "conversion_rate": 1.0,
         "net_total": 100.0,
         "grand_total": 119.0,
         "outstanding_amount": 119.0,
@@ -1273,7 +1284,7 @@ def sales_invoice(name: str = "ACC-SINV-2026-00001", **overrides: Any) -> dict[s
         ],
     }
     doc.update(overrides)
-    return doc
+    return set_item_wise_tax(doc) if "item_wise_tax_details" not in overrides else doc
 
 
 def tax_template(name: str = "VAT 19% - EX", **overrides: Any) -> dict[str, Any]:
@@ -1365,6 +1376,7 @@ def purchase_invoice(name: str = "ACC-PINV-2026-00001", **overrides: Any) -> dic
         "posting_date": "2026-10-01",
         "due_date": "2026-10-12",
         "currency": "EUR",
+        "conversion_rate": 1.0,
         "net_total": 200.0,
         "grand_total": 238.0,
         "outstanding_amount": 238.0,
@@ -1409,7 +1421,7 @@ def purchase_invoice(name: str = "ACC-PINV-2026-00001", **overrides: Any) -> dic
         ],
     }
     doc.update(overrides)
-    return doc
+    return set_item_wise_tax(doc) if "item_wise_tax_details" not in overrides else doc
 
 
 def purchase_tax_template(name: str = "Input VAT 19% - EX", **overrides: Any) -> dict[str, Any]:
@@ -1797,6 +1809,60 @@ def payment_entry(name: str = "ACC-PAY-2026-00001", **overrides: Any) -> dict[st
         ],
     }
     doc.update(overrides)
+    return doc
+
+
+# An item tax template's mark on an account the item isn't taxed on (NOT_APPLICABLE_TAX)
+NOT_APPLICABLE = "N/A"
+
+
+def _item_rate(
+    item_taxes: dict[str, dict[str, float | str]], row: dict[str, Any], tax: dict[str, Any]
+) -> float | str:
+    """_get_tax_rate: the item tax template's rate for the row's account, if it lists it,
+    else the row's."""
+    return item_taxes.get(row["item_code"], {}).get(tax["account_head"], tax.get("rate") or 0.0)
+
+
+def set_item_wise_tax(
+    doc: dict[str, Any], item_taxes: dict[str, dict[str, float | str]] | None = None
+) -> dict[str, Any]:
+    """v16's item_wise_tax_details: per item row and tax row the rate the item was taxed
+    at, its tax and its amount, negated for a Deduct row; none for an account the item's
+    template marks not applicable (set_item_wise_tax). A charge of type Actual is spread
+    over the item rows by their amounts. The amounts are in the company's currency, the
+    invoice's times its conversion_rate. Rows without a name get one, as on insert."""
+    items, taxes = _rows(doc, "items"), _rows(doc, "taxes")
+    for number, row in enumerate(items, start=1):
+        row["name"] = row.get("name") or f"{doc['name']}-{number}"
+    for number, tax in enumerate(taxes, start=1):
+        tax["name"] = tax.get("name") or f"{doc['name']}-t{number}"
+    amounts = [r.get("amount", r.get("qty", 0.0) * r.get("rate", 0.0)) for r in items]
+    net_total = sum(amounts)
+    conversion = doc.get("conversion_rate") or 1.0
+    details: list[dict[str, Any]] = []
+    for tax in taxes:
+        sign = -1 if tax.get("add_deduct_tax") == "Deduct" else 1
+        for row, net in zip(items, amounts, strict=True):
+            if tax.get("charge_type") == "Actual":
+                rate: float | str = tax.get("rate") or 0.0
+                amount = net * tax.get("tax_amount", 0.0) / net_total if net_total else 0.0
+            else:
+                rate = _item_rate(item_taxes or {}, row, tax)
+                if rate == NOT_APPLICABLE:
+                    continue
+                amount = net * float(rate) / 100
+            details.append(
+                {
+                    "doctype": "Item Wise Tax Detail",
+                    "item_row": row["name"],
+                    "tax_row": tax["name"],
+                    "rate": float(rate),
+                    "amount": float(round(sign * amount * conversion, 2)),
+                    "taxable_amount": float(round(sign * net * conversion, 2)),
+                }
+            )
+    doc["item_wise_tax_details"] = details
     return doc
 
 

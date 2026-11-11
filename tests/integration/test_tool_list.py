@@ -50,6 +50,9 @@ def test_each_tool_with_tax_rows_says_what_their_rate_is(
     for name in WITH_TAX_ROWS:
         assert "item tax template" in listed[name], name
         assert "`tax_amount`" in listed[name], name
+        # REQ-001-PRS-F022
+        assert "`tax_summary`" in listed[name], name
+        assert "after any discount" in listed[name], name
         if "purchase" in name:
             assert "`add_deduct_tax` Deduct" in listed[name], name
             assert "`category` Valuation" in listed[name], name

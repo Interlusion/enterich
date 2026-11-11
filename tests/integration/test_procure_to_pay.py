@@ -150,6 +150,52 @@ def test_list_purchase_invoices_returns_the_supplier_invoice_number_as_outside_t
     assert "bill_no" not in record
 
 
+REVERSE_CHARGE = [
+    {"name": "t1", "account_head": "1577 - Input VAT EU - EX", "add_deduct_tax": "Add"},
+    {"name": "t2", "account_head": "1777 - VAT EU - EX", "add_deduct_tax": "Deduct"},
+]
+
+
+@pytest.mark.parametrize(
+    "deducted",
+    [
+        pytest.param({"amount": -38.0, "taxable_amount": -200.0}, id="as v16 computes it"),
+        pytest.param({"amount": -38.0, "taxable_amount": 200.0}, id="as v16 migrated it"),
+    ],
+)
+def test_a_deduct_rows_tax_summary_is_positive_as_the_row(
+    mcp: Session, erp: FakeErpnext, deducted: dict[str, float]
+) -> None:
+    """REQ-001-PRS-F022: the migration and tax withholding negate only the tax."""
+    invoice = purchase_invoice("ACC-PINV-2026-00003")
+    item = invoice["items"][0]["name"]
+    details = [
+        {"item_row": item, "tax_row": "t1", "rate": 19.0, "amount": 38.0, "taxable_amount": 200.0},
+        {"item_row": item, "tax_row": "t2", "rate": 19.0, **deducted},
+    ]
+    taxes = [{**invoice["taxes"][0], **row, "tax_amount": 38.0} for row in REVERSE_CHARGE]
+    erp.add("Purchase Invoice", {**invoice, "taxes": taxes, "item_wise_tax_details": details})
+    result = mcp.call("get_purchase_invoice", {"name": "ACC-PINV-2026-00003"}).data
+    assert [
+        (e["account_head"], e["taxable_amount"], e["tax_amount"]) for e in result["tax_summary"]
+    ] == [
+        ("1577 - Input VAT EU - EX", 200, 38),
+        ("1777 - VAT EU - EX", 200, 38),
+    ]
+
+
+def test_entries_of_nothing_are_left_out_of_the_tax_summary(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-001-PRS-F022: as a row ERPNext added counts an item without a template."""
+    invoice = purchase_invoice("ACC-PINV-2026-00004")
+    item, tax = invoice["items"][0]["name"], invoice["taxes"][0]["name"]
+    details = [
+        {"item_row": item, "tax_row": tax, "rate": 0.0, "amount": 0.0, "taxable_amount": 0.0}
+    ]
+    erp.add("Purchase Invoice", {**invoice, "item_wise_tax_details": details})
+    result = mcp.call("get_purchase_invoice", {"name": "ACC-PINV-2026-00004"}).data
+    assert result["tax_summary"] == []
+
+
 def test_get_purchase_invoice_returns_rows_with_outside_text_apart(mcp: Session) -> None:
     result = mcp.call("get_purchase_invoice", {"name": "ACC-PINV-2026-00001"}).data
     assert result == {
@@ -195,6 +241,15 @@ def test_get_purchase_invoice_returns_rows_with_outside_text_apart(mcp: Session)
                 "rate": 19.0,
                 "tax_amount": 38.0,
                 "description": "Input VAT 19%",
+                "outside_text": {},
+            }
+        ],
+        "tax_summary": [
+            {
+                "account_head": "1576 - Input VAT 19% - EX",
+                "rate": 19.0,
+                "taxable_amount": 200.0,
+                "tax_amount": 38.0,
                 "outside_text": {},
             }
         ],

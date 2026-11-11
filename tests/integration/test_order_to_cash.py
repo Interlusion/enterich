@@ -307,6 +307,15 @@ def test_get_sales_invoice_returns_rows_with_outside_text_apart(
                 "outside_text": {},
             }
         ],
+        "tax_summary": [
+            {
+                "account_head": "1776 - VAT 19% - EX",
+                "rate": 19.0,
+                "taxable_amount": 100.0,
+                "tax_amount": 19.0,
+                "outside_text": {},
+            }
+        ],
         "url": "https://erp.example.com/desk/sales-invoice/ACC-SINV-2026-00001",
         "truncated": [],
         "outside_text": {"customer_name": "Customer CUST-0001", "remarks": "As agreed"},
@@ -319,6 +328,37 @@ def test_an_invoice_with_500_rows_returns_100(mcp: Session, erp: FakeErpnext) ->
     result = mcp.call("get_sales_invoice", {"name": "ACC-SINV-2026-00500"}).data
     assert len(result["items"]) == 100
     assert result["truncated"] == ["items"]
+
+
+def test_a_tax_summary_of_over_100_entries_returns_100(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-001-PRS-F022: cut as a child table is."""
+    invoice = sales_invoice("ACC-SINV-2026-00501")
+    item, tax = invoice["items"][0]["name"], invoice["taxes"][0]["name"]
+    details = [
+        {"item_row": item, "tax_row": tax, "rate": float(r), "amount": 0.0, "taxable_amount": 1.0}
+        for r in range(101)
+    ]
+    erp.add("Sales Invoice", {**invoice, "item_wise_tax_details": details})
+    result = mcp.call("get_sales_invoice", {"name": "ACC-SINV-2026-00501"}).data
+    assert [e["rate"] for e in result["tax_summary"]] == [float(r) for r in range(100, 0, -1)]
+    assert result["truncated"] == ["tax_summary"]
+
+
+def test_a_tax_summary_is_in_the_invoices_currency(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-001-PRS-F022: ERPNext stores the tax per item in the company's currency; the
+    amounts are the end-to-end site's for 200 and 99.99 USD at 0.9137."""
+    invoice = sales_invoice("ACC-SINV-2026-00502", currency="USD", conversion_rate=0.9137)
+    item, tax = invoice["items"][0]["name"], invoice["taxes"][0]["name"]
+    details = [
+        {"item_row": item, "tax_row": tax, "rate": 19.0, "amount": 34.72, "taxable_amount": 182.74},
+        {"item_row": item, "tax_row": tax, "rate": 7.0, "amount": 6.4, "taxable_amount": 91.36},
+    ]
+    erp.add("Sales Invoice", {**invoice, "item_wise_tax_details": details})
+    result = mcp.call("get_sales_invoice", {"name": "ACC-SINV-2026-00502"}).data
+    assert [(e["rate"], e["taxable_amount"], e["tax_amount"]) for e in result["tax_summary"]] == [
+        (19, 200, 38),
+        (7, 99.99, 7),
+    ]
 
 
 def test_long_texts_in_a_get_are_cut_to_500(mcp: Session, erp: FakeErpnext) -> None:
