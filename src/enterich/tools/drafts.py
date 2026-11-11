@@ -21,7 +21,7 @@ from enterich.shapes import (
     rows_of,
     shape,
 )
-from enterich.tools import Context, Refusal, get_named, unknown_name
+from enterich.tools import Context, Refusal, get_named, invoicing, unknown_name
 
 MAX_DUPLICATE_ROWS = 1000
 MAX_NAMED = 5
@@ -291,7 +291,7 @@ def result(
     outside: Set[str] = frozenset(),
     tax_fields: Sequence[str] = TAX_FIELDS,
 ) -> dict[str, Any]:
-    """The draft as REQ-001's Results say; its rows
+    """The draft as REQ-001's Results say, with its tax summary (REQ-001-PRS-F022); its rows
     cut as a get cuts them (REQ-001-PRS-NF003), its `outside` fields under `outside_text`."""
     name = str(saved.get("name"))
     record = shape(
@@ -299,11 +299,14 @@ def result(
     )
     taxes, taxes_cut = cut_rows(rows_of(saved, "taxes"))
     items, items_cut = cut_rows(rows_of(saved, "items"))
+    summary, summary_cut = invoicing.tax_summary(saved)
+    cuts = (("items", items_cut), ("taxes", taxes_cut), ("tax_summary", summary_cut))
     return {
         **record,
         "taxes": [shape(r, tax_fields) for r in taxes],
+        "tax_summary": summary,
         "items": [shape(r, row_fields, flags={"is_free_item"}) for r in items],
         "url": form_url(context.settings.erpnext_public_url, doctype, name),
         "warnings": warnings,
-        "truncated": [t for t, cut in (("items", items_cut), ("taxes", taxes_cut)) if cut],
+        "truncated": [table for table, cut in cuts if cut],
     }

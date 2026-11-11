@@ -225,9 +225,12 @@ async def get_document(
     outside: AbstractSet[str] = frozenset(),
     flags: AbstractSet[str] = frozenset(),
     tables: Mapping[str, Table],
+    derived: Mapping[str, Callable[[dict[str, Any]], tuple[list[dict[str, Any]], bool]]]
+    | None = None,
 ) -> dict[str, Any]:
-    """A document of the assigned company with its child tables, each cut at 100 rows,
-    its link and its texts cut (REQ-001-PRS-F007, REQ-001-PRS-F009, REQ-001-PRS-NF003)."""
+    """A document of the assigned company with its child tables, each cut at 100 rows, and
+    the tables `derived` builds from the document with whether they were cut; its link and
+    its texts cut (REQ-001-PRS-F007, REQ-001-PRS-F009, REQ-001-PRS-NF003)."""
     doc = await get_named(context, doctype, name, field="name", what=what, company=True)
     record = shape(doc, fields, outside=outside, flags=flags)
     outside_text = record.pop("outside_text")
@@ -235,6 +238,10 @@ async def get_document(
     for table, spec in tables.items():
         rows, cut = cut_rows(rows_of(doc, table))
         record[table] = [shape(row, spec.fields, outside=spec.outside) for row in rows]
+        if cut:
+            truncated.append(table)
+    for table, build in (derived or {}).items():
+        record[table], cut = build(doc)
         if cut:
             truncated.append(table)
     url = form_url(context.settings.erpnext_public_url, doctype, str(doc.get("name", name)))
