@@ -170,7 +170,7 @@ REQ-001's [Operation Conventions](req-001-core.md#operation-conventions) apply.
 | `list_customers` | `search` (ID, customer name), `include_disabled`, `limit`, `offset` | `name`, *`customer_name`*, `customer_type`, `customer_group`, *`tax_id`*, `default_currency`, `disabled` |
 | `get_customer` | **`name`** | as above, plus `payment_terms`, `addresses` \[`name`, `address_type`, `is_primary_address`, *`address_line1`*, *`address_line2`*, *`city`*, *`pincode`*, `country`\] |
 | `list_sales_invoices` | `customer`, `state` (draft, unpaid, overdue, paid, return, cancelled), `from_date`, `to_date` (posting date), `limit`, `offset` | `name`, `customer`, *`customer_name`*, `posting_date`, `due_date`, `currency`, `net_total`, `grand_total`, `outstanding_amount`, `status`, `docstatus`, `is_return`, `owner`, `modified` |
-| `get_sales_invoice` | **`name`** | as above, plus `taxes_and_charges`, `total_taxes_and_charges`, `return_against`, *`remarks`*, `items` \[`item_code`, *`item_name`*, *`description`*, `qty`, `uom`, `rate`, `amount`, `income_account`, `item_tax_template`, `cost_center`\], `taxes` \[`charge_type`, `account_head`, `rate`, `tax_amount`, `description`\], `url`, `truncated` |
+| `get_sales_invoice` | **`name`** | as above, plus `taxes_and_charges`, `total_taxes_and_charges`, `return_against`, *`remarks`*, `items` \[`item_code`, *`item_name`*, *`description`*, `qty`, `uom`, `rate`, `amount`, `income_account`, `item_tax_template`, `cost_center`\], `taxes` \[`charge_type`, `account_head`, `rate`, `tax_amount`, `description`\], `tax_summary` \[`account_head`, `rate`, `taxable_amount`, `tax_amount`\] ([REQ-001-PRS-F022](req-001-core.md#req-001-prs-f022-tax-summary)), `url`, `truncated` |
 | `list_sales_tax_templates` | `include_disabled`, `limit`, `offset` | `name`, `title`, `is_default`, `tax_category`, `disabled` |
 | `report_accounts_receivable` | `as_of_date` (default today), `customer`, `ageing_based_on` (due_date, posting_date; default due_date), `limit`, `offset` | rows \[`party`, `voucher_type`, `voucher_no`, `posting_date`, `due_date`, `invoiced`, `paid`, `credit_note`, `outstanding`, `currency`, `age`, `ageing` {`range0` (not yet due) to `range5`, as ERPNext's default ranges 30, 60, 90, 120 days}\]; `total_outstanding` over all rows |
 
@@ -186,7 +186,7 @@ Customer names are not in report rows; `get_customer` gives them.
 - Clearable on update: `remarks`, `taxes_and_charges` (with its rows).
 - The customer isn't changed by an update: ERPNext would keep the first customer's address, payment terms, price list and receivable account. A draft for another customer is a new draft.
 - A row without `rate` gets the rate ERPNext sets from the price list and its pricing rules, as in the form. Enterich never sends `ignore_pricing_rule`, so a site's pricing rules apply to every row; REQ-001-PRS-F016 warns where they replaced a given rate.
-- Results add: `customer`, `posting_date`, `due_date`, `currency`, `net_total`, `total_taxes_and_charges`, `grand_total`, `taxes` \[`account_head`, `rate`, `tax_amount`\], `items` \[`item_code`, `qty`, `rate`, `amount`, `is_free_item`\].
+- Results add: `customer`, `posting_date`, `due_date`, `currency`, `net_total`, `total_taxes_and_charges`, `grand_total`, `taxes` \[`account_head`, `rate`, `tax_amount`\], `tax_summary` \[`account_head`, `rate`, `taxable_amount`, `tax_amount`\] ([REQ-001-PRS-F022](req-001-core.md#req-001-prs-f022-tax-summary)), `items` \[`item_code`, `qty`, `rate`, `amount`, `is_free_item`\].
 
 | Operation | Inputs | Sent to ERPNext |
 | :- | :- | :- |
