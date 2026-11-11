@@ -228,6 +228,8 @@ def test_a_create_returns_the_draft(mcp: Session, erp: FakeErpnext) -> None:
     assert (result["customer"], result["docstatus"], result["status"]) == ("CUST-0001", 0, "Draft")
     assert result["net_total"] == -50
     assert [(r["item_code"], r["qty"]) for r in result["items"]] == [("SKU-1", -1)]
+    # Negative, as the return's tax rows (REQ-001-PRS-F022)
+    assert [(e["taxable_amount"], e["tax_amount"]) for e in result["tax_summary"]] == [(-50, -9.5)]
     assert result["url"].endswith(f"/desk/sales-invoice/{result['name']}")
     assert result["warnings"] == []
 

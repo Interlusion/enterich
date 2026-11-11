@@ -171,6 +171,13 @@ def test_a_reverse_charge_draft_shows_its_deduct_row_and_doesnt_warn(
         ("1777 - VAT EU - EX", 38, "Deduct"),
     ]
     assert (result["total_taxes_and_charges"], result["warnings"]) == (0, [])
+    # ERPNext stores the Deduct row's tax per item negated; the summary is positive as the row
+    assert [
+        (e["account_head"], e["taxable_amount"], e["tax_amount"]) for e in result["tax_summary"]
+    ] == [
+        ("1577 - Input VAT EU - EX", 200, 38),
+        ("1777 - VAT EU - EX", 200, 38),
+    ]
 
 
 def test_a_valuation_row_shows_its_category_and_stays_out_of_the_total(
@@ -231,6 +238,15 @@ def test_a_create_returns_the_draft(mcp: Session, erp: FakeErpnext) -> None:
                 "tax_amount": 38.0,
                 "add_deduct_tax": "Add",
                 "category": "Total",
+                "outside_text": {},
+            }
+        ],
+        "tax_summary": [
+            {
+                "account_head": "1576 - Input VAT 19% - EX",
+                "rate": 19.0,
+                "taxable_amount": 200.0,
+                "tax_amount": 38.0,
                 "outside_text": {},
             }
         ],

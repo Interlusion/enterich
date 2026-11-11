@@ -492,6 +492,24 @@ Only a fixed list of operations, without generic method calls, closes these door
 - Verification: test.
 - Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
 
+#### REQ-001-PRS-F022: Tax summary
+
+**Description**: A sales or purchase invoice get, and an invoice create or update result, returns included, SHALL carry a tax summary (`tax_summary`): ERPNext's tax per item row and tax row (`item_wise_tax_details`), added up per tax row and rate, each entry with the tax row's `account_head`, the `rate` ERPNext taxed the items at, and their `taxable_amount` and `tax_amount`, in the invoice's currency (`currency`). ERPNext stores them in the company's currency; on an invoice in another currency, Enterich divides the sums by the invoice's `conversion_rate` and rounds them to 2 places, as ERPNext's printed tax breakup divides them. An item adds nothing to a tax row whose account its item tax template marks not applicable, and an entry at rate 0 to one that taxes it at 0 %; an entry whose amounts are both 0 is left out. Each entry's `tax_amount` has the sign of its tax row's `tax_amount`, and its `taxable_amount` the sign of its item rows' amounts, however ERPNext stored a Deduct row's details. The entries come in the order of the tax rows, and within one by rate, highest first; they are cut to 100 and named in `truncated`, as a child table is.
+
+**Related URS**: REQ-001-URS-F001, REQ-001-URS-F002
+
+**Definition of Done**:
+
+- A sales invoice draft on a template whose rows carry 0 %, of an item taxed at 19 % (200) and one taxed at 7 % (100), returns 19 % on 200 with 38 of tax on the 19 % row and 7 % on 100 with 7 on the 7 % row, and nothing else; a get of the draft returns the same.
+- With an item row without an item tax template (50) added, each of the two rows also has 0 % on 50, with 0 tax.
+- A purchase invoice draft with the reverse-charge template, of an item taxed at 19 % (100), returns 19 % on 100 with 19 of tax on the Add row and the same on the Deduct row.
+- A return draft's entries are negative, as its tax rows' `tax_amount`.
+- A Deduct row's tax per item stored negated with its amount taxed positive, as v16's migration and tax withholding store them, gives a positive entry, as one stored with both negated does.
+- Without a discount on the grand total, the entries of each tax row add up to its `tax_amount`; with a discount of 10 % on the grand total, to the tax after it, 34.20 of a row whose `tax_amount` is 38. An invoice without tax rows has an empty `tax_summary`.
+- An invoice in USD at a `conversion_rate` of 0.9137, of an item taxed at 19 % (200 USD) and one at 7 % (99.99 USD), returns 19 % on 200 with 38 of tax and 7 % on 99.99 with 7, in USD, as its tax rows.
+- Verification: test.
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
+
 ## PRS — Non-Functional
 
 #### REQ-001-PRS-NF001: Outside text marked
@@ -566,6 +584,7 @@ Numbers are read as decimals, never as binary floating point. Every operation re
 - **Yes/no fields** (ERPNext's Check fields, stored as 0 and 1) are returned as `true` and `false`.
 - **`url`** is the document's form in ERPNext, built as ERPNext v16 builds it: the public URL, `/desk/`, the DocType in lower case with hyphens for spaces, and the name percent-encoded as one segment (`/desk/sales-invoice/SINV-2026-00001`).
 - **Tax rows** (`taxes`): `rate` is the rate saved on the row and `tax_amount` the row's tax. An item with an item tax template is taxed at that template's rate on the rows whose accounts the template lists, or not by such a row at all, so `rate` need not be the rate any item was taxed at. On a purchase invoice, a row with `add_deduct_tax` Deduct is subtracted from the total, and the tax of a row with `category` Valuation goes into the items' valuation, not into the total. The description of every operation whose result has tax rows says so.
+- **Tax summary** (`tax_summary`, REQ-001-PRS-F022): the tax per tax row and rate, from ERPNext's tax per item row and tax row, which comes with the invoice; no further call. Its amounts are after any discount, while a row's `tax_amount` is before a discount on the grand total. On the rarer charge types, `rate` and `taxable_amount` are ERPNext's: on On Item Quantity, an amount per unit on 0; on On Previous Row Amount or Total, the rate on the previous row's tax or total; an Actual charge is spread over the items by their net amounts. A row ERPNext added from item tax templates (REQ-001-PRS-F020) doesn't count an item without one. For an invoice stored before v16 the summary has what v16's migration made: nothing for a cancelled one or a draft not saved since. The descriptions of the operations whose result has it say that the amounts are after a discount.
 - **Creates and updates:** the draft's `name`, `modified`, `status`, `docstatus`, `company`, the further fields its area spec lists, `url`, `warnings`, and `truncated`: its child tables are cut to 100 rows each, as in gets.
 
 ### States
@@ -616,6 +635,8 @@ Checked against Frappe and ERPNext v16.52 source:
 - A list leaves out of every row the fields the user may not read (`get_permitted_fields`): with only the select right on a DocType, all but its standard fields (such as `name` and `modified`) and its search fields, a child table's fields among them; with read, those of a permission level the user lacks. The operations need read (configuration guide).
 - A get returns a field of a permission level the user lacks as null, as if it were empty (`apply_fieldlevel_read_permissions`). A field marked to be masked comes as a placeholder such as `XXXXXXXX`, in lists and gets alike (`mask_fields`).
 - On a purchase invoice, a tax row with `category` Valuation keeps its `tax_amount` and adds nothing to the tax total (`get_tax_amount_if_for_valuation_or_deduction`); one with Valuation and Total adds it. Without a stock item among the items, ERPNext makes both Total (`validate_stock_or_nonstock_items`).
+- A tax row's tax per item (`item_wise_tax_details`) adds up to its tax after the discount in the company's currency (`base_tax_amount_after_discount_amount`, `adjust_rounding_in_item_wise_tax_details`): ERPNext works it out in the invoice's currency and converts the running total (`set_item_wise_tax`). ERPNext's printed tax breakup divides it by `conversion_rate` (`itemised_tax_breakup.html`). `taxable_amount` is the item's net amount, the previous row's tax or total for On Previous Row Amount or Total, and 0 for On Item Quantity, whose `rate` is an amount per unit (`get_current_tax_and_net_amount`). A row ERPNext added from item tax templates counts an item without one at 0 on 0 (`get_item_tax_map`).
+- v16's migration of the tax per item (`migrate_old_item_wise_tax_detail_data_to_table`) made details only for submitted invoices, without rows that carried no tax, and negated only `amount` for a Deduct row, as tax withholding stores them (`tax_withholding_entry`). A draft gets its details at its next save.
 
 Checked on a real ERPNext v16 site by the end-to-end test:
 
@@ -624,6 +645,7 @@ Checked on a real ERPNext v16 site by the end-to-end test:
 - An item with an item tax template is taxed, on a tax row whose account the template lists, at the template's rate for it, and not by that row if the template marks the account not applicable; on other rows at the row's rate. The row keeps the rate it was saved with (`_get_tax_rate`): with the setup wizard's German sales template, whose rows carry 0 %, and an item taxed at 19 %, the row's `rate` is 0 and its `tax_amount` 19 % of the item's amount.
 - On a purchase invoice, a row with `add_deduct_tax` Deduct keeps a positive `tax_amount`, and the total subtracts it: with a reverse-charge template, an Add and a Deduct row of the same amount make a tax total of 0.
 - A draft saved without tax rows gets one row at rate 0 for each account of its items' item tax templates, marked `set_by_item_tax_template`, when Accounts Settings say so (`add_taxes_from_item_tax_template`, on by default; `append_taxes_from_item_tax_template`); the items are then taxed at their templates' rates on those rows. With the setup wizard's German item tax templates, which list the 13 VAT accounts the setup creates, input VAT among them, a sales invoice of an item taxed at 19 % gets 13 rows, 7 of them taxed at 19 %. The rows keep their mark through later saves, as ERPNext adds no rows to a draft that has some.
+- ERPNext v16 stores an invoice's tax per item row and tax row (`item_wise_tax_details`: `item_row`, `tax_row`, `rate`, `amount`, `taxable_amount`; `set_item_wise_tax`), in the company's currency (on an invoice in USD at 0.9137, 34.72 of a row whose `tax_amount` is 38), both amounts negated for a Deduct row, and none for a row the item's tax template marks not applicable. An insert's, an update's and a get's answer carry them, read with the invoice; a return ERPNext maps from an invoice carries none, and gets its own on save. A tax row's `net_amount` isn't the base taxed at its rate: on a template at 0 %, the 19 % row of an invoice with an item taxed at 19 % (20) and one without an item tax template (50) has a `net_amount` of 70.
 - A sales or purchase invoice inserted through the API without `taxes_and_charges` gets no tax rows from a template: without a Tax Rule it keeps no template, not even the company's default, which only the desk's form fills in; a matching Tax Rule's template ERPNext sets as `taxes_and_charges`, but without its rows (`set_missing_values` with `for_validate`, `set_taxes` of the party).
 
 Not checked yet:

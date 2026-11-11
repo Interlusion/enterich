@@ -75,7 +75,7 @@ The invoice then shows:
 | Abziehbare Vorsteuer 19 % | 0 % | 3.80 € |
 | Abziehbare Vorsteuer 7 % | 0 % | 7.00 € |
 
-The tax amounts match the hotel's VAT summary (7 % on 100 €, 19 % on 20 €); the rates shown don't. The rates used are on the item lines. In ERPNext's form, the section **Taxes and Charges Calculation** shows them per item. The invoice also stores them in a hidden table, **Item Wise Tax Details** (`item_wise_tax_details`): for each item line and tax line that applies, the rate used, the tax and the taxable amount, in the company's currency, a deducted line's as negative amounts.
+The tax amounts match the hotel's VAT summary (7 % on 100 €, 19 % on 20 €); the rates shown don't. The rates used are on the item lines. In ERPNext's form, the section **Taxes and Charges Calculation** shows them per item. The invoice also stores them in a hidden table, **Item Wise Tax Details** (`item_wise_tax_details`): for each item line and tax line that applies, the rate used, the tax and the taxable amount, in the company's currency even on an invoice in another (ERPNext's printed tax breakup converts them back), a deducted line's as negative amounts.
 
 ## Two ways to set up VAT
 
@@ -151,7 +151,7 @@ Since 2026 (ERPNext v16), the item tax templates mark the other rate's accounts 
 
 ### The rate shown isn't the rate used
 
-With rates per item, read a tax line's tax amount, not its rate. Enterich's tool descriptions tell the agent the same.
+With rates per item, read a tax line's tax amount, not its rate. Enterich's tool descriptions tell the agent the same, and its results add the rates used per tax line (below).
 
 ### Tax lines ERPNext adds by itself
 
@@ -233,16 +233,16 @@ sequenceDiagram
   E->>N: the template's tax lines
   E->>N: insert the draft with items and tax lines
   N-->>E: the saved draft, tax computed
-  E-->>A: tax lines (rate, tax_amount, …) and warnings
+  E-->>A: tax lines, tax summary and warnings
 ```
 
 - **Inputs:** the invoice drafts take the template (`taxes_and_charges`); `list_sales_tax_templates` and `list_purchase_tax_templates` show the templates and which is the default. An item line takes `item_code`, `qty`, `rate` (the price), `uom`, the account and the cost centre, but no item tax template: its tax rate comes from the item ([REQ-004](../specs/req-004-order-to-cash.md), [REQ-005](../specs/req-005-procure-to-pay.md)).
-- **Results:** each tax line with its `rate` and `tax_amount`, on purchases also `add_deduct_tax` and `category`; the descriptions say that `rate` need not be any item's rate ([REQ-001](../specs/req-001-core.md#results)). `get_sales_invoice` and `get_purchase_invoice` give each item line's item tax template; `get_item` gives the item's own Taxes rows, not its group's ([REQ-003](../specs/req-003-master-data.md)).
+- **Results:** each tax line with its `rate` and `tax_amount`, on purchases also `add_deduct_tax` and `category`; the descriptions say that `rate` need not be any item's rate ([REQ-001](../specs/req-001-core.md#results)). Beside them, `tax_summary` is the VAT summary: per tax line, each rate the items were taxed at, with the amount taxed and the tax, added up from Item Wise Tax Details, in the invoice's currency and after any discount. On the hotel bill: 7 % on 100 € with 7.00 € on the 7 % line, 19 % on 20 € with 3.80 € on the 19 % line. An item a line taxes at 0 % shows as 0 % on that line. Invoices from before ERPNext v16 have what v16's migration made of their details, cancelled ones nothing ([REQ-001-PRS-F022](../specs/req-001-core.md#req-001-prs-f022-tax-summary)). `get_sales_invoice` and `get_purchase_invoice` give each item line's item tax template; `get_item` gives the item's own Taxes rows, not its group's ([REQ-003](../specs/req-003-master-data.md)).
 - **Warnings**, in the result and in the draft's comment ([reviewing drafts](reviewing-drafts.md#enterichs-comments)):
   - a template whose lines all came to zero tax ([REQ-001-PRS-F012](../specs/req-001-core.md#req-001-prs-f012-tax-template-without-tax));
   - tax lines ERPNext added from item tax templates, with their number and tax ([REQ-001-PRS-F020](../specs/req-001-core.md#req-001-prs-f020-tax-rows-from-item-tax-templates));
   - a template ERPNext named from a Tax Rule without its lines ([REQ-001-PRS-F021](../specs/req-001-core.md#req-001-prs-f021-tax-template-without-its-rows)).
-- **Not yet:** the item tax template per item line as an input, and a VAT summary per rate in the results. Both are in the [backlog](../backlog/backlog.md).
+- **Not yet:** the item tax template per item line as an input; it is in the [backlog](../backlog/backlog.md).
 
 ## Glossary
 

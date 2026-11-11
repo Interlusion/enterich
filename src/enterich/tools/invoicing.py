@@ -8,12 +8,14 @@ from typing import Any, Literal
 
 from enterich.shapes import (
     InvoiceState,
+    cut_rows,
     cut_texts,
     decimal,
     form_url,
     invoice_state,
     like_pattern,
     page,
+    rows_of,
     shape,
     split_outside,
     today,
@@ -45,8 +47,14 @@ MAX_ADDRESSES = 100
 TAX_RATE_NOTE = (
     "A tax row's `rate` is the rate saved on it; an item with an item tax template is taxed "
     "at that template's rate on the rows whose accounts it lists, or not by such a row, so "
-    "`rate` need not be any item's rate: take the tax from `tax_amount`."
+    "`rate` need not be any item's rate: take the tax from `tax_amount`. `tax_summary` "
+    "adds up the tax per tax row and the rate the items were taxed at, with the amount "
+    "taxed (`taxable_amount`), after any discount, where `tax_amount` is before one on the "
+    "grand total; an item at 0 % there wasn't taxed by that row."
 )
+TAX_SUMMARY_FIELDS = ("account_head", "rate", "taxable_amount", "tax_amount")
+# A tax summary converted from the company's currency is rounded to the cent
+CENT = Decimal("0.01")
 PURCHASE_TAX_RATE_NOTE = (
     f"{TAX_RATE_NOTE} A row with `add_deduct_tax` Deduct is subtracted from the total, and "
     "the tax of one with `category` Valuation isn't in it."
@@ -180,6 +188,52 @@ async def list_invoices(
     return page([_invoice(side, row) for row in rows], offset, limit)
 
 
+def tax_summary(doc: dict[str, Any]) -> tuple[list[dict[str, Any]], bool]:
+    """ERPNext's tax per item row and tax row added up per tax row and rate, in the order of
+    the rows and by rate, highest first, without entries of nothing; cut at 100 entries
+    (REQ-001-PRS-F022). ERPNext negates a Deduct row's tax per item, which is turned back to
+    the sign of the row's `tax_amount`; the amount taxed it negates only when it computes
+    it, not in v16's migration of older invoices or for tax withholding, so a Deduct row's
+    takes the sign of its item row's amount. ERPNext stores them in the company's currency;
+    on an invoice in another, the sums are divided by its conversion rate, as ERPNext's
+    printed tax breakup does."""
+    taxes = rows_of(doc, "taxes")
+    conversion = decimal(doc.get("conversion_rate")) or Decimal(1)
+    numbers = {row.get("name"): number for number, row in enumerate(taxes)}
+    negative = {r.get("name") for r in rows_of(doc, "items") if decimal(r.get("amount")) < 0}
+    sums: dict[tuple[int, Decimal], tuple[Decimal, Decimal]] = {}
+    for detail in rows_of(doc, "item_wise_tax_details"):
+        number = numbers.get(detail.get("tax_row"))
+        if number is None:
+            continue
+        taxable, tax = decimal(detail.get("taxable_amount")), decimal(detail.get("amount"))
+        if taxes[number].get("add_deduct_tax") == "Deduct":
+            tax = -tax
+            taxable = -abs(taxable) if detail.get("item_row") in negative else abs(taxable)
+        key = (number, decimal(detail.get("rate")))
+        base, total = sums.get(key, (Decimal(0), Decimal(0)))
+        sums[key] = (base + taxable, total + tax)
+    if conversion != 1:
+        sums = {
+            key: ((base / conversion).quantize(CENT), (tax / conversion).quantize(CENT))
+            for key, (base, tax) in sums.items()
+        }
+    entries = [
+        shape(
+            {
+                "account_head": taxes[number].get("account_head"),
+                "rate": float(rate),
+                "taxable_amount": float(base),
+                "tax_amount": float(tax),
+            },
+            TAX_SUMMARY_FIELDS,
+        )
+        for (number, rate), (base, tax) in sorted(sums.items(), key=lambda s: (s[0][0], -s[0][1]))
+        if base or tax
+    ]
+    return cut_rows(entries)
+
+
 async def get_invoice(side: Side, context: Context, name: str) -> dict[str, Any]:
     return await get_document(
         context,
@@ -193,6 +247,7 @@ async def get_invoice(side: Side, context: Context, name: str) -> dict[str, Any]
             "items": Table(side.item_fields, side.item_outside),
             "taxes": Table(side.tax_fields),
         },
+        derived={"tax_summary": tax_summary},
     )
 
 

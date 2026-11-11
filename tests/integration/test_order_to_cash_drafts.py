@@ -2,7 +2,8 @@
 REQ-001's draft rules: bodies, duplicates, stale updates, clearing, warnings and their
 comment, the limit of drafts per hour (REQ-001-PRS-F002, REQ-001-PRS-F003,
 REQ-001-PRS-F004, REQ-001-PRS-F005, REQ-001-PRS-F012, REQ-001-PRS-F015,
-REQ-001-PRS-F016, REQ-001-PRS-F019, REQ-001-PRS-F020, REQ-001-PRS-F021)."""
+REQ-001-PRS-F016, REQ-001-PRS-F019, REQ-001-PRS-F020, REQ-001-PRS-F021), and the
+tax summary (REQ-001-PRS-F022)."""
 
 import re
 import time
@@ -190,6 +191,15 @@ def test_a_create_returns_the_draft_with_the_rates_erpnext_set(
             {
                 "account_head": "1776 - VAT 19% - EX",
                 "rate": 19.0,
+                "tax_amount": 23.75,
+                "outside_text": {},
+            }
+        ],
+        "tax_summary": [
+            {
+                "account_head": "1776 - VAT 19% - EX",
+                "rate": 19.0,
+                "taxable_amount": 125.0,
                 "tax_amount": 23.75,
                 "outside_text": {},
             }
@@ -397,7 +407,7 @@ def test_a_template_without_tax_warns_on_the_draft(mcp: Session, erp: FakeErpnex
     assert comment["content"].endswith(f"<br>{warning}")
 
 
-ITEM_TAX = {"1776 - VAT 19% - EX": 19.0, "1777 - VAT 7% - EX": 0.0}
+ITEM_TAX: dict[str, float | str] = {"1776 - VAT 19% - EX": 19.0, "1777 - VAT 7% - EX": 0.0}
 ITEM_TAX_WARNING = (
     "The draft has 2 tax rows, with 19.00 of tax, that ERPNext added from the items' item "
     "tax templates when it was saved without tax rows; check them in `taxes`, or give "
@@ -531,6 +541,54 @@ def test_a_failing_comment_still_returns_the_draft_and_says_so(
     assert "VAT 0% - EX" in tax
     assert "comment" in missing
     assert erp.comments == []
+
+
+# Tax summary (REQ-001-PRS-F022)
+
+TWO_RATES = [
+    {**VAT_ROWS[0], "rate": 0.0},
+    {**VAT_ROWS[0], "account_head": "1777 - VAT 7% - EX", "description": "VAT 7%", "rate": 0.0},
+]
+
+
+def summary(result: dict[str, Any]) -> list[tuple[str, float, float, float]]:
+    return [
+        (e["account_head"], e["rate"], e["taxable_amount"], e["tax_amount"])
+        for e in result["tax_summary"]
+    ]
+
+
+def test_the_tax_summary_gives_each_rate_with_what_it_taxed(mcp: Session, erp: FakeErpnext) -> None:
+    erp.add("Sales Taxes and Charges Template", tax_template("VAT 0/0 - EX", taxes=TWO_RATES))
+    erp.item_taxes["SKU-1"] = {"1776 - VAT 19% - EX": 19.0, "1777 - VAT 7% - EX": "N/A"}
+    erp.item_taxes["SKU-2"] = {"1776 - VAT 19% - EX": "N/A", "1777 - VAT 7% - EX": 7.0}
+    items = [{"item_code": "SKU-1", "qty": 2}, {"item_code": "SKU-2", "qty": 1}]
+    result = create(mcp, items=items, taxes_and_charges="VAT 0/0 - EX").data
+    assert [t["rate"] for t in result["taxes"]] == [0, 0]
+    assert summary(result) == [
+        ("1776 - VAT 19% - EX", 19, 100, 19),
+        ("1777 - VAT 7% - EX", 7, 20, 1.4),
+    ]
+    got = mcp.call("get_sales_invoice", {"name": result["name"]}).data
+    assert got["tax_summary"] == result["tax_summary"]
+
+
+def test_an_item_without_an_item_tax_template_is_in_it_at_0(mcp: Session, erp: FakeErpnext) -> None:
+    erp.add("Sales Taxes and Charges Template", tax_template("VAT 0/0 - EX", taxes=TWO_RATES))
+    erp.item_taxes["SKU-1"] = {"1776 - VAT 19% - EX": 19.0, "1777 - VAT 7% - EX": "N/A"}
+    # SKU-3 at 10 twice: added up per row and rate, after the higher rate
+    items = [{"item_code": c, "qty": 1} for c in ("SKU-3", "SKU-1", "SKU-3")]
+    result = create(mcp, items=items, taxes_and_charges="VAT 0/0 - EX").data
+    assert summary(result) == [
+        ("1776 - VAT 19% - EX", 19, 50, 9.5),
+        ("1776 - VAT 19% - EX", 0, 20, 0),
+        ("1777 - VAT 7% - EX", 0, 20, 0),
+    ]
+
+
+def test_without_tax_rows_the_tax_summary_is_empty(mcp: Session, erp: FakeErpnext) -> None:
+    result = create(mcp).data
+    assert (result["taxes"], result["tax_summary"]) == ([], [])
 
 
 # The draft's origin (REQ-001-PRS-F015, REQ-002-PRS-NF008)
