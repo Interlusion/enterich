@@ -121,7 +121,9 @@ def test_inputs_outside_the_schema_are_refused_before_erpnext(
 
 def test_a_list_too_large_for_one_result_asks_to_narrow(mcp: Session, erp: FakeErpnext) -> None:
     for i in range(100):
-        erp.add("Item", item(f"LONG-{i:03}", item_name="n" * 1200))
+        # Each text cut to 500 (REQ-001-PRS-NF003), three of them still too large
+        long = {"item_name": "n" * 1200, "item_group": "g" * 1200, "stock_uom": "u" * 1200}
+        erp.add("Item", item(f"LONG-{i:03}", **long))
     result = mcp.call("list_items", {"limit": 100, "search": "LONG"})
     assert result.error
     assert "narrow" in result.text

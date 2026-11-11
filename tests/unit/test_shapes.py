@@ -19,6 +19,7 @@ from enterich.shapes import (
     cut_rows,
     decimal,
     like_pattern,
+    page,
     split_outside,
 )
 
@@ -148,6 +149,40 @@ def test_child_tables_are_cut_to_100_rows() -> None:
     assert kept[-1] == {"n": 99}
     assert cut is True
     assert cut_rows(rows[:100]) == (rows[:100], False)
+
+
+def test_a_pages_texts_are_cut_to_500() -> None:
+    """REQ-001-PRS-NF003: as a get's, named as `records.<field>`."""
+    records: list[dict[str, Any]] = [
+        {"name": "A", "remarks": "r" * 501, "outside_text": {"description": "d" * 600}},
+        {"name": "B", "remarks": "short", "outside_text": {}},
+    ]
+    result = page(records, offset=0, limit=10)
+    assert [len(r["remarks"]) for r in result["records"]] == [500, 5]
+    assert len(result["records"][0]["outside_text"]["description"]) == 500
+    assert result["truncated"] == ["records.description", "records.remarks"]
+
+
+def test_texts_in_nested_rows_and_objects_are_cut_with_their_path() -> None:
+    records: list[dict[str, Any]] = [
+        {"lines": [{"text": "x" * 600}], "summary": {"note": "y" * 600}, "outside_text": {}}
+    ]
+    [record] = page(records, offset=0, limit=10)["records"]
+    assert (len(record["lines"][0]["text"]), len(record["summary"]["note"])) == (500, 500)
+    assert page(records, offset=0, limit=10)["truncated"] == [
+        "records.lines.text",
+        "records.summary.note",
+    ]
+
+
+def test_a_page_with_nothing_cut_names_nothing() -> None:
+    assert page([{"name": "A", "outside_text": {}}], offset=0, limit=10) == {
+        "count": 1,
+        "offset": 0,
+        "has_more": False,
+        "records": [{"name": "A", "outside_text": {}}],
+        "truncated": [],
+    }
 
 
 days = TypeAdapter(Day)
