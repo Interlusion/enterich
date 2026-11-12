@@ -575,6 +575,25 @@ def test_an_update_of_a_payment_to_a_supplier_sends_its_bank_as_paid_from(
     }
 
 
+@pytest.mark.parametrize(
+    "bank",
+    [
+        "Main - Other Bank",  # another company's
+        "Customer - Their Bank",  # a party's
+        "Old - Example Bank",  # disabled
+    ],
+)
+def test_an_update_takes_only_an_enabled_bank_account_of_the_company(
+    mcp: Session, erp: FakeErpnext, bank: str
+) -> None:
+    # REQ-007-PRS-F004 holds for the update's bank account as for the create's
+    result = update(mcp, bank_account=bank)
+    assert result.error
+    assert result.text.startswith("bank_account: ")
+    assert bank in result.text
+    assert erp.writes() == []
+
+
 def test_an_empty_list_removes_the_references(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp, references=[])
     assert not result.error, result.text
