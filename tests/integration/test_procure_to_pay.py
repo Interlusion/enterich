@@ -122,7 +122,12 @@ def test_list_purchase_invoices_sends_exactly_the_catalogued_call(
 ) -> None:
     mcp.call(
         "list_purchase_invoices",
-        {"supplier": "SUPP-0001", "state": "overdue", "from_date": "2026-10-01"},
+        {
+            "supplier": "SUPP-0001",
+            "state": "overdue",
+            "from_date": "2026-10-01",
+            "to_date": "2026-10-31",
+        },
     )
     [call] = erp.received
     assert (call.method, call.path) == ("GET", "/api/resource/Purchase Invoice")
@@ -135,6 +140,7 @@ def test_list_purchase_invoices_sends_exactly_the_catalogued_call(
         ["outstanding_amount", ">", 0],
         ["due_date", "<", TODAY],
         ["posting_date", ">=", "2026-10-01"],
+        ["posting_date", "<=", "2026-10-31"],
     ]
     assert call.param("order_by") == "posting_date desc, name desc"
 
