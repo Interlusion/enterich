@@ -318,6 +318,27 @@ async def test_cached_keys_work_until_5_minutes_then_503(jwks: FakeJwks, signer:
         await v.verify_token(token(signer))
 
 
+async def test_each_jwks_fetch_logs_its_outcome_and_keys(
+    jwks: FakeJwks, signer: Signer, logs: Logs
+) -> None:
+    """The `jwks` line of REQ-002-PRS-NF008."""
+    clock = Clock()
+    v = verifier(jwks, clock=clock)
+    assert await v.verify_token(token(signer)) is not None
+    jwks.down = True
+    clock.now += 301
+    with pytest.raises(KeysUnavailable):
+        await v.verify_token(token(signer))
+    lines = [
+        {k: value for k, value in line.items() if k not in ("time", "event")}
+        for line in logs.events("jwks")
+    ]
+    assert lines == [
+        {"level": "info", "outcome": "fetched", "keys": 1},
+        {"level": "warning", "outcome": "failed", "reason": "_JwksError", "keys": 0},
+    ]
+
+
 @pytest.mark.parametrize("keys", [[], [{"kty": "RSA", "kid": "broken", "n": "x", "e": "AQAB"}]])
 async def test_a_jwks_without_usable_keys_counts_as_unavailable(
     signer: Signer, keys: list[dict[str, Any]]
