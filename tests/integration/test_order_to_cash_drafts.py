@@ -643,6 +643,21 @@ def test_each_operation_has_its_own_call(mcp: Session, logs: Logs) -> None:
     )
 
 
+def test_the_line_counts_the_erpnext_calls_and_their_time(
+    mcp: Session, erp: FakeErpnext, logs: Logs
+) -> None:
+    erp.delay = 0.1
+    create(mcp)
+    assert [(r.method, r.path) for r in erp.received] == [
+        ("GET", PATH),
+        ("POST", PATH),
+        ("POST", COMMENT_METHOD),
+    ]
+    [line] = logs.events("operation")
+    assert line["erpnext_calls"] == 3
+    assert 0.3 <= line["erpnext_duration"] <= line["duration"] < 1.0
+
+
 def test_a_refused_write_leaves_no_comment(mcp: Session, erp: FakeErpnext, logs: Logs) -> None:
     assert create(mcp, customer="CUST-9999").error
     assert update(mcp, modified="2026-10-28 10:00:00.000000", remarks="x").error
