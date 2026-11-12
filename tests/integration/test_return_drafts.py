@@ -821,6 +821,7 @@ def test_an_update_to_the_invoices_day_carries_its_posting_time(
 # Updates check the invoice again
 
 
+@pytest.mark.parametrize("doctype", SIDES)
 @pytest.mark.parametrize(
     "change", [{"items": [{"item_code": "SKU-1", "qty": 1}]}, {"posting_date": "2026-10-27"}]
 )
@@ -834,22 +835,29 @@ def test_an_update_to_the_invoices_day_carries_its_posting_time(
 def test_an_update_refuses_an_invoice_a_create_refuses(
     mcp: Session,
     erp: FakeErpnext,
+    doctype: str,
     change: dict[str, Any],
     invoice_fields: dict[str, Any],
     says: str,
 ) -> None:
-    erp.docs["Sales Invoice"][INVOICE].update(invoice_fields)
-    result = update(mcp, **change)
+    sales = doctype == "Sales Invoice"
+    erp.docs[doctype][INVOICE if sales else BILL].update(invoice_fields)
+    result = update(mcp, tool(doctype, "update"), **change)
     assert result.error
     assert result.text.startswith("return_against: ")
     assert says in result.text
     assert erp.writes() == []
-    assert [r for r in erp.received if r.path == SALES_RETURN_METHOD] == []
+    method = SALES_RETURN_METHOD if sales else DEBIT_NOTE_METHOD
+    assert [r for r in erp.received if r.path == method] == []
 
 
-def test_a_return_against_no_invoice_isnt_updated(mcp: Session, erp: FakeErpnext) -> None:
-    erp.docs["Sales Invoice"][SALES_DRAFT]["return_against"] = None
-    result = update(mcp, remarks="Changed")
+@pytest.mark.parametrize("doctype", SIDES)
+def test_a_return_against_no_invoice_isnt_updated(
+    mcp: Session, erp: FakeErpnext, doctype: str
+) -> None:
+    draft = SALES_DRAFT if doctype == "Sales Invoice" else PURCHASE_DRAFT
+    erp.docs[doctype][draft]["return_against"] = None
+    result = update(mcp, tool(doctype, "update"), remarks="Changed")
     assert result.error
     assert result.text.startswith("name: ")
     assert "against no invoice" in result.text
