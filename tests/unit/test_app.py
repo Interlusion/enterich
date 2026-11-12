@@ -53,7 +53,9 @@ def test_the_error_line_carries_the_traceback_and_is_written_once() -> None:
     assert "raw failure" in lines[0]["traceback"]
 
 
-async def posted(messages: list[Message]) -> tuple[list[bytes], list[int]]:
+async def posted(
+    messages: list[Message], headers: list[tuple[bytes, bytes]] | None = None
+) -> tuple[list[bytes], list[int]]:
     """POST /mcp with these receive messages: the body the inner app read, the statuses sent."""
     read: list[bytes] = []
     statuses: list[int] = []
@@ -68,7 +70,7 @@ async def posted(messages: list[Message]) -> tuple[list[bytes], list[int]]:
         if message["type"] == "http.response.start":
             statuses.append(message["status"])
 
-    scope: Scope = {"type": "http", "method": "POST", "path": "/mcp", "headers": []}
+    scope: Scope = {"type": "http", "method": "POST", "path": "/mcp", "headers": headers or []}
     await Wrapper(inner, "/mcp")(scope, receive, send)
     return read, statuses
 
@@ -109,6 +111,17 @@ async def test_parts_over_1_mib_together_get_413_without_a_content_length() -> N
         ]
     )
     assert (read, statuses) == ([], [413])
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("declared", [b"2097152", b"abc"])
+async def test_a_content_length_over_1_mib_or_not_a_number_gets_413_unread(
+    declared: bytes,
+) -> None:
+    # REQ-002-PRS-NF011, kept cheap (REQ-002-URS-NF009): the body sent is small and stays unread.
+    messages: list[Message] = [{"type": "http.request", "body": b"{}", "more_body": False}]
+    read, statuses = await posted(messages, [(b"content-length", declared)])
+    assert (read, statuses, len(messages)) == ([], [413], 1)
 
 
 @pytest.mark.parametrize("method", ["POST", "DELETE"])
