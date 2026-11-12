@@ -280,6 +280,17 @@ def test_a_create_with_the_drafts_rows_is_refused_naming_it(mcp: Session, erp: F
     [
         {"accounts": [{"account": RENT, "debit": 501}, {"account": BANK, "credit": 501}]},
         {
+            "accounts": [
+                {"account": RENT, "debit": 500},
+                {
+                    "account": DEBTORS,
+                    "credit": 500,
+                    "party_type": "Customer",
+                    "party": "CUST-0001",
+                },
+            ]
+        },
+        {
             "accounts": [{"account": RENT, "debit": 500}, {"account": BANK, "credit": 500}],
             "posting_date": "2026-11-02",
         },
