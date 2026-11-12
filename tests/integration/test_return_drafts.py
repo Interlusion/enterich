@@ -469,17 +469,20 @@ def test_a_draft_debit_note_against_the_invoice_is_a_duplicate(
 # update_draft_sales_return, update_draft_purchase_return
 
 
+@pytest.mark.parametrize("doctype", SIDES)
 def test_an_update_with_items_sends_the_rows_of_erpnexts_return(
-    mcp: Session, erp: FakeErpnext
+    mcp: Session, erp: FakeErpnext, doctype: str
 ) -> None:
-    mapped = erp.mapped_return("Sales Invoice", INVOICE)
-    result = update(mcp, items=[{"item_code": "SKU-1", "qty": 2}])
+    against = INVOICE if doctype == "Sales Invoice" else BILL
+    method = SALES_RETURN_METHOD if doctype == "Sales Invoice" else DEBIT_NOTE_METHOD
+    mapped = erp.mapped_return(doctype, against)
+    result = update(mcp, tool(doctype, "update"), items=[{"item_code": "SKU-1", "qty": 2}])
     assert not result.error, result.text
-    [put] = erp.writes(SALES)
-    assert (put.method, put.path) == ("PUT", f"{SALES}/{SALES_DRAFT}")
+    [put] = erp.writes(f"/api/resource/{doctype}")
+    assert (put.method, put.path) == ("PUT", f"/api/resource/{doctype}/{numbered(doctype, 20)}")
     assert put.body == {"items": lines(mapped, (0, 2)), "modified": MODIFIED}
-    [mapping] = [r for r in erp.received if r.path == SALES_RETURN_METHOD]
-    assert mapping.params == {"source_name": INVOICE}
+    [mapping] = [r for r in erp.received if r.path == method]
+    assert mapping.params == {"source_name": against}
     assert [(r["item_code"], r["qty"]) for r in result.data["items"]] == [("SKU-1", -2)]
 
 
