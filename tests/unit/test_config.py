@@ -62,7 +62,18 @@ def test_the_listen_port_may_be_any_from_1_to_65535(port: int) -> None:
     assert s.port == port
 
 
-@pytest.mark.parametrize("value", ["", "  ", "erp example.com", "erp.example.com/x", "user@erp"])
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "  ",
+        "erp example.com",
+        "erp.example.com/x",
+        "user@erp",
+        "erp.example.com:",
+        "erp.example.com:abc",
+    ],
+)
 def test_an_empty_or_invalid_erpnext_host_stops_enterich(value: str) -> None:
     assert problems(ERPNEXT_HOST=value) == [
         "ENTERICH_ERPNEXT_HOST: must be a host name or IP address, optionally with a port"
