@@ -250,6 +250,20 @@ def test_an_unknown_or_unpermitted_name_names_the_input(
     assert "isn't permitted" in result.text
 
 
+@pytest.mark.parametrize("body", [{}, {"exc_type": "PermissionError"}])
+@pytest.mark.parametrize("status", [404, 403])
+def test_a_bare_404_or_403_for_a_name_names_the_input(
+    mcp: Session, erp: FakeErpnext, status: int, body: dict[str, Any]
+) -> None:
+    """REQ-001-PRS-F008: a refusal without `_server_messages` answers per REQ-001-PRS-F009."""
+    erp.fail("/api/method/frappe.client.get", status, body)
+    result = mcp.call("get_item", {"item_code": "SKU-1"})
+    assert result.error
+    assert "item_code" in result.text
+    assert "doesn't exist" in result.text
+    assert "isn't permitted" in result.text
+
+
 def test_a_long_erpnext_message_reaches_the_agent_cut_to_300(
     mcp: Session, erp: FakeErpnext
 ) -> None:
