@@ -3,6 +3,7 @@
 import io
 import json
 import logging
+import traceback
 
 import pytest
 
@@ -58,8 +59,8 @@ def test_the_level_filters_library_lines_only() -> None:
     assert events == ["start", "rejection", "library"]
 
 
-def fail() -> None:
-    raise RuntimeError("boom")
+def fail(message: str = "boom") -> None:
+    raise RuntimeError(message)
 
 
 def test_exceptions_keep_their_type() -> None:
@@ -71,3 +72,15 @@ def test_exceptions_keep_their_type() -> None:
     line = json.loads(stream.getvalue())
     assert line["exception"] == "RuntimeError"
     assert "boom" in line["traceback"]
+
+
+def test_a_failure_is_an_error_line_with_the_cleaned_traceback() -> None:
+    stream = capture()
+    with pytest.raises(RuntimeError) as caught:
+        fail("bad token s3cret")
+    log.failure(caught.value, secrets=("s3cret",))
+    line = json.loads(stream.getvalue())
+    assert line["event"] == "error"
+    assert line["level"] == "error"
+    expected = "".join(traceback.format_exception(caught.value)).replace("s3cret", "***")
+    assert line["traceback"] == expected
