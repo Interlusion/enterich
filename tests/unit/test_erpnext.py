@@ -114,6 +114,15 @@ async def test_a_call_ends_after_the_call_timeout(
         await Erpnext(settings(), fake.transport()).get_doc("Item", "SKU-1")
 
 
+async def test_an_unreachable_erpnext_is_an_error_naming_the_failure() -> None:
+    def refuse(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("Connection refused", request=request)
+
+    with pytest.raises(ErpnextError) as caught:
+        await Erpnext(settings(), httpx2.MockTransport(refuse)).get_doc("Item", "SKU-1")
+    assert str(caught.value) == "ERPNext can't be reached (ConnectError)."
+
+
 async def test_the_call_timeout_is_the_only_time_limit(fake: FakeErpnext) -> None:
     """httpx's default of 5 s would end a call that ERPNext answers within the 30 s."""
     timeouts: list[object] = []
