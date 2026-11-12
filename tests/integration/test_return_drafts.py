@@ -509,6 +509,29 @@ def test_an_update_of_a_debit_note_sends_the_credit_notes_number(
     assert put.body == {"bill_no": "CN-78", "bill_date": "2026-10-26", "modified": MODIFIED}
 
 
+@pytest.mark.parametrize("kind", ["create", "update"])
+def test_a_debit_note_returns_what_a_purchase_invoice_draft_does(
+    mcp: Session, erp: FakeErpnext, kind: str
+) -> None:
+    for doc in erp.docs["Purchase Invoice"].values():
+        for line in doc["items"]:
+            line["expense_account"] = "5000 - Cost - EX"
+    if kind == "create":
+        erp.docs["Purchase Invoice"].pop(PURCHASE_DRAFT)
+        result = create(
+            mcp, "create_draft_purchase_return", items=[{"item_code": "SKU-1", "qty": 1}]
+        )
+    else:
+        result = update(mcp, "update_draft_purchase_return", remarks="Damaged")
+    assert not result.error, result.text
+    assert [(r["item_code"], r["expense_account"]) for r in result.data["items"]] == [
+        ("SKU-1", "5000 - Cost - EX")
+    ]
+    assert [
+        (t["account_head"], t["add_deduct_tax"], t["category"]) for t in result.data["taxes"]
+    ] == [("1576 - Input VAT 19% - EX", "Add", "Total")]
+
+
 def test_an_update_without_a_change_is_refused(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp)
     assert result.error

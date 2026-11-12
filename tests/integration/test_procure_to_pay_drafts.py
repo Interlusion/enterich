@@ -464,6 +464,33 @@ def test_an_update_sends_exactly_the_catalogued_body(mcp: Session, erp: FakeErpn
     }
 
 
+def test_an_update_returns_the_draft_with_its_purchase_fields(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    result = update(mcp, remarks="Corrected").data
+    assert result["items"] == [
+        {
+            "item_code": "PAPER",
+            "qty": 5,
+            "rate": 20,
+            "amount": 100,
+            "expense_account": COST,
+            "is_free_item": False,
+            "outside_text": {},
+        }
+    ]
+    assert result["taxes"] == [
+        {
+            "account_head": "1576 - Input VAT 19% - EX",
+            "rate": 19.0,
+            "tax_amount": 19.0,
+            "add_deduct_tax": "Add",
+            "category": "Total",
+            "outside_text": {},
+        }
+    ]
+
+
 def test_an_update_with_a_template_sends_the_purchase_rows(mcp: Session, erp: FakeErpnext) -> None:
     update(mcp, taxes_and_charges="Input VAT 19% - EX")
     [put] = erp.writes(PATH)
