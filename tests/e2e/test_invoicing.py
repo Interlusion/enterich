@@ -5,7 +5,15 @@ the invoices' tax summary (REQ-001-PRS-F022)."""
 
 from datetime import timedelta
 
-from tests.e2e.seed import COMPANY, INPUT_VAT, SALES_VAT, SALES_VAT_7, Seed, site_today
+from tests.e2e.seed import (
+    COMPANY,
+    INPUT_VAT,
+    SALES_TERMS,
+    SALES_VAT,
+    SALES_VAT_7,
+    Seed,
+    site_today,
+)
 from tests.e2e.site import Site
 from tests.integration.mcp import Session
 
@@ -226,8 +234,13 @@ def test_accounts_receivable_ages_the_open_part_by_due_date(mcp: Session, seeded
         0,
         69,
     )
-    assert (record["due_date"], record["currency"]) == (seeded.sales_due.isoformat(), "EUR")
-    # Not yet due on the day it was posted
+    assert (record["posting_date"], record["due_date"], record["currency"]) == (
+        seeded.posted.isoformat(),
+        seeded.sales_due.isoformat(),
+        "EUR",
+    )
+    # Not yet due on the day it was posted: aged by due date, the age is negative
+    assert record["age"] == (seeded.posted - seeded.sales_due).days
     assert record["ageing"] == {
         "range0": 69,
         **dict.fromkeys(("range1", "range2", "range3", "range4", "range5"), 0),
@@ -241,6 +254,24 @@ def test_accounts_receivable_as_of_today_by_default(mcp: Session, seeded: Seed) 
     assert (record["voucher_no"], record["outstanding"]) == (seeded.sales_invoice, 69)
     assert sum(record["ageing"].values()) == 69
     assert report["total_outstanding"] == 69
+
+
+def test_accounts_receivable_ages_from_a_past_as_of_date(mcp: Session, seeded: Seed) -> None:
+    """REQ-004-PRS-F004: from that date, not from today. Overdue by 15 days that day; aged
+    from today, at least 60 days later, the outstanding would sit in a later range."""
+    day = seeded.past_posted + SALES_TERMS + timedelta(days=15)
+    report = mcp.call(
+        "report_accounts_receivable",
+        {"customer": seeded.past_customer, "as_of_date": day.isoformat()},
+    ).data
+    [record] = report["records"]
+    assert (record["voucher_no"], record["outstanding"]) == (seeded.past_sales_invoice, 100)
+    assert record["ageing"] == {
+        "range0": 0,
+        "range1": 100,
+        **dict.fromkeys(("range2", "range3", "range4", "range5"), 0),
+    }
+    assert report["total_outstanding"] == 100
 
 
 def test_accounts_payable_by_posting_date(mcp: Session, seeded: Seed) -> None:

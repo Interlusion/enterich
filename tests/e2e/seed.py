@@ -178,6 +178,10 @@ class Seed:
     bank_account: str
     # Submitted, for the reads and reports; all posted on `posted`.
     sales_invoice: str
+    # Submitted, unpaid and posted on `past_posted`, well before the first run's today, to
+    # a customer of its own: for ageing as of a day in the past
+    past_customer: str
+    past_sales_invoice: str
     purchase_invoice: str
     payment_entry: str
     journal_entry: str
@@ -186,6 +190,7 @@ class Seed:
     cancelled: dict[str, str]
     posted: date
     sales_due: date
+    past_posted: date
 
 
 def seed(site: Site) -> Seed:
@@ -224,6 +229,9 @@ def seed(site: Site) -> Seed:
     customer = ensure(
         site, "Customer", {"customer_name": "Example Customer"}, customer_type="Company"
     )
+    past_customer = ensure(
+        site, "Customer", {"customer_name": "Example Past Customer"}, customer_type="Company"
+    )
     supplier = ensure(
         site, "Supplier", {"supplier_name": "Example Supplier"}, supplier_type="Company"
     )
@@ -235,6 +243,8 @@ def seed(site: Site) -> Seed:
     bank_ledger, bank_account = bank(site)
     vouchers = Vouchers(site, item, bank_ledger, bank_account)
     sales_invoice = vouchers.sales_invoice(customer, sales_template)
+    fiscal_year(site, vouchers.past.year)
+    past_sales_invoice = vouchers.past_sales_invoice(past_customer)
     purchase_invoice = vouchers.purchase_invoice(supplier, purchase_template)
     payment_entry = vouchers.payment_entry(customer, sales_invoice)
     journal_entry = vouchers.journal_entry()
@@ -257,6 +267,8 @@ def seed(site: Site) -> Seed:
         bank_ledger=bank_ledger,
         bank_account=bank_account,
         sales_invoice=sales_invoice,
+        past_customer=past_customer,
+        past_sales_invoice=past_sales_invoice,
         purchase_invoice=purchase_invoice,
         payment_entry=payment_entry,
         journal_entry=journal_entry,
@@ -264,6 +276,7 @@ def seed(site: Site) -> Seed:
         cancelled=cancelled,
         posted=vouchers.posted,
         sales_due=vouchers.sales_due,
+        past_posted=vouchers.past,
     )
 
 
@@ -290,7 +303,7 @@ def company(site: Site) -> None:
 
 
 def fiscal_year(site: Site, year: int) -> None:
-    """This year's, for a site kept running into a new year."""
+    """This year's, for a site kept running into a new year; or a past voucher's."""
     ensure(
         site,
         "Fiscal Year",
@@ -423,6 +436,8 @@ SALES_VAT_7 = f"2321 - Umsatzsteuer 7 % - {ABBR}"
 INPUT_VAT = ("Input VAT 19 %", f"1520 - Abziehbare Vorsteuer 19 % - {ABBR}")
 VAT_RATE = 19
 SALES_TERMS = timedelta(days=30)
+# How long before the first run's today the past sales invoice is posted
+PAST = timedelta(days=90)
 PURCHASE_TERMS = timedelta(days=14)
 # A well-known example IBAN with a valid check sum; ERPNext checks it.
 IBAN = "DE89370400440532013000"
@@ -508,7 +523,8 @@ def advances_apart(site: Site, on: bool) -> str:
 
 class Vouchers:
     """Submitted vouchers, each found by a reference only the seed uses. A kept site keeps
-    those of its first run, so `posted` and `sales_due` are read from the sales invoice."""
+    those of its first run, so `posted`, `sales_due` and `past` are read from the sales
+    invoices."""
 
     def __init__(self, site: Site, item: str, bank_ledger: str, bank_account: str) -> None:
         self.site = site
@@ -522,6 +538,8 @@ class Vouchers:
         else:
             self.posted = site_today()
             self.sales_due = self.posted + SALES_TERMS
+        past = site.get_list("Sales Invoice", {"po_no": "SEED-SI-PAST"}, ["posting_date"])
+        self.past = date.fromisoformat(past[0]["posting_date"]) if past else site_today() - PAST
 
     def submitted(self, doctype: str, identity: dict[str, str], **fields: Any) -> str:
         # The tests make drafts with the seed's references too, the purchase invoice's
@@ -540,6 +558,18 @@ class Vouchers:
             items=[{"item_code": self.item, "qty": 2, "rate": 50}],
             taxes_and_charges=template,
             taxes=vat_rows(SALES_VAT),
+        )
+
+    def past_sales_invoice(self, customer: str) -> str:
+        """Unpaid, without taxes, due SALES_TERMS after `past`."""
+        return self.submitted(
+            "Sales Invoice",
+            {"po_no": "SEED-SI-PAST"},
+            customer=customer,
+            posting_date=self.past.isoformat(),
+            set_posting_time=1,
+            due_date=(self.past + SALES_TERMS).isoformat(),
+            items=[{"item_code": self.item, "qty": 1, "rate": 100}],
         )
 
     def purchase_invoice(self, supplier: str, template: str) -> str:

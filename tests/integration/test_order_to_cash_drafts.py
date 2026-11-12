@@ -829,6 +829,18 @@ def test_rows_given_replace_all_rows(mcp: Session, erp: FakeErpnext) -> None:
     assert len(erp.docs["Sales Invoice"][DRAFT]["items"]) == 1
 
 
+def test_an_update_row_without_a_rate_is_sent_without_one_and_priced_by_erpnext(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    erp.prices["SKU-3"] = 12.0  # not the draft's stored 10.0: the rate is ERPNext's new one
+    result = update(mcp, items=[{"item_code": "SKU-3", "qty": 5}])
+    assert not result.error, result.text
+    [put] = erp.writes(PATH)
+    assert put.body == {"items": [{"item_code": "SKU-3", "qty": 5}], "modified": MODIFIED}
+    [row] = result.data["items"]
+    assert (row["item_code"], row["qty"], row["rate"], row["amount"]) == ("SKU-3", 5, 12.0, 60.0)
+
+
 @pytest.mark.parametrize(
     ("name", "says"),
     [
