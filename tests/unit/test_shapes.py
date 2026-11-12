@@ -1,6 +1,6 @@
 """Shared input types and result shaping: REQ-001-PRS-F010 (names),
 REQ-001-PRS-F014 (common inputs), REQ-001-PRS-NF001 (outside text),
-REQ-001-PRS-NF003 (child tables)."""
+REQ-001-PRS-NF003 (child tables, result size)."""
 
 from decimal import Decimal
 from typing import Any
@@ -21,6 +21,7 @@ from enterich.shapes import (
     like_pattern,
     page,
     split_outside,
+    to_text,
 )
 
 names = TypeAdapter(Name)
@@ -200,6 +201,14 @@ def test_a_page_has_more_only_beyond_its_limit() -> None:
     assert (exactly["count"], exactly["has_more"]) == (2, False)
     beyond = page(records, offset=0, limit=2)
     assert (beyond["count"], beyond["has_more"]) == (2, True)
+
+
+def test_a_result_stays_under_100000_characters() -> None:
+    """REQ-001-PRS-NF003: a result of exactly 100,000 characters is already too large."""
+    frame = len('{"a": ""}')
+    under = to_text({"a": "x" * (99_999 - frame)})
+    assert len(under or "") == 99_999
+    assert to_text({"a": "x" * (100_000 - frame)}) is None
 
 
 days = TypeAdapter(Day)
