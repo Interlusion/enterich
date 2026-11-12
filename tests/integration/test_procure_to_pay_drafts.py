@@ -304,7 +304,7 @@ def test_inputs_outside_the_schema_are_refused_before_erpnext(
     assert erp.received == []
 
 
-# Duplicates (REQ-005-PRS-F006)
+# Duplicates (REQ-005-PRS-F006, REQ-001-PRS-F005)
 
 
 def test_the_bill_check_sends_exactly_the_catalogued_call(mcp: Session, erp: FakeErpnext) -> None:
@@ -360,6 +360,18 @@ def test_erpnexts_own_bill_check_still_refuses(mcp: Session, erp: FakeErpnext) -
     result = create(mcp, bill_no="R-4711", allow_duplicate=True)
     assert result.error
     assert "Supplier Invoice No exists in Purchase Invoice ACC-PINV-2026-00001" in result.text
+
+
+@pytest.mark.parametrize("arguments", [{}, {"bill_no": "R-9000"}])
+def test_a_create_sent_again_is_refused_naming_the_first_draft(
+    mcp: Session, erp: FakeErpnext, arguments: dict[str, Any]
+) -> None:
+    first = create(mcp, **arguments).data
+    again = create(mcp, **arguments)
+    assert again.error
+    assert again.text.startswith("allow_duplicate:")
+    assert first["name"] in again.text
+    assert len(erp.writes(PATH)) == 1
 
 
 def test_without_a_bill_the_items_match(mcp: Session, erp: FakeErpnext) -> None:

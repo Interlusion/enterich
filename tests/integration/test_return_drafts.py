@@ -386,7 +386,7 @@ def test_a_return_counts_with_the_sales_invoices(limited: Session, erp: FakeErpn
     assert erp.writes() == []
 
 
-# create_draft_purchase_return (REQ-005-PRS-F008)
+# create_draft_purchase_return (REQ-005-PRS-F008, REQ-001-PRS-F005)
 
 
 def test_a_debit_note_sends_erpnexts_return_with_the_credit_notes_number(
@@ -479,6 +479,18 @@ def test_a_draft_debit_note_against_the_invoice_is_a_duplicate(
     assert result.error
     assert result.text.startswith("allow_duplicate: ")
     assert PURCHASE_DRAFT in result.text
+
+
+def test_a_debit_note_sent_again_is_refused_naming_the_first_draft(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    erp.docs["Purchase Invoice"].pop(PURCHASE_DRAFT)
+    first = create(mcp, "create_draft_purchase_return").data
+    again = create(mcp, "create_draft_purchase_return")
+    assert again.error
+    assert again.text.startswith("allow_duplicate: ")
+    assert first["name"] in again.text
+    assert len(erp.writes(PURCHASES)) == 1
 
 
 # update_draft_sales_return, update_draft_purchase_return
