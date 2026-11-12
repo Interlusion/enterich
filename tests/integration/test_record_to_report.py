@@ -471,7 +471,7 @@ def test_a_ledger_without_its_summary_rows_is_a_faulty_answer(
     erp.reports["General Ledger"] = answers[broken]
     result = mcp.call("report_general_ledger", {"from_date": "2026-10-01", "to_date": "2026-10-31"})
     assert result.error
-    assert "General Ledger" in result.text
+    assert "General Ledger lacks its opening, total and closing rows" in result.text
 
 
 def test_a_leap_year_fits_and_a_longer_range_is_refused(mcp: Session, erp: FakeErpnext) -> None:
