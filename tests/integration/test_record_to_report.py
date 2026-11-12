@@ -622,6 +622,20 @@ def test_a_year_of_other_companies_only_doesnt_count(mcp: Session, erp: FakeErpn
     assert not [r for r in erp.received if r.path == REPORT]
 
 
+@pytest.mark.parametrize("companies", [(COMPANY, "Other AG"), ("Other AG", COMPANY)])
+def test_a_year_of_the_company_and_others_counts(
+    mcp: Session, erp: FakeErpnext, companies: tuple[str, str]
+) -> None:
+    # ERPNext lists the year once per company row; any of them may be the company's.
+    erp.add("Fiscal Year", fiscal_year("2027-SH", "2027-01-01", "2027-12-31", *companies))
+    erp.reports["Trial Balance"] = balances()
+    result = mcp.call(
+        "report_trial_balance", {"from_date": "2027-01-01", "to_date": "2027-03-31"}
+    ).data
+    assert result["fiscal_year"] == "2027-SH"
+    assert report_call(erp, "Trial Balance").param("filters")["fiscal_year"] == "2027-SH"
+
+
 def test_dates_in_two_fiscal_years_are_refused(mcp: Session, erp: FakeErpnext) -> None:
     result = mcp.call("report_trial_balance", {"from_date": "2025-12-01", "to_date": "2026-01-31"})
     assert result.error
