@@ -729,19 +729,32 @@ def test_an_invoice_with_a_fixed_amount_is_returned_only_whole(
     assert not mcp.call(tool(doctype), {"return_against": name}).error
 
 
+@pytest.mark.parametrize("doctype", SIDES)
 @pytest.mark.parametrize(
     "fixed",
     [{"discount_amount": 10.0}, {"taxes": [ACTUAL]}],
     ids=["discount", "charge"],
 )
+@pytest.mark.parametrize("items", [None, [{"item_code": "SKU-1", "qty": 2}]], ids=["all", "some"])
 def test_a_partly_returned_invoice_with_a_fixed_amount_takes_no_return(
-    mcp: Session, erp: FakeErpnext, fixed: dict[str, Any]
+    mcp: Session,
+    erp: FakeErpnext,
+    doctype: str,
+    fixed: dict[str, Any],
+    items: list[dict[str, Any]] | None,
 ) -> None:
-    erp.docs["Sales Invoice"].pop(SALES_DRAFT)
-    erp.docs["Sales Invoice"][INVOICE].update(fixed)
-    result = create(mcp)
+    name = numbered(doctype, 8)
+    invoice(erp, doctype, name, [("w1", "SKU-1", 2.0), ("w2", "SKU-2", 1.0)], **fixed)
+    link = "sales_invoice_item" if doctype == "Sales Invoice" else "purchase_invoice_item"
+    factory = sales_invoice if doctype == "Sales Invoice" else purchase_invoice
+    back = numbered(doctype, 9)
+    erp.add(doctype, factory(back, **returned(back, name, link, [("w2", "SKU-2", 1.0)])))
+    arguments: dict[str, Any] = {"return_against": name}
+    if items is not None:
+        arguments["items"] = items
+    result = mcp.call(tool(doctype), arguments)
     assert result.error
-    assert result.text.startswith("return_against: ")
+    assert result.text.startswith(f"return_against: {name} ")
     assert "fixed" in result.text
     assert erp.writes() == []
 
