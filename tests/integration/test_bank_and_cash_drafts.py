@@ -321,24 +321,25 @@ def test_amounts_take_cents(mcp: Session, erp: FakeErpnext) -> None:
 
 
 @pytest.mark.parametrize(
-    "invoice",
+    ("invoice", "says"),
     [
-        "ACC-SINV-2026-00003",  # another customer's
-        "ACC-SINV-2026-00004",  # a draft
-        "ACC-SINV-2026-00005",  # cancelled
-        "ACC-SINV-2026-00006",  # paid
-        "ACC-SINV-2026-00007",  # a return
-        "ACC-SINV-2026-00008",  # another company's
-        "ACC-SINV-2026-09999",
+        ("ACC-SINV-2026-00003", "is CUST-0002's invoice, not CUST-0001's"),
+        ("ACC-SINV-2026-00004", "is a draft; only submitted invoices are paid"),
+        ("ACC-SINV-2026-00005", "is cancelled; only submitted invoices are paid"),
+        ("ACC-SINV-2026-00006", "has nothing outstanding"),
+        ("ACC-SINV-2026-00007", "is a return; it takes no payment"),
+        ("ACC-SINV-2026-00008", "doesn't exist"),  # another company's
+        ("ACC-SINV-2026-09999", "doesn't exist"),
     ],
 )
 def test_only_the_partys_open_invoices_take_a_payment(
-    mcp: Session, erp: FakeErpnext, invoice: str
+    mcp: Session, erp: FakeErpnext, invoice: str, says: str
 ) -> None:
     result = create(mcp, references=[{"reference_name": invoice, "allocated_amount": 10}])
     assert result.error
     assert result.text.startswith("references: ")
     assert invoice in result.text
+    assert says in result.text
     assert erp.writes() == []
 
 
@@ -397,7 +398,8 @@ def test_an_allocation_above_the_outstanding_amount_is_refused(
     assert result.error
     assert result.text.startswith("references: ")
     assert "ACC-SINV-2026-00002" in result.text
-    assert "50" in result.text
+    assert "50.01" in result.text
+    assert " 50 " in result.text
     assert erp.writes() == []
 
 
@@ -586,6 +588,25 @@ def test_an_update_of_a_payment_to_a_supplier_sends_its_bank_as_paid_from(
     }
 
 
+@pytest.mark.parametrize(
+    "bank",
+    [
+        "Main - Other Bank",  # another company's
+        "Customer - Their Bank",  # a party's
+        "Old - Example Bank",  # disabled
+    ],
+)
+def test_an_update_takes_only_an_enabled_bank_account_of_the_company(
+    mcp: Session, erp: FakeErpnext, bank: str
+) -> None:
+    # REQ-007-PRS-F004 holds for the update's bank account as for the create's
+    result = update(mcp, bank_account=bank)
+    assert result.error
+    assert result.text.startswith("bank_account: ")
+    assert bank in result.text
+    assert erp.writes() == []
+
+
 def test_an_empty_list_removes_the_references(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp, references=[])
     assert not result.error, result.text
@@ -655,10 +676,37 @@ def test_an_update_lowering_the_amount_below_the_allocations_is_refused(
     assert erp.writes() == []
 
 
+def test_an_update_lowering_the_amount_with_references_within_it_goes_through(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    # REQ-007-PRS-F005: the given references replace the draft's 80 as saved in the check
+    references = [{"reference_name": INVOICE, "allocated_amount": 50}]
+    result = update(mcp, paid_amount=50, references=references)
+    assert not result.error, result.text
+    [put] = erp.writes(PATH)
+    assert put.body == {
+        "references": [
+            {
+                "reference_doctype": "Sales Invoice",
+                "reference_name": INVOICE,
+                "allocated_amount": 50,
+            }
+        ],
+        "paid_from": None,
+        "paid_from_account_currency": None,
+        "paid_from_account_type": None,
+        "paid_amount": 50,
+        "received_amount": 50,
+        "modified": MODIFIED,
+    }
+
+
 def test_references_above_the_drafts_amount_are_refused(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp, references=PAID)  # 119 against the draft's 80
     assert result.error
     assert result.text.startswith("references: ")
+    assert "119" in result.text
+    assert "80" in result.text
     assert erp.writes() == []
 
 
@@ -756,6 +804,13 @@ def test_an_update_of_a_large_draft_cuts_its_references(mcp: Session, erp: FakeE
     assert len(result["references"]) == 100
     assert result["truncated"] == ["references"]
     assert len(erp.docs["Payment Entry"][DRAFT]["references"]) == 101
+
+
+def test_an_update_warns_of_two_currencies(mcp: Session, erp: FakeErpnext) -> None:
+    erp.add("Account", account(BANK, account_currency="USD"))
+    result = update(mcp, reference_no="TX-4801").data
+    [warning] = result["warnings"]
+    assert "The bank account is in USD, the party's account in EUR" in warning
 
 
 # Drafts per hour (REQ-001-PRS-F019)
