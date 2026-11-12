@@ -87,6 +87,33 @@ async def test_a_client_gone_mid_body_hands_the_inner_app_what_arrived() -> None
 
 
 @pytest.mark.anyio
+async def test_the_read_body_is_handed_out_once_and_then_receive_reaches_the_client() -> None:
+    # REQ-002-PRS-NF011: the wrapper reads the body to count it; an inner app that waits
+    # for http.disconnect afterwards must get it, not the body again.
+    messages: list[Message] = [
+        {"type": "http.request", "body": b"{}", "more_body": False},
+        {"type": "http.disconnect"},
+    ]
+    received: list[Message] = []
+
+    async def inner(scope: Scope, receive: Receive, send: Send) -> None:
+        received.extend([await receive(), await receive()])
+
+    async def receive() -> Message:
+        return messages.pop(0)
+
+    async def send(message: Message) -> None:
+        pass
+
+    scope: Scope = {"type": "http", "method": "POST", "path": "/mcp", "headers": []}
+    await Wrapper(inner, "/mcp")(scope, receive, send)
+    assert received == [
+        {"type": "http.request", "body": b"{}", "more_body": False},
+        {"type": "http.disconnect"},
+    ]
+
+
+@pytest.mark.anyio
 async def test_a_body_in_several_parts_reaches_the_inner_app_whole() -> None:
     # Uvicorn splits a large body across messages; the last may carry no body key.
     read, _ = await posted(
