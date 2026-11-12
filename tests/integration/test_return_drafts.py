@@ -649,11 +649,16 @@ def test_an_invoice_with_a_fixed_amount_is_returned_only_whole(
     assert not mcp.call(tool(doctype), {"return_against": name}).error
 
 
+@pytest.mark.parametrize(
+    "fixed",
+    [{"discount_amount": 10.0}, {"taxes": [ACTUAL]}],
+    ids=["discount", "charge"],
+)
 def test_a_partly_returned_invoice_with_a_fixed_amount_takes_no_return(
-    mcp: Session, erp: FakeErpnext
+    mcp: Session, erp: FakeErpnext, fixed: dict[str, Any]
 ) -> None:
     erp.docs["Sales Invoice"].pop(SALES_DRAFT)
-    erp.docs["Sales Invoice"][INVOICE]["discount_amount"] = 10.0
+    erp.docs["Sales Invoice"][INVOICE].update(fixed)
     result = create(mcp)
     assert result.error
     assert result.text.startswith("return_against: ")
