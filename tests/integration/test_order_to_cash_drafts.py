@@ -334,6 +334,23 @@ def test_a_create_sent_again_is_refused_naming_the_first_draft(
 
 
 @pytest.mark.parametrize(
+    ("count", "more"), [(1, ""), (5, ""), (6, " and 1 more")], ids=["one", "five", "six"]
+)
+def test_a_refusal_names_up_to_five_drafts_and_counts_the_rest(
+    mcp: Session, erp: FakeErpnext, count: int, more: str
+) -> None:
+    made = sorted(create(mcp, allow_duplicate=True).data["name"] for _ in range(count))
+    again = create(mcp)
+    assert again.error
+    assert again.text == (
+        "allow_duplicate: a draft with the same customer, posting date and items exists "
+        f"({', '.join(made[:5])}{more}). Check it first; to create another anyway, repeat "
+        "with allow_duplicate true."
+    )
+    assert len(erp.writes(PATH)) == count
+
+
+@pytest.mark.parametrize(
     "changed",
     [
         {"items": [{"item_code": "SKU-1", "qty": 3}]},
@@ -349,6 +366,18 @@ def test_a_create_differing_in_its_match_goes_through_without_warning(
     create(mcp)
     result = create(mcp, **changed).data
     assert result["warnings"] == []
+    assert len(erp.writes(PATH)) == 2
+
+
+def test_a_row_given_twice_counts_twice(mcp: Session, erp: FakeErpnext) -> None:
+    row = {"item_code": "SKU-1", "qty": 1}
+    first = create(mcp, items=[row, row]).data
+    once = create(mcp, items=[row]).data
+    assert once["warnings"] == []
+    again = create(mcp, items=[row, row])
+    assert again.error
+    assert first["name"] in again.text
+    assert once["name"] not in again.text
     assert len(erp.writes(PATH)) == 2
 
 
@@ -503,6 +532,8 @@ def test_kept_rates_and_free_items_dont_warn(mcp: Session, erp: FakeErpnext) -> 
         ("SKU-1", 48, False),
         ("GIFT", 0, True),
     ]
+    # ERPNext answers 0 and 1; the result has booleans (REQ-001-PRS-F014)
+    assert [type(r["is_free_item"]) for r in result["items"]] == [bool, bool]
     assert result["warnings"] == []
     assert [c["content"].count("<br>") for c in erp.comments] == [0]
 
@@ -945,6 +976,9 @@ def test_an_update_warns_where_a_pricing_rule_replaced_a_rate(
     [warning] = result["warnings"]
     assert "row 2" in warning.lower()
     assert "SKU-2" in warning
+    # Row 2 is matched to the second row given, not the first (REQ-001-PRS-F016)
+    assert "19" in warning
+    assert "15" in warning
     [comment] = erp.comments
     assert comment["reference_name"] == DRAFT
 
@@ -956,11 +990,17 @@ def test_an_update_to_a_template_without_tax_warns(mcp: Session) -> None:
 
 
 def test_an_update_of_a_large_draft_cuts_its_rows(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-001-PRS-NF003: items, taxes and the tax summary, each named in `truncated`."""
     rows = [invoice_row(f"SKU-{n % 3 + 1}", 1, 10.0) for n in range(150)]
-    erp.docs["Sales Invoice"][DRAFT]["items"] = rows
+    taxes = [
+        {**VAT_ROWS[0], "name": f"tax-{n}", "account_head": f"1776-{n} - VAT 19% - EX"}
+        for n in range(150)
+    ]
+    erp.docs["Sales Invoice"][DRAFT].update(items=rows, taxes=taxes)
     result = update(mcp, remarks="Checked").data
-    assert len(result["items"]) == 100
-    assert result["truncated"] == ["items"]
+    tables = ["items", "taxes", "tax_summary"]
+    assert [len(result[t]) for t in tables] == [100, 100, 100]
+    assert result["truncated"] == tables
     assert len(erp.docs["Sales Invoice"][DRAFT]["items"]) == 150
 
 
@@ -974,6 +1014,17 @@ def test_rows_at_rate_0_are_named_up_to_20(mcp: Session, erp: FakeErpnext) -> No
     assert "10 more rows" in more
     [comment] = erp.comments
     assert comment["content"].endswith(more)
+
+
+def test_20_rows_at_rate_0_are_named_without_a_count(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-001-PRS-F016: the count of further rows comes only when there are any."""
+    rows = [invoice_row(f"NP-{n}", 1, 0.0) for n in range(20)]
+    erp.docs["Sales Invoice"][DRAFT]["items"] = rows
+    result = update(mcp, remarks="Checked").data
+    assert len(result["warnings"]) == 20
+    assert "NP-19" in result["warnings"][-1]
+    [comment] = erp.comments
+    assert "more rows" not in comment["content"]
 
 
 # Due dates (REQ-001-PRS-F017)
@@ -1036,6 +1087,29 @@ def test_an_update_without_a_date_keeps_the_due_date(mcp: Session, erp: FakeErpn
     assert result["due_date"] == "2026-12-20"
     put = erp.writes(PATH)[-1]
     assert put.body == {"remarks": "Checked", "modified": created["modified"]}
+
+
+def test_a_fixed_posting_date_keeps_the_due_date_on_a_later_day(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    fixed = "2026-10-01"  # before TODAY; the terms of CUST-0001 would give 2026-10-31
+    draft = sales_invoice(
+        "ACC-SINV-2026-00021",
+        docstatus=0,
+        status="Draft",
+        set_posting_time=1,
+        posting_date=fixed,
+        due_date="2026-10-20",
+        payment_terms_template="",
+        payment_schedule=[{"due_date": "2026-10-20", "invoice_portion": 100}],
+        modified=MODIFIED,
+    )
+    erp.add("Sales Invoice", draft)
+    result = update(mcp, "ACC-SINV-2026-00021", remarks="Checked")
+    assert not result.error, result.text
+    assert (result.data["posting_date"], result.data["due_date"]) == (fixed, "2026-10-20")
+    put = erp.writes(PATH)[-1]
+    assert put.body == {"remarks": "Checked", "modified": MODIFIED}
 
 
 # Drafts per hour (REQ-001-PRS-F019)

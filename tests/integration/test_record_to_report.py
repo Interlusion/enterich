@@ -101,7 +101,7 @@ def report_call(erp: FakeErpnext, name: str) -> Received:
 
 
 def test_list_accounts_sends_exactly_the_catalogued_call(mcp: Session, erp: FakeErpnext) -> None:
-    mcp.call("list_accounts", {"search": "1200", "root_type": "Asset"})
+    mcp.call("list_accounts", {"search": "1200", "root_type": "Asset", "limit": 5, "offset": 5})
     [call] = erp.received
     assert (call.method, call.path) == ("GET", "/api/resource/Account")
     assert call.param("fields") == ACCOUNT_FIELDS
@@ -117,6 +117,7 @@ def test_list_accounts_sends_exactly_the_catalogued_call(mcp: Session, erp: Fake
         ["account_number", "like", "%1200%"],
     ]
     assert call.param("order_by") == "name asc"
+    assert (call.param("limit_start"), call.param("limit_page_length")) == ("5", "6")
 
 
 def test_list_accounts_returns_the_companys_ledger_accounts(mcp: Session) -> None:
@@ -144,6 +145,10 @@ def test_groups_and_disabled_accounts_only_when_asked_for(mcp: Session, erp: Fak
         BANK,
         "1300 - Old Bank - EX",
     ]
+    # 1 == True in Python: check the JSON types, not only the values
+    flags = [(r["is_group"], r["disabled"]) for r in result["records"]]
+    assert {type(flag) for pair in flags for flag in pair} == {bool}
+    assert flags == [(True, False), (False, False), (False, True)]
 
 
 def test_list_cost_centers_sends_exactly_the_catalogued_call(
@@ -163,8 +168,10 @@ def test_list_cost_centers_sends_exactly_the_catalogued_call(
         ["cost_center_name", "like", "%main%"],
         ["cost_center_number", "like", "%main%"],
     ]
+    assert (call.param("limit_start"), call.param("limit_page_length")) == ("0", "21")
     assert [r["name"] for r in result["records"]] == ["Main - EX"]
     assert result["records"][0]["is_group"] is False
+    assert result["records"][0]["disabled"] is False
 
 
 # list_journal_entries, get_journal_entry (REQ-006-PRS-F002)
@@ -181,6 +188,8 @@ def test_list_journal_entries_sends_exactly_the_catalogued_call(
             "voucher_type": "Bank Entry",
             "from_date": "2026-10-01",
             "to_date": "2026-10-31",
+            "limit": 5,
+            "offset": 5,
         },
     )
     [call] = erp.received
@@ -194,6 +203,7 @@ def test_list_journal_entries_sends_exactly_the_catalogued_call(
         ["posting_date", "<=", "2026-10-31"],
     ]
     assert call.param("order_by") == "posting_date desc, name desc"
+    assert (call.param("limit_start"), call.param("limit_page_length")) == ("5", "6")
 
 
 def test_list_journal_entries_returns_the_remark_as_outside_text(mcp: Session) -> None:
@@ -302,6 +312,27 @@ def test_the_ledger_call_carries_the_given_inputs_as_lists(mcp: Session, erp: Fa
         "party_type": "Customer",
         "party": ["CUST-0001"],
         "voucher_no": "ACC-JV-2026-00001",
+        "include_default_book_entries": 1,
+        "show_remarks": 1,
+    }
+
+
+def test_a_party_type_alone_filters_the_ledger_without_a_lookup(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    # Only a given party needs party_type; party_type alone names nothing to check.
+    erp.reports["General Ledger"] = ledger([])
+    result = mcp.call(
+        "report_general_ledger",
+        {"from_date": "2026-10-01", "to_date": "2026-10-31", "party_type": "Customer"},
+    )
+    assert not result.error
+    assert [r.path for r in erp.received] == [REPORT]
+    assert report_call(erp, "General Ledger").param("filters") == {
+        "company": COMPANY,
+        "from_date": "2026-10-01",
+        "to_date": "2026-10-31",
+        "party_type": "Customer",
         "include_default_book_entries": 1,
         "show_remarks": 1,
     }
@@ -430,12 +461,14 @@ def test_summary_rows_are_found_by_position_in_any_language(mcp: Session, erp: F
     assert result["closing"]["debit"] == 570.0
 
 
-@pytest.mark.parametrize("broken", ["first", "last"])
+@pytest.mark.parametrize("broken", ["first", "last", "entry_last"])
 def test_a_ledger_without_its_summary_rows_is_a_faulty_answer(
     mcp: Session, erp: FakeErpnext, broken: str
 ) -> None:
     rows = ledger([ledger_entry("ACC-JV-2026-00001", 500.0, 0.0)])
-    erp.reports["General Ledger"] = rows[1:] if broken == "first" else rows[:-1]
+    # entry_last: the closing row replaced by an entry, so only the last row has a posting date
+    answers = {"first": rows[1:], "last": rows[:-1], "entry_last": [*rows[:-1], rows[1]]}
+    erp.reports["General Ledger"] = answers[broken]
     result = mcp.call("report_general_ledger", {"from_date": "2026-10-01", "to_date": "2026-10-31"})
     assert result.error
     assert "General Ledger" in result.text
@@ -623,3 +656,43 @@ def test_a_fiscal_year_list_without_its_fields_is_refused(mcp: Session, erp: Fak
     assert "Fiscal Year" in result.text
     assert "year_end_date" in result.text
     assert not [r for r in erp.received if r.path == REPORT]
+
+
+# Paging (REQ-001-PRS-F014)
+
+
+@pytest.mark.parametrize(
+    ("tool", "inputs", "expected"),
+    [
+        ("list_accounts", {"include_groups": True, "include_disabled": True}, (1, 1, True)),
+        ("list_cost_centers", {}, (0, 1, False)),
+        ("list_journal_entries", {}, (0, 1, False)),
+        (
+            "report_general_ledger",
+            {"from_date": "2026-10-01", "to_date": "2026-10-31"},
+            (1, 1, True),
+        ),
+        (
+            "report_trial_balance",
+            {"from_date": "2026-01-01", "to_date": "2026-10-31"},
+            (1, 1, True),
+        ),
+    ],
+)
+def test_lists_and_reports_carry_the_given_offset(
+    mcp: Session,
+    erp: FakeErpnext,
+    tool: str,
+    inputs: dict[str, Any],
+    expected: tuple[int, int, bool],
+) -> None:
+    erp.reports["General Ledger"] = ledger(
+        [
+            ledger_entry("ACC-JV-2026-00001", 100.0, 0.0),
+            ledger_entry("ACC-JV-2026-00002", 200.0, 0.0, posting_date="2026-10-02"),
+            ledger_entry("ACC-JV-2026-00003", 0.0, 300.0, posting_date="2026-10-03"),
+        ]
+    )
+    erp.reports["Trial Balance"] = balances()
+    result = mcp.call(tool, {**inputs, "limit": 1, "offset": 1}).data
+    assert (result["count"], result["offset"], result["has_more"]) == expected
