@@ -728,6 +728,16 @@ def test_an_update_warns_of_a_part_not_allocated(mcp: Session) -> None:
     assert "20" in warning
 
 
+def test_an_update_of_a_large_draft_cuts_its_references(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-001-PRS-NF003: an update's result cuts its child tables as a get does."""
+    [row] = erp.docs["Payment Entry"][DRAFT]["references"]
+    erp.docs["Payment Entry"][DRAFT]["references"] = [row] * 101
+    result = update(mcp, reference_no="TX-4801").data
+    assert len(result["references"]) == 100
+    assert result["truncated"] == ["references"]
+    assert len(erp.docs["Payment Entry"][DRAFT]["references"]) == 101
+
+
 # Drafts per hour (REQ-001-PRS-F019)
 
 
