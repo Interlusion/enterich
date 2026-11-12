@@ -172,7 +172,9 @@ async def test_a_refusal_is_at_most_300_characters(fake: FakeErpnext) -> None:
     assert len(text) <= 300
 
 
-@pytest.mark.parametrize("answer", [{}, {"message": None}, {"message": ["x"]}])
+@pytest.mark.parametrize(
+    "answer", [{}, {"message": None}, {"message": ["x"]}, [], "agent@example.com", 5]
+)
 async def test_an_answer_without_the_agent_user_is_an_error_and_not_kept(
     fake: FakeErpnext, answer: object
 ) -> None:
