@@ -145,13 +145,18 @@ async def test_long_keys_and_lists_are_cut_in_the_line(
     async def read(inputs: Nothing, context: Context) -> dict[str, Any]:
         return {"records": []}
 
-    arguments = {"k" * 10_000: list(range(10_000)), "nested": {str(i): i for i in range(10_000)}}
+    arguments = {
+        "k" * 10_000: list(range(10_000)),
+        "nested": {str(i): i for i in range(10_000)},
+        "texts": ["t" * 10_000, "u"],
+    }
     error, text = await call(monkeypatch, read, arguments=arguments)
     assert error
     assert len(text) <= 300
     [operation] = logs.events("operation")
     logged = operation["arguments"]
-    assert [len(key) for key in logged] == [200, 6]
-    assert len(logged["k" * 200]) == 100
+    assert [len(key) for key in logged] == [200, 6, 5]
+    assert logged["k" * 200] == list(range(100))
+    assert logged["texts"] == ["t" * 200, "u"]
     assert len(logged["nested"]) == 100
     assert len(operation["outcome"]["refusal"]) <= 300
