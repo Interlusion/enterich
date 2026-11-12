@@ -104,6 +104,9 @@ async def test_a_scope_that_is_not_a_string_grants_no_scopes(
         ({"typ": None}, "not an access token"),
         ({"azp": None}, "wrong client"),
         ({"azp": CLIENT_ID, "client_id": "another-client"}, "azp and client_id differ"),
+        # REQ-002-PRS-NF001: a claim present but not a string names no client
+        ({"azp": 123, "client_id": CLIENT_ID}, "wrong client"),
+        ({"client_id": 123}, "wrong client"),
         ({"exp": Rel(-LEEWAY - 10)}, "expired"),
         ({"nbf": Rel(LEEWAY + 10)}, "not yet valid"),
         ({"iat": Rel(LEEWAY + 10)}, "not yet valid"),
