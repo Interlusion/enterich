@@ -110,6 +110,22 @@ async def test_a_read_counts_rows_whatever_the_result_holds(
     assert logs.events("operation")[0]["outcome"] == {"rows": 1}
 
 
+async def test_the_operation_line_is_a_warning_only_for_a_refusal(
+    monkeypatch: pytest.MonkeyPatch, logs: Logs
+) -> None:
+    async def read(inputs: Nothing, context: Context) -> dict[str, Any]:
+        return {"records": []}
+
+    async def refuse(inputs: Nothing, context: Context) -> dict[str, Any]:
+        raise tools.Refusal("No.")
+
+    assert not (await call(monkeypatch, read))[0]
+    assert (await call(monkeypatch, refuse))[0]
+    served, refused = logs.events("operation")
+    assert (served["outcome"], served["level"]) == ({"rows": 0}, "info")
+    assert (refused["outcome"], refused["level"]) == ({"refusal": "No."}, "warning")
+
+
 async def test_a_create_names_the_document(monkeypatch: pytest.MonkeyPatch, logs: Logs) -> None:
     async def create(inputs: Nothing, context: Context) -> dict[str, Any]:
         return {"name": "SINV-0001", "warnings": []}
