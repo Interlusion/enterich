@@ -56,6 +56,12 @@ def test_the_listen_address_comes_from_the_environment() -> None:
     assert s.host == "127.0.0.1"
 
 
+@pytest.mark.parametrize("port", [1, 65535])
+def test_the_listen_port_may_be_any_from_1_to_65535(port: int) -> None:
+    s = load({**ENV, "ENTERICH_PORT": str(port)}, ("list_items",))
+    assert s.port == port
+
+
 @pytest.mark.parametrize("value", ["", "  ", "erp example.com", "erp.example.com/x", "user@erp"])
 def test_an_empty_or_invalid_erpnext_host_stops_enterich(value: str) -> None:
     assert [p.split(":")[0] for p in problems(ERPNEXT_HOST=value)] == ["ENTERICH_ERPNEXT_HOST"]
@@ -105,6 +111,7 @@ def test_all_problems_are_reported_at_once() -> None:
         ("TIMEZONE", "Europe/Nowhere"),
         ("TOOLS", "list_items,drop_database"),
         ("PORT", "0"),
+        ("PORT", "65536"),
         ("LOG_LEVEL", "TRACE"),
         ("REQUIRED_SCOPES", ""),
         ("REQUIRED_SCOPES", "   "),
