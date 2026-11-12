@@ -1,7 +1,7 @@
 """Master data (REQ-003-PRS-F001), and through it REQ-001's conventions:
 REQ-001-PRS-F001, REQ-001-PRS-F008, REQ-001-PRS-F009, REQ-001-PRS-F010, REQ-001-PRS-F011,
-REQ-001-PRS-F014, REQ-001-PRS-NF001, REQ-001-PRS-NF002, REQ-001-PRS-NF003, and the
-operation line of REQ-002-PRS-NF008."""
+REQ-001-PRS-F014, REQ-001-PRS-NF001, REQ-001-PRS-NF002, REQ-001-PRS-NF003, the operation
+line of REQ-002-PRS-NF008, and a refused key under REQ-002-PRS-NF007."""
 
 from typing import Any, cast
 
@@ -331,6 +331,18 @@ def test_each_operation_writes_one_line(mcp: Session, logs: Logs) -> None:
     assert refused["operation"] == "get_item"
     assert "refusal" in refused["outcome"]
     assert refused["erpnext_calls"] == 0
+
+
+def test_a_key_erpnext_stops_accepting_fails_the_next_operation(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    # REQ-002-PRS-NF007: no ERPNext session or response cache answers in ERPNext's stead
+    assert not mcp.call("get_item", {"item_code": "SKU-1"}).error
+    erp.fail("/api/method/frappe.client.get", 401, error(401, "AuthenticationError", "Bad key"))
+    result = mcp.call("get_item", {"item_code": "SKU-1"})
+    assert result.error
+    assert "AuthenticationError" in result.text
+    assert [c.path for c in erp.received] == ["/api/method/frappe.client.get"] * 2
 
 
 def test_an_operation_ends_after_the_operation_timeout(
