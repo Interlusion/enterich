@@ -293,10 +293,12 @@ def test_a_create_differing_in_a_row_or_the_date_goes_through(
     assert result.data["warnings"] == []
 
 
+# 100.005 is saved as 100.0, exactly the 0.005 a given amount may differ by.
+@pytest.mark.parametrize("amount", [100.004, 100.005])
 def test_a_repeated_create_matches_the_amounts_erpnext_rounded(
-    mcp: Session, erp: FakeErpnext
+    mcp: Session, erp: FakeErpnext, amount: float
 ) -> None:
-    rows = [{"account": RENT, "debit": 100.004}, {"account": BANK, "credit": 100.004}]
+    rows = [{"account": RENT, "debit": amount}, {"account": BANK, "credit": amount}]
     first = create(mcp, accounts=rows).data
     assert erp.docs["Journal Entry"][first["name"]]["total_debit"] == 100.0
     again = create(mcp, accounts=rows)
