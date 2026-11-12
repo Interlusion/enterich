@@ -413,6 +413,23 @@ def test_a_tax_summary_is_in_the_invoices_currency(mcp: Session, erp: FakeErpnex
     ]
 
 
+def test_a_tax_detail_of_no_tax_row_is_skipped(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-001-PRS-F022: the details are added up per tax row; one whose tax row isn't on
+    the invoice makes no entry, and the details after it still count."""
+    invoice = sales_invoice("ACC-SINV-2026-00503")
+    item, tax = invoice["items"][0]["name"], invoice["taxes"][0]["name"]
+    details = [
+        {"item_row": item, "tax_row": "gone", "rate": 7.0, "amount": 7.0, "taxable_amount": 100.0},
+        {"item_row": item, "tax_row": tax, "rate": 19.0, "amount": 19.0, "taxable_amount": 100.0},
+    ]
+    erp.add("Sales Invoice", {**invoice, "item_wise_tax_details": details})
+    result = mcp.call("get_sales_invoice", {"name": "ACC-SINV-2026-00503"}).data
+    assert [
+        (e["account_head"], e["rate"], e["taxable_amount"], e["tax_amount"])
+        for e in result["tax_summary"]
+    ] == [("1776 - VAT 19% - EX", 19, 100, 19)]
+
+
 def test_long_texts_in_a_get_are_cut_to_500(mcp: Session, erp: FakeErpnext) -> None:
     rows = [{**sales_invoice()["items"][0], "description": "d" * 2000} for _ in range(100)]
     erp.add("Sales Invoice", sales_invoice("ACC-SINV-2026-00100", items=rows, remarks="r" * 2000))
