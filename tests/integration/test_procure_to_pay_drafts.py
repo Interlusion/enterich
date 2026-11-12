@@ -197,14 +197,26 @@ def test_a_valuation_row_shows_its_category_and_stays_out_of_the_total(
     assert result["total_taxes_and_charges"] == 38
 
 
+ITEM_TAX: dict[str, float | str] = {"1576 - Input VAT 19% - EX": 19.0}
+ITEM_TAX_WARNING = (
+    "The draft has 1 tax row, with 38.00 of tax, that ERPNext added from the items' item "
+    "tax templates when it was saved without tax rows; check them in `taxes`, or give "
+    "`taxes_and_charges` to replace them."
+)
+
+
 def test_a_purchase_draft_warns_of_item_tax_rows(mcp: Session, erp: FakeErpnext) -> None:
-    erp.item_taxes["PAPER"] = {"1576 - Input VAT 19% - EX": 19.0}
-    [warning] = create(mcp).data["warnings"]
-    assert warning == (
-        "The draft has 1 tax row, with 38.00 of tax, that ERPNext added from the items' item "
-        "tax templates when it was saved without tax rows; check them in `taxes`, or give "
-        "`taxes_and_charges` to replace them."
-    )
+    erp.item_taxes["PAPER"] = ITEM_TAX
+    assert create(mcp).data["warnings"] == [ITEM_TAX_WARNING]
+
+
+def test_a_purchase_template_takes_the_place_of_item_tax_rows(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    erp.item_taxes["PAPER"] = ITEM_TAX
+    result = create(mcp, taxes_and_charges="Input VAT 19% - EX").data
+    assert [t["account_head"] for t in result["taxes"]] == ["1576 - Input VAT 19% - EX"]
+    assert result["warnings"] == []
 
 
 def test_a_sales_template_answers_as_unknown(mcp: Session, erp: FakeErpnext) -> None:
@@ -445,6 +457,27 @@ def test_an_update_with_a_template_sends_the_purchase_rows(mcp: Session, erp: Fa
         "taxes": VAT_ROWS,
         "modified": MODIFIED,
     }
+
+
+def test_clearing_the_template_warns_of_item_tax_rows(mcp: Session, erp: FakeErpnext) -> None:
+    erp.item_taxes["PAPER"] = ITEM_TAX
+    result = update(mcp, taxes_and_charges="").data
+    assert len(result["taxes"]) == 1
+    # The fixture draft holds PAPER once, at 100
+    assert result["warnings"] == [ITEM_TAX_WARNING.replace("38.00", "19.00")]
+
+
+def test_item_tax_rows_warn_again_until_a_template_replaces_them(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    erp.item_taxes["PAPER"] = ITEM_TAX
+    draft = create(mcp).data
+    again = update(mcp, draft["name"], draft["modified"], remarks="Checked").data
+    assert again["warnings"] == [ITEM_TAX_WARNING]
+    replaced = update(
+        mcp, draft["name"], again["modified"], taxes_and_charges="Input VAT 19% - EX"
+    ).data
+    assert replaced["warnings"] == []
 
 
 def test_clearing_the_bill_number(mcp: Session, erp: FakeErpnext) -> None:
