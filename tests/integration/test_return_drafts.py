@@ -516,6 +516,26 @@ def test_a_draft_debit_note_against_the_invoice_is_a_duplicate(
     assert result.error
     assert result.text.startswith("allow_duplicate: ")
     assert PURCHASE_DRAFT in result.text
+    assert erp.writes() == []
+    [check] = [r for r in erp.lists(PURCHASES) if ["is_return", "=", 1] in r.param("filters")]
+    assert check.param("filters") == [
+        ["company", "=", COMPANY],
+        ["docstatus", "=", 0],
+        ["is_return", "=", 1],
+        ["return_against", "=", BILL],
+    ]
+
+
+@pytest.mark.parametrize(("docstatus", "status"), [(1, "Return"), (2, "Cancelled")])
+def test_submitted_and_cancelled_debit_notes_arent_duplicates(
+    mcp: Session, erp: FakeErpnext, docstatus: int, status: str
+) -> None:
+    """REQ-005-PRS-F009: only a draft return against the invoice counts."""
+    erp.docs["Purchase Invoice"][PURCHASE_DRAFT].update(docstatus=docstatus, status=status)
+    result = create(mcp, "create_draft_purchase_return", items=[{"item_code": "SKU-1", "qty": 1}])
+    assert not result.error, result.text
+    assert result.data["warnings"] == []
+    assert len(erp.writes(PURCHASES)) == 1
 
 
 def test_a_debit_note_sent_again_is_refused_naming_the_first_draft(
@@ -778,19 +798,32 @@ def test_an_invoice_with_a_fixed_amount_is_returned_only_whole(
     assert not mcp.call(tool(doctype), {"return_against": name}).error
 
 
+@pytest.mark.parametrize("doctype", SIDES)
 @pytest.mark.parametrize(
     "fixed",
     [{"discount_amount": 10.0}, {"taxes": [ACTUAL]}],
     ids=["discount", "charge"],
 )
+@pytest.mark.parametrize("items", [None, [{"item_code": "SKU-1", "qty": 2}]], ids=["all", "some"])
 def test_a_partly_returned_invoice_with_a_fixed_amount_takes_no_return(
-    mcp: Session, erp: FakeErpnext, fixed: dict[str, Any]
+    mcp: Session,
+    erp: FakeErpnext,
+    doctype: str,
+    fixed: dict[str, Any],
+    items: list[dict[str, Any]] | None,
 ) -> None:
-    erp.docs["Sales Invoice"].pop(SALES_DRAFT)
-    erp.docs["Sales Invoice"][INVOICE].update(fixed)
-    result = create(mcp)
+    name = numbered(doctype, 8)
+    invoice(erp, doctype, name, [("w1", "SKU-1", 2.0), ("w2", "SKU-2", 1.0)], **fixed)
+    link = "sales_invoice_item" if doctype == "Sales Invoice" else "purchase_invoice_item"
+    factory = sales_invoice if doctype == "Sales Invoice" else purchase_invoice
+    back = numbered(doctype, 9)
+    erp.add(doctype, factory(back, **returned(back, name, link, [("w2", "SKU-2", 1.0)])))
+    arguments: dict[str, Any] = {"return_against": name}
+    if items is not None:
+        arguments["items"] = items
+    result = mcp.call(tool(doctype), arguments)
     assert result.error
-    assert result.text.startswith("return_against: ")
+    assert result.text.startswith(f"return_against: {name} ")
     assert "fixed" in result.text
     assert erp.writes() == []
 
@@ -870,6 +903,7 @@ def test_an_update_to_the_invoices_day_carries_its_posting_time(
 # Updates check the invoice again
 
 
+@pytest.mark.parametrize("doctype", SIDES)
 @pytest.mark.parametrize(
     "change", [{"items": [{"item_code": "SKU-1", "qty": 1}]}, {"posting_date": "2026-10-27"}]
 )
@@ -883,22 +917,29 @@ def test_an_update_to_the_invoices_day_carries_its_posting_time(
 def test_an_update_refuses_an_invoice_a_create_refuses(
     mcp: Session,
     erp: FakeErpnext,
+    doctype: str,
     change: dict[str, Any],
     invoice_fields: dict[str, Any],
     says: str,
 ) -> None:
-    erp.docs["Sales Invoice"][INVOICE].update(invoice_fields)
-    result = update(mcp, **change)
+    sales = doctype == "Sales Invoice"
+    erp.docs[doctype][INVOICE if sales else BILL].update(invoice_fields)
+    result = update(mcp, tool(doctype, "update"), **change)
     assert result.error
     assert result.text.startswith("return_against: ")
     assert says in result.text
     assert erp.writes() == []
-    assert [r for r in erp.received if r.path == SALES_RETURN_METHOD] == []
+    method = SALES_RETURN_METHOD if sales else DEBIT_NOTE_METHOD
+    assert [r for r in erp.received if r.path == method] == []
 
 
-def test_a_return_against_no_invoice_isnt_updated(mcp: Session, erp: FakeErpnext) -> None:
-    erp.docs["Sales Invoice"][SALES_DRAFT]["return_against"] = None
-    result = update(mcp, remarks="Changed")
+@pytest.mark.parametrize("doctype", SIDES)
+def test_a_return_against_no_invoice_isnt_updated(
+    mcp: Session, erp: FakeErpnext, doctype: str
+) -> None:
+    draft = SALES_DRAFT if doctype == "Sales Invoice" else PURCHASE_DRAFT
+    erp.docs[doctype][draft]["return_against"] = None
+    result = update(mcp, tool(doctype, "update"), remarks="Changed")
     assert result.error
     assert result.text.startswith("name: ")
     assert "against no invoice" in result.text
@@ -945,6 +986,29 @@ def test_only_a_submitted_purchase_invoice_of_the_company_takes_a_return(
     assert says in result.text
     assert erp.writes() == []
     assert [r for r in erp.received if r.path == DEBIT_NOTE_METHOD] == []
+
+
+@pytest.mark.parametrize("kind", ["create", "update"])
+@pytest.mark.parametrize(
+    ("items", "says"),
+    [
+        ([{"item_code": "SKU-9", "qty": 1}], "SKU-9 isn't on"),
+        ([{"item_code": "SKU-1", "qty": 3}], "3 of SKU-1 can't be returned; 2 left"),
+    ],
+)
+def test_a_debit_note_returns_items_at_most_as_far_as_left(
+    mcp: Session, erp: FakeErpnext, kind: str, items: list[dict[str, Any]], says: str
+) -> None:
+    if kind == "create":
+        erp.docs["Purchase Invoice"].pop(PURCHASE_DRAFT)
+        result = create(mcp, "create_draft_purchase_return", items=items)
+    else:
+        result = update(mcp, "update_draft_purchase_return", items=items)
+    assert result.error
+    assert result.text.startswith("items: ")
+    assert says in result.text
+    assert BILL in result.text
+    assert erp.writes() == []
 
 
 def test_a_purchase_invoice_with_nothing_left_is_refused(mcp: Session, erp: FakeErpnext) -> None:
