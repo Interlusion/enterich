@@ -175,6 +175,18 @@ def test_http_erpnext_public_url_to_another_host_loads() -> None:
     assert s.warnings == ()
 
 
+@pytest.mark.parametrize(
+    ("value", "url"),
+    [
+        ("https://erp.example.com/", "https://erp.example.com"),
+        ("http://erp.internal/X/", "http://erp.internal/X"),
+    ],
+)
+def test_a_trailing_slash_is_dropped_from_the_erpnext_urls(value: str, url: str) -> None:
+    s = load({**ENV, "ENTERICH_ERPNEXT_URL": value, "ENTERICH_ERPNEXT_PUBLIC_URL": value}, ())
+    assert (s.erpnext_url, s.erpnext_public_url) == (url, url)
+
+
 def test_unknown_enterich_variables_are_reported_as_warnings() -> None:
     s = load({**ENV, "ENTERICH_TOOL": "list_items"}, ("list_items",))
     assert s.warnings == ("ENTERICH_TOOL is not a known variable and is ignored",)
