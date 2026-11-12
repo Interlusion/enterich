@@ -10,7 +10,7 @@ import httpx2
 import pytest
 
 from enterich import erpnext
-from enterich.erpnext import Erpnext, ErpnextError
+from enterich.erpnext import Erpnext, ErpnextError, Refused
 from tests.fakes.erpnext import FakeErpnext, customer, error, item, sales_invoice
 from tests.fakes.settings import API_KEY, API_SECRET, settings
 
@@ -205,6 +205,17 @@ async def test_a_refusal_without_messages_carries_status_and_type(
     assert text == "ERPNext refused the request (417 ValidationError)."
 
 
+@pytest.mark.parametrize("body", [{}, {"exc_type": None}, {"exc_type": 5}, {"exc_type": ["x"]}])
+async def test_a_refusal_without_a_type_carries_the_status_alone(
+    fake: FakeErpnext, body: dict[str, object]
+) -> None:
+    fake.fail("/api/method/frappe.client.get", 417, body)
+    with pytest.raises(Refused) as caught:
+        await Erpnext(settings(), fake.transport()).get_doc("Item", "SKU-1")
+    assert str(caught.value) == "ERPNext refused the request (417)."
+    assert caught.value.exc_type is None
+
+
 async def test_a_refusal_is_at_most_300_characters(fake: FakeErpnext) -> None:
     text = await failure(fake, 417, error(417, "ValidationError", "x" * 2000))
     assert len(text) <= 300
@@ -225,8 +236,9 @@ async def test_an_answer_without_the_agent_user_is_an_error_and_not_kept(
 
 async def test_a_refusal_that_isnt_json_still_reports_the_status(fake: FakeErpnext) -> None:
     fake.fail("/api/method/frappe.client.get", 502, None)
-    with pytest.raises(ErpnextError, match="502"):
+    with pytest.raises(ErpnextError) as caught:
         await Erpnext(settings(), fake.transport()).get_doc("Item", "SKU-1")
+    assert str(caught.value) == "ERPNext refused the request (502)."
 
 
 async def test_a_deeply_nested_answer_isnt_json(fake: FakeErpnext) -> None:
