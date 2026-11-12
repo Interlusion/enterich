@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from harness import inventory, mutation, triage
+from harness import gate, inventory, mutation, triage
 
 
 def test_the_inventory_reads_a_requirements_definition_of_done() -> None:
@@ -163,3 +163,34 @@ def test_a_suppression_without_a_backlog_item_drops_the_finding(tmp_path: Path) 
 def test_survivors_a_script_can_judge_are_filtered(diff: str, kind: str | None) -> None:
     """ADR-008: only what no caller can observe is left out of the agents' survey."""
     assert mutation.filtered(diff) == kind
+
+
+TESTS_ONLY = ["tests/unit/test_shapes.py"]
+
+
+def test_a_fix_branch_with_a_test_first_passes_the_gate() -> None:
+    subjects = ["test: a page of exactly limit records has no more", "fix: has_more at the limit"]
+    paths = [*TESTS_ONLY, "src/enterich/shapes.py", "CHANGELOG.md"]
+    assert gate.problems("auto/tests-page-limit", subjects, paths) == []
+
+
+@pytest.mark.parametrize(
+    ("branch", "subjects", "paths", "problem"),
+    [
+        ("fix/page-limit", ["test: t"], TESTS_ONLY, "not an auto/ branch"),
+        ("auto/x", [], [], "no commits"),
+        ("auto/x", ["fix: f", "test: t"], TESTS_ONLY, "test: first"),
+        ("auto/x", ["test: t", "Fix the page"], TESTS_ONLY, "not a Conventional Commit"),
+        ("auto/x", ["test: t"], [*TESTS_ONLY, "docs/specs/req-001-core.md"], "docs/specs/"),
+        ("auto/x", ["test: t"], ["docs/arc42/adr/ADR-008-improvement-pipeline.md"], "adr"),
+        ("auto/x", ["test: t"], ["AGENTS.md"], "AGENTS.md"),
+        ("auto/x", ["test: t"], [".github/workflows/ci.yml"], ".github/"),
+        ("auto/x", ["test: t"], ["pyproject.toml", "uv.lock"], "pyproject.toml"),
+        ("auto/x", ["test: t"], ["tests/snapshots/test_tools.ambr"], "tests/snapshots/"),
+        ("auto/x", ["test: t"], ["harness/triage.py"], "harness/"),
+    ],
+)
+def test_the_gate_refuses_what_adr_008_forbids(
+    branch: str, subjects: list[str], paths: list[str], problem: str
+) -> None:
+    assert any(problem in p for p in gate.problems(branch, subjects, paths))
