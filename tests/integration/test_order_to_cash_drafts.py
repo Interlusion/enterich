@@ -1038,6 +1038,29 @@ def test_an_update_without_a_date_keeps_the_due_date(mcp: Session, erp: FakeErpn
     assert put.body == {"remarks": "Checked", "modified": created["modified"]}
 
 
+def test_a_fixed_posting_date_keeps_the_due_date_on_a_later_day(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    fixed = "2026-10-01"  # before TODAY; the terms of CUST-0001 would give 2026-10-31
+    draft = sales_invoice(
+        "ACC-SINV-2026-00021",
+        docstatus=0,
+        status="Draft",
+        set_posting_time=1,
+        posting_date=fixed,
+        due_date="2026-10-20",
+        payment_terms_template="",
+        payment_schedule=[{"due_date": "2026-10-20", "invoice_portion": 100}],
+        modified=MODIFIED,
+    )
+    erp.add("Sales Invoice", draft)
+    result = update(mcp, "ACC-SINV-2026-00021", remarks="Checked")
+    assert not result.error, result.text
+    assert (result.data["posting_date"], result.data["due_date"]) == (fixed, "2026-10-20")
+    put = erp.writes(PATH)[-1]
+    assert put.body == {"remarks": "Checked", "modified": MODIFIED}
+
+
 # Drafts per hour (REQ-001-PRS-F019)
 
 LIMITED = (
