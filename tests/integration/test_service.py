@@ -385,12 +385,14 @@ def test_a_jwks_fetch_has_a_time_limit(
     assert None not in limits[0].values()
 
 
-def test_healthz_needs_nothing(jwks: FakeJwks, logs: Logs) -> None:
+def test_healthz_needs_nothing(jwks: FakeJwks, erpnext: FakeErpnext, logs: Logs) -> None:
     jwks.down = True
-    with client(jwks) as c:
+    erpnext.raw = (503, b"")
+    with client(jwks, erpnext=erpnext) as c:
         response = c.get("/healthz", headers={"authorization": "Bearer garbage"})
     assert response.status_code == 200
     assert jwks.fetches == 0
+    assert erpnext.received == []
     assert logs.events("rejection") == []
 
 
