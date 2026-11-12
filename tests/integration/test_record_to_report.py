@@ -317,6 +317,27 @@ def test_the_ledger_call_carries_the_given_inputs_as_lists(mcp: Session, erp: Fa
     }
 
 
+def test_a_party_type_alone_filters_the_ledger_without_a_lookup(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    # Only a given party needs party_type; party_type alone names nothing to check.
+    erp.reports["General Ledger"] = ledger([])
+    result = mcp.call(
+        "report_general_ledger",
+        {"from_date": "2026-10-01", "to_date": "2026-10-31", "party_type": "Customer"},
+    )
+    assert not result.error
+    assert [r.path for r in erp.received] == [REPORT]
+    assert report_call(erp, "General Ledger").param("filters") == {
+        "company": COMPANY,
+        "from_date": "2026-10-01",
+        "to_date": "2026-10-31",
+        "party_type": "Customer",
+        "include_default_book_entries": 1,
+        "show_remarks": 1,
+    }
+
+
 def test_with_an_account_the_ledger_has_opening_balance_and_closing(
     mcp: Session, erp: FakeErpnext
 ) -> None:
