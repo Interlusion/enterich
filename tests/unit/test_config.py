@@ -51,6 +51,11 @@ def test_a_limit_of_drafts_per_hour_is_a_whole_number(value: str, limit: int) ->
     assert s.max_drafts_per_hour == limit
 
 
+def test_the_listen_address_comes_from_the_environment() -> None:
+    s = load({**ENV, "ENTERICH_HOST": " 127.0.0.1 "}, ("list_items",))
+    assert s.host == "127.0.0.1"
+
+
 @pytest.mark.parametrize("value", ["", "  ", "erp example.com", "erp.example.com/x", "user@erp"])
 def test_an_empty_or_invalid_erpnext_host_stops_enterich(value: str) -> None:
     assert [p.split(":")[0] for p in problems(ERPNEXT_HOST=value)] == ["ENTERICH_ERPNEXT_HOST"]
