@@ -18,9 +18,10 @@ from enterich.app import create_app
 from enterich.auth import Verifier
 from enterich.tools import names
 from tests.conftest import Logs
+from tests.fakes.erpnext import FakeErpnext
 from tests.fakes.jwks import FakeJwks, Signer, rsa_signer, token
 from tests.fakes.settings import API_KEY, API_SECRET, ISSUER, RESOURCE_URL, settings
-from tests.integration.mcp import ACCEPT, BASE, METADATA, bearer, client
+from tests.integration.mcp import ACCEPT, BASE, METADATA, VERSION, bearer, client
 
 
 def offered(answer: Any) -> list[str]:
@@ -199,12 +200,20 @@ def test_a_missing_scope_gets_403(jwks: FakeJwks, signer: Signer, logs: Logs) ->
 
 
 def test_a_refused_token_gets_401_and_one_short_line_each(
-    jwks: FakeJwks, signer: Signer, logs: Logs
+    jwks: FakeJwks, signer: Signer, erpnext: FakeErpnext, logs: Logs
 ) -> None:
     person = token(signer, sub="11111111-1111-1111-1111-111111111111")
-    with client(jwks) as c:
-        statuses = {c.post("/mcp", headers=bearer(person), json={}).status_code for _ in range(50)}
+    headers = {**bearer(person), "mcp-protocol-version": VERSION}
+    call: dict[str, Any] = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {"name": "list_items", "arguments": {}},
+    }
+    with client(jwks, erpnext=erpnext) as c:
+        statuses = {c.post("/mcp", headers=headers, json=call).status_code for _ in range(50)}
     assert statuses == {401}
+    assert erpnext.received == []
     lines = [line for line in logs.stream.getvalue().splitlines() if '"rejection"' in line]
     assert len(lines) == 50
     assert all(len(line) <= 300 for line in lines)
