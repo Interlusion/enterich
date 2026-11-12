@@ -15,6 +15,7 @@ from tests.fakes.erpnext import (
     customer,
     purchase_invoice,
     sales_invoice,
+    set_item_wise_tax,
     supplier,
 )
 from tests.fakes.settings import DRAFTS_PER_HOUR
@@ -321,7 +322,10 @@ def test_an_invoice_with_nothing_left_is_refused(mcp: Session, erp: FakeErpnext)
     [
         ({"items": [{"item_code": "SKU-1", "qty": 0}]}, "items.0.qty: "),
         ({"items": [{"item_code": "SKU-1", "qty": -1}]}, "items.0.qty: "),
-        ({"items": [{"item_code": "SKU-1", "qty": 1.0001}]}, "items.0.qty: "),
+        (
+            {"items": [{"item_code": "SKU-1", "qty": 1.0001}]},
+            "items.0.qty: Decimal input should have no more than 3 decimal places",
+        ),
         ({"items": []}, "items: "),
         ({"items": [{"item_code": "SKU-1", "qty": 1}] * 21}, "items: "),
         ({"items": [{"item_code": "SKU-1", "qty": 1, "rate": 60}]}, "items.0.rate: Extra"),
@@ -386,7 +390,7 @@ def test_a_return_counts_with_the_sales_invoices(limited: Session, erp: FakeErpn
     assert erp.writes() == []
 
 
-# create_draft_purchase_return (REQ-005-PRS-F008)
+# create_draft_purchase_return (REQ-005-PRS-F008, REQ-001-PRS-F005)
 
 
 def test_a_debit_note_sends_erpnexts_return_with_the_credit_notes_number(
@@ -458,6 +462,39 @@ def test_a_debit_note_without_a_number_keeps_the_invoices(mcp: Session, erp: Fak
     assert post.body["items"][0]["qty"] == -2
 
 
+def test_a_reverse_charge_debit_notes_tax_summary_is_negative_on_both_rows(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    """REQ-001-PRS-F022: the Deduct row's entries too, however ERPNext stored its details."""
+    erp.docs["Purchase Invoice"].pop(PURCHASE_DRAFT)
+    bill = erp.docs["Purchase Invoice"][BILL]
+    bill["taxes"] = [
+        {**bill["taxes"][0], "account_head": account, "add_deduct_tax": way, "tax_amount": 15.2}
+        for account, way in (("1577 - Input VAT EU - EX", "Add"), ("1777 - VAT EU - EX", "Deduct"))
+    ]
+    set_item_wise_tax(bill)
+    result = create(mcp, "create_draft_purchase_return", items=[{"item_code": "SKU-1", "qty": 1}])
+    assert not result.error, result.text
+    draft = result.data
+
+    def summary(doc: dict[str, Any]) -> list[tuple[str, float, float]]:
+        return [
+            (e["account_head"], e["taxable_amount"], e["tax_amount"]) for e in doc["tax_summary"]
+        ]
+
+    # Negative, as the return's tax rows
+    assert [t["tax_amount"] for t in draft["taxes"]] == [-7.6, -7.6]
+    negative = [("1577 - Input VAT EU - EX", -40, -7.6), ("1777 - VAT EU - EX", -40, -7.6)]
+    assert summary(draft) == negative
+    # As v16 computes it, the Deduct row's amount taxed is negated to positive; as its
+    # migration and tax withholding store it, it keeps the item row's sign
+    stored = erp.docs["Purchase Invoice"][draft["name"]]
+    [deducted] = [d for d in stored["item_wise_tax_details"] if d["amount"] > 0]
+    assert deducted["taxable_amount"] == 40
+    deducted["taxable_amount"] = -40.0
+    assert summary(mcp.call("get_purchase_invoice", {"name": draft["name"]}).data) == negative
+
+
 @pytest.mark.parametrize(
     ("invoice", "says"),
     [("ACC-PINV-2026-00002", "stock"), ("ACC-PINV-2026-00003", "paid")],
@@ -479,6 +516,18 @@ def test_a_draft_debit_note_against_the_invoice_is_a_duplicate(
     assert result.error
     assert result.text.startswith("allow_duplicate: ")
     assert PURCHASE_DRAFT in result.text
+
+
+def test_a_debit_note_sent_again_is_refused_naming_the_first_draft(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    erp.docs["Purchase Invoice"].pop(PURCHASE_DRAFT)
+    first = create(mcp, "create_draft_purchase_return").data
+    again = create(mcp, "create_draft_purchase_return")
+    assert again.error
+    assert again.text.startswith("allow_duplicate: ")
+    assert first["name"] in again.text
+    assert len(erp.writes(PURCHASES)) == 1
 
 
 # update_draft_sales_return, update_draft_purchase_return

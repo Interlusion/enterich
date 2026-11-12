@@ -103,7 +103,7 @@ def test_disabled_items_are_left_out_unless_asked_for(mcp: Session, erp: FakeErp
     [
         ({"limit": 101}, "limit"),
         ({"limit": 0}, "limit"),
-        ({"offset": 10001}, "offset"),
+        ({"offset": 10001}, "offset: Input should be less than or equal to 10000"),
         ({"search": ""}, "search"),
         ({"search": "x" * 141}, "search"),
         ({"doctype": "User"}, "doctype"),
@@ -250,6 +250,20 @@ def test_an_unknown_or_unpermitted_name_names_the_input(
     assert "isn't permitted" in result.text
 
 
+@pytest.mark.parametrize("body", [{}, {"exc_type": "PermissionError"}])
+@pytest.mark.parametrize("status", [404, 403])
+def test_a_bare_404_or_403_for_a_name_names_the_input(
+    mcp: Session, erp: FakeErpnext, status: int, body: dict[str, Any]
+) -> None:
+    """REQ-001-PRS-F008: a refusal without `_server_messages` answers per REQ-001-PRS-F009."""
+    erp.fail("/api/method/frappe.client.get", status, body)
+    result = mcp.call("get_item", {"item_code": "SKU-1"})
+    assert result.error
+    assert "item_code" in result.text
+    assert "doesn't exist" in result.text
+    assert "isn't permitted" in result.text
+
+
 def test_a_long_erpnext_message_reaches_the_agent_cut_to_300(
     mcp: Session, erp: FakeErpnext
 ) -> None:
@@ -310,10 +324,12 @@ def test_the_tool_list_carries_titles_annotations_and_strict_schemas(mcp: Sessio
 def test_enterich_tools_limits_what_is_offered(
     jwks: FakeJwks, signer: Signer, erp: FakeErpnext
 ) -> None:
-    with client(jwks, settings(tools="get_item"), erp) as c:
+    chosen = "get_item,list_customers,create_draft_sales_invoice"
+    with client(jwks, settings(tools=chosen), erp) as c:
         mcp = Session(c, token(signer))
-        assert [t["name"] for t in mcp.tools()] == ["get_item"]
-        assert mcp.call("list_items").error
+        assert sorted(t["name"] for t in mcp.tools()) == sorted(chosen.split(","))
+        result = mcp.call("list_items")
+        assert (result.error, result.text) == (True, "Unknown tool: list_items")
     assert erp.received == []
 
 

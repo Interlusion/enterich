@@ -986,11 +986,9 @@ def test_an_update_warns_where_a_pricing_rule_replaced_a_rate(
     ]
     result = update(mcp, items=items).data
     [warning] = result["warnings"]
-    assert "row 2" in warning.lower()
-    assert "SKU-2" in warning
-    # Row 2 is matched to the second row given, not the first (REQ-001-PRS-F016)
-    assert "19" in warning
-    assert "15" in warning
+    assert warning == (
+        "Row 2 (SKU-2): rate 19 was given, but ERPNext saved 15; a pricing rule set it."
+    )
     [comment] = erp.comments
     assert comment["reference_name"] == DRAFT
 

@@ -49,6 +49,7 @@ INVOICE_FIELDS = [
     "owner",
     "modified",
 ]
+TEMPLATE_FIELDS = ["name", "title", "is_default", "tax_category", "disabled"]
 SUPPLIER_OUTSIDE = {"supplier_name": "Supplier SUPP-0001", "tax_id": "DE987654321"}
 
 
@@ -337,7 +338,10 @@ def test_only_purchase_templates_are_listed(mcp: Session, erp: FakeErpnext) -> N
     result = mcp.call("list_purchase_tax_templates").data
     [call] = erp.received
     assert call.path == "/api/resource/Purchase Taxes and Charges Template"
+    assert call.param("fields") == TEMPLATE_FIELDS
     assert call.param("filters") == [["company", "=", COMPANY], ["disabled", "=", 0]]
+    assert call.param("order_by") == "name asc"
+    assert (call.param("limit_start"), call.param("limit_page_length")) == ("0", "21")
     assert [r["name"] for r in result["records"]] == ["Input VAT 19% - EX"]
 
 

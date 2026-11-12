@@ -431,7 +431,7 @@ def test_a_payment_without_references_checks_no_invoice(mcp: Session, erp: FakeE
     assert erp.lists("/api/resource/Sales Invoice") == []
 
 
-# The duplicate match (REQ-007-PRS-F006)
+# The duplicate match (REQ-007-PRS-F006, REQ-001-PRS-F005)
 
 
 def test_a_recorded_bank_reference_is_refused(mcp: Session, erp: FakeErpnext) -> None:
@@ -454,6 +454,17 @@ def test_a_drafts_bank_reference_is_refused(mcp: Session, erp: FakeErpnext) -> N
     result = create(mcp, reference_no="TX-4800")
     assert result.error
     assert DRAFT in result.text
+
+
+def test_a_create_sent_again_is_refused_naming_the_first_draft(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    first = create(mcp).data
+    again = create(mcp)
+    assert again.error
+    assert again.text.startswith("allow_duplicate: ")
+    assert first["name"] in again.text
+    assert len(erp.writes(PATH)) == 1
 
 
 @pytest.mark.parametrize(
