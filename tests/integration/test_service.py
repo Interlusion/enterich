@@ -15,10 +15,11 @@ import pytest
 from starlette.testclient import TestClient
 
 from enterich.app import create_app
+from enterich.auth import Verifier
 from enterich.tools import names
 from tests.conftest import Logs
 from tests.fakes.jwks import FakeJwks, Signer, rsa_signer, token
-from tests.fakes.settings import ISSUER, RESOURCE_URL, settings
+from tests.fakes.settings import API_KEY, API_SECRET, ISSUER, RESOURCE_URL, settings
 from tests.integration.mcp import ACCEPT, BASE, METADATA, bearer, client
 
 
@@ -410,3 +411,23 @@ def test_no_token_part_reaches_the_log_or_responses(
         _, payload, signature = t.split(".")
         assert payload not in text
         assert signature not in text
+
+
+def test_an_exception_in_the_mcp_app_is_logged_without_the_api_key_and_secret(
+    jwks: FakeJwks, signer: Signer, logs: Logs, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def failing(self: Verifier, t: str) -> None:
+        raise RuntimeError(f"key {API_KEY} secret {API_SECRET}")
+
+    monkeypatch.setattr(Verifier, "verify_token", failing)
+    with client(jwks) as c:
+        response = c.post("/mcp", headers=bearer(token(signer)), json={})
+    assert response.status_code == 500
+    assert API_KEY not in response.text
+    assert API_SECRET not in response.text
+    [line] = logs.events("error")
+    assert line["exception"] == "RuntimeError"
+    assert line["message"] == "key *** secret ***"
+    assert "key *** secret ***" in line["traceback"]
+    assert API_KEY not in line["traceback"]
+    assert API_SECRET not in line["traceback"]
