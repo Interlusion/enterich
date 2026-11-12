@@ -510,6 +510,7 @@ def test_an_update_of_a_debit_note_sends_the_credit_notes_number(
     assert not result.error, result.text
     [put] = erp.writes(PURCHASES)
     assert put.body == {"bill_no": "CN-78", "bill_date": "2026-10-26", "modified": MODIFIED}
+    assert result.data["outside_text"] == {"bill_no": "CN-78"}  # the supplier's text
 
 
 @pytest.mark.parametrize("kind", ["create", "update"])
