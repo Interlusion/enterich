@@ -284,6 +284,18 @@ def test_list_sales_invoices_returns_the_assigned_companys_records(mcp: Session)
     assert "customer_name" not in record
 
 
+def test_invoice_paging_reports_more(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-001-PRS-F014: a list asks ERPNext for one record more than `limit` to tell
+    whether more follow."""
+    erp.add("Sales Invoice", sales_invoice("ACC-SINV-2026-00003", posting_date="2026-10-02"))
+    erp.add("Sales Invoice", sales_invoice("ACC-SINV-2026-00004", posting_date="2026-10-03"))
+    result = mcp.call("list_sales_invoices", {"limit": 1, "offset": 1}).data
+    [call] = erp.received
+    assert (call.param("limit_start"), call.param("limit_page_length")) == ("1", "2")
+    assert [r["name"] for r in result["records"]] == ["ACC-SINV-2026-00003"]
+    assert (result["count"], result["offset"], result["has_more"]) == (1, 1, True)
+
+
 # get_sales_invoice
 
 
