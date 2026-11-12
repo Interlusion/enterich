@@ -663,6 +663,31 @@ def test_an_update_lowering_the_amount_below_the_allocations_is_refused(
     assert erp.writes() == []
 
 
+def test_an_update_lowering_the_amount_with_references_within_it_goes_through(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    # REQ-007-PRS-F005: the given references replace the draft's 80 as saved in the check
+    references = [{"reference_name": INVOICE, "allocated_amount": 50}]
+    result = update(mcp, paid_amount=50, references=references)
+    assert not result.error, result.text
+    [put] = erp.writes(PATH)
+    assert put.body == {
+        "references": [
+            {
+                "reference_doctype": "Sales Invoice",
+                "reference_name": INVOICE,
+                "allocated_amount": 50,
+            }
+        ],
+        "paid_from": None,
+        "paid_from_account_currency": None,
+        "paid_from_account_type": None,
+        "paid_amount": 50,
+        "received_amount": 50,
+        "modified": MODIFIED,
+    }
+
+
 def test_references_above_the_drafts_amount_are_refused(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp, references=PAID)  # 119 against the draft's 80
     assert result.error
