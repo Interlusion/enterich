@@ -184,6 +184,38 @@ def test_a_deduct_rows_tax_summary_is_positive_as_the_row(
     ]
 
 
+@pytest.mark.parametrize(
+    "taxable",
+    [
+        pytest.param(200.0, id="as v16 computes it"),
+        pytest.param(-200.0, id="as v16 migrated it"),
+    ],
+)
+def test_a_deduct_rows_tax_summary_on_a_return_is_negative_as_its_item_rows(
+    mcp: Session, erp: FakeErpnext, taxable: float
+) -> None:
+    """REQ-001-PRS-F022: the amount taxed takes the sign of the item rows, not of the details."""
+    invoice = purchase_invoice("ACC-PINV-2026-00003", is_return=1)
+    items = [{**invoice["items"][0], "qty": -10.0, "amount": -200.0}]
+    detail = {"item_row": items[0]["name"], "rate": 19.0}
+    details = [
+        {**detail, "tax_row": "t1", "amount": -38.0, "taxable_amount": -200.0},
+        {**detail, "tax_row": "t2", "amount": 38.0, "taxable_amount": taxable},
+    ]
+    taxes = [{**invoice["taxes"][0], **row, "tax_amount": -38.0} for row in REVERSE_CHARGE]
+    erp.add(
+        "Purchase Invoice",
+        {**invoice, "items": items, "taxes": taxes, "item_wise_tax_details": details},
+    )
+    result = mcp.call("get_purchase_invoice", {"name": "ACC-PINV-2026-00003"}).data
+    assert [
+        (e["account_head"], e["taxable_amount"], e["tax_amount"]) for e in result["tax_summary"]
+    ] == [
+        ("1577 - Input VAT EU - EX", -200, -38),
+        ("1777 - VAT EU - EX", -200, -38),
+    ]
+
+
 def test_entries_of_nothing_are_left_out_of_the_tax_summary(mcp: Session, erp: FakeErpnext) -> None:
     """REQ-001-PRS-F022: as a row ERPNext added counts an item without a template."""
     invoice = purchase_invoice("ACC-PINV-2026-00004")
