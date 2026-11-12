@@ -3,6 +3,7 @@ REQ-002-PRS-NF003, REQ-002-PRS-NF008, REQ-002-PRS-NF009, REQ-002-PRS-NF010,
 REQ-002-PRS-NF011, REQ-002-PRS-NF012."""
 
 import json
+from importlib.metadata import version as installed
 from typing import Any
 
 import httpx2
@@ -65,6 +66,8 @@ def test_initialize_and_list_tools(
         assert init.status_code == 200
         assert init.headers["content-type"].startswith("application/json")
         assert init.json()["result"]["protocolVersion"] == version
+        server = init.json()["result"]["serverInfo"]
+        assert (server["name"], server["version"]) == ("enterich", installed("enterich"))
         tools = list_tools(c, t, version)
         assert tools.status_code == 200
         assert offered(tools.json()) == list(names())
