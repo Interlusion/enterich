@@ -157,30 +157,41 @@ REVERSE_CHARGE = [
 
 
 @pytest.mark.parametrize(
-    "deducted",
+    "stored",
     [
-        pytest.param({"amount": -38.0, "taxable_amount": -200.0}, id="as v16 computes it"),
-        pytest.param({"amount": -38.0, "taxable_amount": 200.0}, id="as v16 migrated it"),
+        pytest.param(-1.0, id="as v16 computes it"),
+        pytest.param(1.0, id="as v16 migrated it"),
+    ],
+)
+@pytest.mark.parametrize(
+    ("amount", "tax"),
+    [
+        pytest.param(200.0, 38.0, id="item of 200"),
+        pytest.param(0.5, 0.1, id="item below 1"),
     ],
 )
 def test_a_deduct_rows_tax_summary_is_positive_as_the_row(
-    mcp: Session, erp: FakeErpnext, deducted: dict[str, float]
+    mcp: Session, erp: FakeErpnext, amount: float, tax: float, stored: float
 ) -> None:
     """REQ-001-PRS-F022: the migration and tax withholding negate only the tax."""
     invoice = purchase_invoice("ACC-PINV-2026-00003")
-    item = invoice["items"][0]["name"]
+    items = [{**invoice["items"][0], "rate": amount / 10, "amount": amount}]
+    detail = {"item_row": items[0]["name"], "rate": 19.0}
     details = [
-        {"item_row": item, "tax_row": "t1", "rate": 19.0, "amount": 38.0, "taxable_amount": 200.0},
-        {"item_row": item, "tax_row": "t2", "rate": 19.0, **deducted},
+        {**detail, "tax_row": "t1", "amount": tax, "taxable_amount": amount},
+        {**detail, "tax_row": "t2", "amount": -tax, "taxable_amount": stored * amount},
     ]
-    taxes = [{**invoice["taxes"][0], **row, "tax_amount": 38.0} for row in REVERSE_CHARGE]
-    erp.add("Purchase Invoice", {**invoice, "taxes": taxes, "item_wise_tax_details": details})
+    taxes = [{**invoice["taxes"][0], **row, "tax_amount": tax} for row in REVERSE_CHARGE]
+    erp.add(
+        "Purchase Invoice",
+        {**invoice, "items": items, "taxes": taxes, "item_wise_tax_details": details},
+    )
     result = mcp.call("get_purchase_invoice", {"name": "ACC-PINV-2026-00003"}).data
     assert [
         (e["account_head"], e["taxable_amount"], e["tax_amount"]) for e in result["tax_summary"]
     ] == [
-        ("1577 - Input VAT EU - EX", 200, 38),
-        ("1777 - VAT EU - EX", 200, 38),
+        ("1577 - Input VAT EU - EX", amount, tax),
+        ("1777 - VAT EU - EX", amount, tax),
     ]
 
 
