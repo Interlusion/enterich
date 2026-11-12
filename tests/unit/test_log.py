@@ -74,6 +74,15 @@ def test_exceptions_keep_their_type() -> None:
     assert "boom" in line["traceback"]
 
 
+def test_an_exception_never_raised_keeps_its_type() -> None:
+    # A library may pass an exception instance that has no traceback.
+    stream = capture()
+    logging.getLogger("mcp.server").error("failed", exc_info=ValueError("v"))
+    line = json.loads(stream.getvalue())
+    assert line["exception"] == "ValueError"
+    assert "ValueError: v" in line["traceback"]
+
+
 def test_a_failure_is_an_error_line_with_the_cleaned_traceback() -> None:
     stream = capture()
     with pytest.raises(RuntimeError) as caught:
