@@ -6,10 +6,11 @@ from collections.abc import AsyncIterator
 from decimal import Decimal
 
 import anyio
+import httpx2
 import pytest
 
 from enterich import erpnext
-from enterich.erpnext import Erpnext, ErpnextError
+from enterich.erpnext import Erpnext, ErpnextError, Refused
 from tests.fakes.erpnext import FakeErpnext, customer, error, item, sales_invoice
 from tests.fakes.settings import API_KEY, API_SECRET, settings
 
@@ -68,6 +69,16 @@ async def test_a_redirect_is_a_refusal_not_a_second_request(fake: FakeErpnext) -
     assert len(fake.received) == 1
 
 
+@pytest.mark.parametrize("status", [300, 399])
+async def test_every_3xx_answer_is_a_redirect_even_with_a_json_body(
+    fake: FakeErpnext, status: int
+) -> None:
+    fake.raw = (status, b'{"message": {}}')
+    with pytest.raises(ErpnextError, match="redirect"):
+        await Erpnext(settings(), fake.transport()).get_doc("Item", "SKU-1")
+    assert len(fake.received) == 1
+
+
 @pytest.fixture
 async def local_erpnext() -> AsyncIterator[int]:
     """A minimal HTTP server on loopback, answering every request with an empty list."""
@@ -113,15 +124,66 @@ async def test_a_call_ends_after_the_call_timeout(
         await Erpnext(settings(), fake.transport()).get_doc("Item", "SKU-1")
 
 
+async def test_an_unreachable_erpnext_is_an_error_naming_the_failure() -> None:
+    def refuse(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("Connection refused", request=request)
+
+    with pytest.raises(ErpnextError) as caught:
+        await Erpnext(settings(), httpx2.MockTransport(refuse)).get_doc("Item", "SKU-1")
+    assert str(caught.value) == "ERPNext can't be reached (ConnectError)."
+
+
+async def test_the_call_timeout_is_the_only_time_limit(fake: FakeErpnext) -> None:
+    """httpx's default of 5 s would end a call that ERPNext answers within the 30 s."""
+    timeouts: list[object] = []
+
+    async def handle(request: httpx2.Request) -> httpx2.Response:
+        timeouts.append(request.extensions["timeout"])
+        return await fake.handle(request)
+
+    await Erpnext(settings(), httpx2.MockTransport(handle)).get_doc("Item", "SKU-1")
+    assert timeouts == [{"connect": None, "read": None, "write": None, "pool": None}]
+
+
 async def test_a_response_over_10_mib_is_refused(fake: FakeErpnext) -> None:
     fake.huge_response = True
     with pytest.raises(ErpnextError, match="10 MiB"):
         await Erpnext(settings(), fake.transport()).get_doc("Item", "SKU-1")
 
 
+class Chunked(httpx2.AsyncByteStream):
+    """An answer arriving in 64 KiB pieces, as a real socket delivers a large one."""
+
+    def __init__(self, body: bytes) -> None:
+        self.body = body
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        for start in range(0, len(self.body), 64 * 1024):
+            yield self.body[start : start + 64 * 1024]
+
+
+def chunked(body: bytes) -> httpx2.MockTransport:
+    return httpx2.MockTransport(lambda _: httpx2.Response(200, stream=Chunked(body)))
+
+
+async def test_a_response_of_exactly_10_mib_in_many_chunks_is_read_whole() -> None:
+    head, tail = b'{"message": {"name": "SKU-1", "description": "', b'"}}'
+    padding = b"x" * (erpnext.MAX_RESPONSE_BYTES - len(head) - len(tail))
+    client = Erpnext(settings(), chunked(head + padding + tail))
+    doc = await client.get_doc("Item", "SKU-1")
+    assert doc == {"name": "SKU-1", "description": padding.decode()}
+
+
+async def test_a_response_over_10_mib_in_many_chunks_is_refused() -> None:
+    body = b'{"data": "' + b"x" * (20 * 1024 * 1024) + b'"}'
+    with pytest.raises(ErpnextError, match="10 MiB"):
+        await Erpnext(settings(), chunked(body)).get_doc("Item", "SKU-1")
+
+
 @pytest.mark.parametrize(
     ("status", "exc_type", "message"),
     [
+        (400, "CSRFTokenError", "Invalid Request"),
         (403, "PermissionError", "No permission for Item"),
         (417, "ValidationError", "Posting Date cannot be before the fiscal year"),
         (417, "LinkValidationError", "Could not find Customer: Nobody GmbH"),
@@ -161,10 +223,26 @@ async def test_tracebacks_and_debug_output_are_not_forwarded(fake: FakeErpnext) 
     assert "frappe.exceptions" not in text
 
 
-async def test_a_refusal_without_messages_carries_status_and_type(fake: FakeErpnext) -> None:
-    text = await failure(fake, 417, {"exc_type": "ValidationError"})
-    assert "417" in text
-    assert "ValidationError" in text
+@pytest.mark.parametrize("server_messages", [None, '{"message": "x"}', "5"])
+async def test_a_refusal_without_messages_carries_status_and_type(
+    fake: FakeErpnext, server_messages: str | None
+) -> None:
+    body: dict[str, object] = {"exc_type": "ValidationError"}
+    if server_messages is not None:
+        body["_server_messages"] = server_messages  # JSON, but no list of messages
+    text = await failure(fake, 417, body)
+    assert text == "ERPNext refused the request (417 ValidationError)."
+
+
+@pytest.mark.parametrize("body", [{}, {"exc_type": None}, {"exc_type": 5}, {"exc_type": ["x"]}])
+async def test_a_refusal_without_a_type_carries_the_status_alone(
+    fake: FakeErpnext, body: dict[str, object]
+) -> None:
+    fake.fail("/api/method/frappe.client.get", 417, body)
+    with pytest.raises(Refused) as caught:
+        await Erpnext(settings(), fake.transport()).get_doc("Item", "SKU-1")
+    assert str(caught.value) == "ERPNext refused the request (417)."
+    assert caught.value.exc_type is None
 
 
 async def test_a_refusal_is_at_most_300_characters(fake: FakeErpnext) -> None:
@@ -172,7 +250,9 @@ async def test_a_refusal_is_at_most_300_characters(fake: FakeErpnext) -> None:
     assert len(text) <= 300
 
 
-@pytest.mark.parametrize("answer", [{}, {"message": None}, {"message": ["x"]}])
+@pytest.mark.parametrize(
+    "answer", [{}, {"message": None}, {"message": ["x"]}, [], "agent@example.com", 5]
+)
 async def test_an_answer_without_the_agent_user_is_an_error_and_not_kept(
     fake: FakeErpnext, answer: object
 ) -> None:
@@ -185,8 +265,9 @@ async def test_an_answer_without_the_agent_user_is_an_error_and_not_kept(
 
 async def test_a_refusal_that_isnt_json_still_reports_the_status(fake: FakeErpnext) -> None:
     fake.fail("/api/method/frappe.client.get", 502, None)
-    with pytest.raises(ErpnextError, match="502"):
+    with pytest.raises(ErpnextError) as caught:
         await Erpnext(settings(), fake.transport()).get_doc("Item", "SKU-1")
+    assert str(caught.value) == "ERPNext refused the request (502)."
 
 
 async def test_a_deeply_nested_answer_isnt_json(fake: FakeErpnext) -> None:
@@ -315,6 +396,18 @@ async def test_the_client_counts_calls_and_their_time(fake: FakeErpnext) -> None
     assert meter.seconds >= 0.1
 
 
+async def test_reads_send_no_body_and_no_content_type(fake: FakeErpnext) -> None:
+    client = Erpnext(settings(), fake.transport())
+    await client.get_doc("Item", "SKU-1")
+    await client.get_list(
+        "Item", fields=["item_code"], order_by="name asc", start=0, page_length=21
+    )
+    assert [received.method for received in fake.received] == ["GET", "GET"]
+    for received in fake.received:
+        assert "content-type" not in received.headers
+        assert received.headers.get("content-length", "0") == "0"
+
+
 async def test_writes_send_json_with_decimals_as_numbers(fake: FakeErpnext) -> None:
     fake.add("Customer", customer("CUST-0001"))
     client = Erpnext(settings(), fake.transport())
@@ -336,12 +429,18 @@ async def test_an_update_names_the_document_in_one_path_segment(fake: FakeErpnex
     assert saved["remarks"] == "x"
 
 
-@pytest.mark.parametrize("body", [b'{"message": [1]}', b'{"message": {}}'])
+@pytest.mark.parametrize(
+    ("body", "text"),
+    [
+        (b'{"message": [1]}', "has tax rows that aren't records"),
+        (b'{"message": {}}', "has no message"),
+    ],
+)
 async def test_tax_rows_that_arent_records_are_a_faulty_answer(
-    fake: FakeErpnext, body: bytes
+    fake: FakeErpnext, body: bytes, text: str
 ) -> None:
     fake.raw = (200, body)
-    with pytest.raises(ErpnextError):
+    with pytest.raises(ErpnextError, match=text):
         await Erpnext(settings(), fake.transport()).tax_rows(
             "Sales Taxes and Charges Template", "T"
         )
