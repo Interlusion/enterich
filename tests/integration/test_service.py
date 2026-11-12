@@ -84,11 +84,15 @@ def test_a_single_exchange_under_2026_07_28(jwks: FakeJwks, signer: Signer, logs
     assert offered(response.json()) == list(names())
 
 
-def test_the_origin_header_changes_nothing(jwks: FakeJwks, signer: Signer, logs: Logs) -> None:
-    """REQ-002-PRS-NF004: no Origin check (ADR-002), the same answer for any client."""
+@pytest.mark.parametrize("host", ["0.0.0.0", "127.0.0.1"])
+def test_the_origin_header_changes_nothing(
+    jwks: FakeJwks, signer: Signer, logs: Logs, host: str
+) -> None:
+    """REQ-002-PRS-NF004: no Origin check (ADR-002), the same answer for any client, also
+    when Enterich listens on a loopback address."""
     t = token(signer)
-    answers: list[tuple[int, Any]] = []
-    with client(jwks) as c:
+    answers: list[tuple[int, str]] = []
+    with client(jwks, settings(host=host)) as c:
         for origin in ["https://claude.ai", "https://attacker.example.net", "null", None]:
             headers = {**bearer(t), "mcp-protocol-version": "2025-11-25"}
             if origin is not None:
@@ -98,10 +102,11 @@ def test_the_origin_header_changes_nothing(jwks: FakeJwks, signer: Signer, logs:
                 headers=headers,
                 json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
             )
-            answers.append((response.status_code, response.json()))
+            answers.append((response.status_code, response.text))
     assert [status for status, _ in answers] == [200] * 4
-    assert all(answer == answers[0][1] for _, answer in answers)
-    assert offered(answers[0][1]) == list(names())
+    bodies = [json.loads(text) for _, text in answers]
+    assert all(body == bodies[0] for body in bodies)
+    assert offered(bodies[0]) == list(names())
 
 
 def test_no_session_state_between_processes(jwks: FakeJwks, signer: Signer, logs: Logs) -> None:
