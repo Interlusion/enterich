@@ -81,6 +81,16 @@ async def test_expires_at_carries_the_leeway(jwks: FakeJwks, signer: Signer) -> 
     assert access.expires_at == exp + 5
 
 
+@pytest.mark.parametrize("scope", [["openid"], 123, None])
+async def test_a_scope_that_is_not_a_string_grants_no_scopes(
+    jwks: FakeJwks, signer: Signer, scope: Any
+) -> None:
+    # None drops the claim. The token stays valid; a required scope then gets 403.
+    access = await verifier(jwks).verify_token(token(signer, scope=scope))
+    assert access is not None
+    assert access.scopes == []
+
+
 @pytest.mark.parametrize(
     ("overrides", "reason"),
     [
