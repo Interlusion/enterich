@@ -51,9 +51,33 @@ def test_a_limit_of_drafts_per_hour_is_a_whole_number(value: str, limit: int) ->
     assert s.max_drafts_per_hour == limit
 
 
-@pytest.mark.parametrize("value", ["", "  ", "erp example.com", "erp.example.com/x", "user@erp"])
+def test_the_listen_address_comes_from_the_environment() -> None:
+    s = load({**ENV, "ENTERICH_HOST": " 127.0.0.1 "}, ("list_items",))
+    assert s.host == "127.0.0.1"
+
+
+@pytest.mark.parametrize("port", [1, 65535])
+def test_the_listen_port_may_be_any_from_1_to_65535(port: int) -> None:
+    s = load({**ENV, "ENTERICH_PORT": str(port)}, ("list_items",))
+    assert s.port == port
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "  ",
+        "erp example.com",
+        "erp.example.com/x",
+        "user@erp",
+        "erp.example.com:",
+        "erp.example.com:abc",
+    ],
+)
 def test_an_empty_or_invalid_erpnext_host_stops_enterich(value: str) -> None:
-    assert [p.split(":")[0] for p in problems(ERPNEXT_HOST=value)] == ["ENTERICH_ERPNEXT_HOST"]
+    assert problems(ERPNEXT_HOST=value) == [
+        "ENTERICH_ERPNEXT_HOST: must be a host name or IP address, optionally with a port"
+    ]
 
 
 @pytest.mark.parametrize(
@@ -77,55 +101,78 @@ def test_all_problems_are_reported_at_once() -> None:
     ]
 
 
+HTTPS_ONLY = "must use https (http only for a loopback host)"
+CANONICAL = "must be canonical: lower-case scheme and host, no default port"
+PLAIN_PATH = "must have a path of plain segments without a trailing slash, e.g. /mcp"
+VALID_HOST = "must be an http or https URL with a valid host"
+ASYMMETRIC = (
+    "must list asymmetric algorithms only: "
+    "ES256, ES384, ES512, EdDSA, PS256, PS384, PS512, RS256, RS384, RS512"
+)
+IANA = "must be an IANA time zone name, e.g. Europe/Berlin"
+
+
 @pytest.mark.parametrize(
-    ("name", "value"),
+    ("name", "value", "rule"),
     [
-        ("ISSUER", "http://id.example.com/realms/example"),
-        ("JWKS_URL", "http://id.example.com/certs"),
-        ("RESOURCE_URL", "https://ERP.example.com/mcp/"),
-        ("RESOURCE_URL", "https://erp.example.com/mcp/"),
-        ("RESOURCE_URL", "HTTPS://erp.example.com/mcp"),
-        ("RESOURCE_URL", "https://erp.example.com:443/mcp"),
-        ("RESOURCE_URL", "https://erp.example.com"),
-        ("RESOURCE_URL", "https://erp.example.com/mcp?x=1"),
-        ("RESOURCE_URL", "https://erp.example.com/mcp#top"),
-        ("RESOURCE_URL", "https://user:pw@erp.example.com/mcp"),
-        ("ERPNEXT_URL", "ftp://erp.example.com"),
-        ("ERPNEXT_PUBLIC_URL", "erp.example.com"),
-        ("CLOCK_LEEWAY", "61"),
-        ("CLOCK_LEEWAY", "-1"),
-        ("CLOCK_LEEWAY", "five"),
-        ("TOKEN_ALGORITHMS", "HS256"),
-        ("TOKEN_ALGORITHMS", "RS256,none"),
-        ("TIMEZONE", "Europe/Nowhere"),
-        ("TOOLS", "list_items,drop_database"),
-        ("PORT", "0"),
-        ("LOG_LEVEL", "TRACE"),
-        ("REQUIRED_SCOPES", ""),
-        ("REQUIRED_SCOPES", "   "),
-        ("RESOURCE_URL", "https://erp.example.com:/mcp"),
-        ("RESOURCE_URL", "https://erp.example.com/m%63p"),
-        ("RESOURCE_URL", "https://erp.example.com/a/../mcp"),
-        ("RESOURCE_URL", "https://erp.example.com/./mcp"),
-        ("RESOURCE_URL", "https://erp.example.com/mcp;x"),
-        ("RESOURCE_URL", "https://erp.example.com//mcp"),
-        ("ISSUER", "https://id exa.com/realms/example"),
-        ("ISSUER", "https://ID.example.com/realms/example"),
-        ("JWKS_URL", "https://id exa.com/certs"),
-        ("JWKS_URL", "https://id.example.com:/certs"),
-        ("ERPNEXT_URL", "http://erp internal:8080"),
-        ("TIMEZONE", "a" * 300),
-        ("MAX_DRAFTS_PER_HOUR", "0"),
-        ("MAX_DRAFTS_PER_HOUR", "1001"),
-        ("MAX_DRAFTS_PER_HOUR", "-5"),
-        ("MAX_DRAFTS_PER_HOUR", "ten"),
-        ("MAX_DRAFTS_PER_HOUR", ""),
+        ("ISSUER", "http://id.example.com/realms/example", HTTPS_ONLY),
+        ("JWKS_URL", "http://id.example.com/certs", HTTPS_ONLY),
+        ("RESOURCE_URL", "https://ERP.example.com/mcp/", CANONICAL),
+        ("RESOURCE_URL", "https://erp.example.com/mcp/", PLAIN_PATH),
+        ("RESOURCE_URL", "HTTPS://erp.example.com/mcp", CANONICAL),
+        ("RESOURCE_URL", "https://erp.example.com:443/mcp", CANONICAL),
+        ("RESOURCE_URL", "http://127.0.0.1:80/mcp", CANONICAL),
+        ("RESOURCE_URL", "https://erp.example.COM/mcp", CANONICAL),
+        ("RESOURCE_URL", "https://erp.example.com", PLAIN_PATH),
+        ("RESOURCE_URL", "https://erp.example.com/mcp?x=1", "must not have a query or fragment"),
+        ("RESOURCE_URL", "https://erp.example.com/mcp#top", "must not have a query or fragment"),
+        ("RESOURCE_URL", "https://erp.example.com/mcp?", "must not have a query or fragment"),
+        ("RESOURCE_URL", "https://erp.example.com/mcp#", "must not have a query or fragment"),
+        (
+            "RESOURCE_URL",
+            "https://user:pw@erp.example.com/mcp",
+            "must not contain user information",
+        ),
+        ("RESOURCE_URL", "https://user@erp.example.com/mcp", "must not contain user information"),
+        ("ERPNEXT_URL", "http://user@127.0.0.1:8080", "must not contain user information"),
+        ("ERPNEXT_URL", "ftp://erp.example.com", VALID_HOST),
+        ("ERPNEXT_PUBLIC_URL", "erp.example.com", VALID_HOST),
+        ("CLOCK_LEEWAY", "61", "must be from 0 to 60"),
+        ("CLOCK_LEEWAY", "-1", "must be from 0 to 60"),
+        ("CLOCK_LEEWAY", "five", "must be a whole number from 0 to 60"),
+        ("TOKEN_ALGORITHMS", "HS256", ASYMMETRIC),
+        ("TOKEN_ALGORITHMS", "RS256,none", ASYMMETRIC),
+        ("TIMEZONE", "Europe/Nowhere", IANA),
+        ("TOOLS", "list_items,drop_database", "unknown operations: drop_database"),
+        ("PORT", "0", "must be from 1 to 65535"),
+        ("PORT", "65536", "must be from 1 to 65535"),
+        ("LOG_LEVEL", "TRACE", "must be one of DEBUG, INFO, WARNING, ERROR"),
+        ("REQUIRED_SCOPES", "", "must name at least one scope"),
+        ("REQUIRED_SCOPES", "   ", "must name at least one scope"),
+        ("RESOURCE_URL", "https://erp.example.com:/mcp", "must not have an empty port"),
+        ("RESOURCE_URL", "https://erp.example.com/m%63p", PLAIN_PATH),
+        ("RESOURCE_URL", "https://erp.example.com/a/../mcp", PLAIN_PATH),
+        ("RESOURCE_URL", "https://erp.example.com/./mcp", PLAIN_PATH),
+        ("RESOURCE_URL", "https://erp.example.com/mcp;x", PLAIN_PATH),
+        ("RESOURCE_URL", "https://erp.example.com//mcp", PLAIN_PATH),
+        ("RESOURCE_URL", "https://999.1.1.1/mcp", "must be a URL the metadata can publish"),
+        ("RESOURCE_URL", "https://1.1/mcp", "must be in the form the metadata publishes"),
+        ("ISSUER", "https://id exa.com/realms/example", VALID_HOST),
+        ("ISSUER", "https://ID.example.com/realms/example", CANONICAL),
+        ("JWKS_URL", "https://id exa.com/certs", VALID_HOST),
+        ("JWKS_URL", "https://id.example.com:/certs", "must not have an empty port"),
+        ("JWKS_URL", "https://id.example.com:x/certs", "must be a URL"),
+        ("ERPNEXT_URL", "http://erp internal:8080", VALID_HOST),
+        ("TIMEZONE", "a" * 300, IANA),
+        ("MAX_DRAFTS_PER_HOUR", "0", "must be from 1 to 1000"),
+        ("MAX_DRAFTS_PER_HOUR", "1001", "must be from 1 to 1000"),
+        ("MAX_DRAFTS_PER_HOUR", "-5", "must be from 1 to 1000"),
+        ("MAX_DRAFTS_PER_HOUR", "ten", "must be a whole number from 1 to 1000"),
+        ("MAX_DRAFTS_PER_HOUR", "", "must be a whole number from 1 to 1000"),
     ],
 )
-def test_invalid_values_stop_enterich_with_name_and_rule(name: str, value: str) -> None:
-    found = problems(**{name: value})
-    assert len(found) == 1
-    assert found[0].startswith(f"ENTERICH_{name}: ")
+def test_invalid_values_stop_enterich_with_name_and_rule(name: str, value: str, rule: str) -> None:
+    assert problems(**{name: value}) == [f"ENTERICH_{name}: {rule}"]
 
 
 def test_http_urls_are_allowed_for_loopback_hosts() -> None:
@@ -155,6 +202,24 @@ def test_messages_never_contain_secrets() -> None:
 def test_http_erpnext_url_to_another_host_warns() -> None:
     s = load({**ENV, "ENTERICH_ERPNEXT_URL": "http://erp.internal:8080"}, ())
     assert s.warnings == ("ENTERICH_ERPNEXT_URL uses http: the API key travels unencrypted",)
+
+
+def test_http_erpnext_public_url_to_another_host_loads() -> None:
+    s = load({**ENV, "ENTERICH_ERPNEXT_PUBLIC_URL": "http://erp.internal"}, ())
+    assert s.erpnext_public_url == "http://erp.internal"
+    assert s.warnings == ()
+
+
+@pytest.mark.parametrize(
+    ("value", "url"),
+    [
+        ("https://erp.example.com/", "https://erp.example.com"),
+        ("http://erp.internal/X/", "http://erp.internal/X"),
+    ],
+)
+def test_a_trailing_slash_is_dropped_from_the_erpnext_urls(value: str, url: str) -> None:
+    s = load({**ENV, "ENTERICH_ERPNEXT_URL": value, "ENTERICH_ERPNEXT_PUBLIC_URL": value}, ())
+    assert (s.erpnext_url, s.erpnext_public_url) == (url, url)
 
 
 def test_unknown_enterich_variables_are_reported_as_warnings() -> None:
