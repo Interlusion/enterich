@@ -223,7 +223,7 @@ async def test_a_9_kib_token_is_refused(jwks: FakeJwks, signer: Signer) -> None:
 async def test_a_jku_header_causes_no_fetch(jwks: FakeJwks, signer: Signer) -> None:
     v = verifier(jwks)
     await v.verify_token(token(signer, {"jku": "https://attacker.example.net/keys"}))
-    assert jwks.requested == [JWKS_URL]
+    assert jwks.requested == [("GET", JWKS_URL)]
 
 
 async def test_an_embedded_jwk_header_is_not_used(jwks: FakeJwks) -> None:
