@@ -124,6 +124,8 @@ IANA = "must be an IANA time zone name, e.g. Europe/Berlin"
         ("RESOURCE_URL", "https://erp.example.com", PLAIN_PATH),
         ("RESOURCE_URL", "https://erp.example.com/mcp?x=1", "must not have a query or fragment"),
         ("RESOURCE_URL", "https://erp.example.com/mcp#top", "must not have a query or fragment"),
+        ("RESOURCE_URL", "https://erp.example.com/mcp?", "must not have a query or fragment"),
+        ("RESOURCE_URL", "https://erp.example.com/mcp#", "must not have a query or fragment"),
         (
             "RESOURCE_URL",
             "https://user:pw@erp.example.com/mcp",
