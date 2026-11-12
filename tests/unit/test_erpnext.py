@@ -429,12 +429,18 @@ async def test_an_update_names_the_document_in_one_path_segment(fake: FakeErpnex
     assert saved["remarks"] == "x"
 
 
-@pytest.mark.parametrize("body", [b'{"message": [1]}', b'{"message": {}}'])
+@pytest.mark.parametrize(
+    ("body", "text"),
+    [
+        (b'{"message": [1]}', "has tax rows that aren't records"),
+        (b'{"message": {}}', "has no message"),
+    ],
+)
 async def test_tax_rows_that_arent_records_are_a_faulty_answer(
-    fake: FakeErpnext, body: bytes
+    fake: FakeErpnext, body: bytes, text: str
 ) -> None:
     fake.raw = (200, body)
-    with pytest.raises(ErpnextError):
+    with pytest.raises(ErpnextError, match=text):
         await Erpnext(settings(), fake.transport()).tax_rows(
             "Sales Taxes and Charges Template", "T"
         )
