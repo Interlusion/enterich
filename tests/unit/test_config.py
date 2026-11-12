@@ -129,6 +129,8 @@ IANA = "must be an IANA time zone name, e.g. Europe/Berlin"
             "https://user:pw@erp.example.com/mcp",
             "must not contain user information",
         ),
+        ("RESOURCE_URL", "https://user@erp.example.com/mcp", "must not contain user information"),
+        ("ERPNEXT_URL", "http://user@127.0.0.1:8080", "must not contain user information"),
         ("ERPNEXT_URL", "ftp://erp.example.com", VALID_HOST),
         ("ERPNEXT_PUBLIC_URL", "erp.example.com", VALID_HOST),
         ("CLOCK_LEEWAY", "61", "must be from 0 to 60"),
