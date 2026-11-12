@@ -170,6 +170,16 @@ def test_addresses_are_cut_to_100(mcp: Session, erp: FakeErpnext) -> None:
     assert result["truncated"] == ["addresses"]
 
 
+def test_exactly_100_addresses_are_not_cut(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-001-PRS-NF003: only what is over 100 is cut and listed in `truncated`."""
+    # CUST-0002 has its billing address already: 99 more make 100.
+    for i in range(99):
+        erp.add("Address", address(f"CUST-0002-{i:03}", "Customer", "CUST-0002"))
+    result = mcp.call("get_customer", {"name": "CUST-0002"}).data
+    assert len(result["addresses"]) == 100
+    assert result["truncated"] == []
+
+
 def test_an_unknown_customer_names_the_input(mcp: Session) -> None:
     result = mcp.call("get_customer", {"name": "NOBODY"})
     assert result.error
