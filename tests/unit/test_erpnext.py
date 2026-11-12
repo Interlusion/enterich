@@ -161,10 +161,15 @@ async def test_tracebacks_and_debug_output_are_not_forwarded(fake: FakeErpnext) 
     assert "frappe.exceptions" not in text
 
 
-async def test_a_refusal_without_messages_carries_status_and_type(fake: FakeErpnext) -> None:
-    text = await failure(fake, 417, {"exc_type": "ValidationError"})
-    assert "417" in text
-    assert "ValidationError" in text
+@pytest.mark.parametrize("server_messages", [None, '{"message": "x"}', "5"])
+async def test_a_refusal_without_messages_carries_status_and_type(
+    fake: FakeErpnext, server_messages: str | None
+) -> None:
+    body: dict[str, object] = {"exc_type": "ValidationError"}
+    if server_messages is not None:
+        body["_server_messages"] = server_messages  # JSON, but no list of messages
+    text = await failure(fake, 417, body)
+    assert text == "ERPNext refused the request (417 ValidationError)."
 
 
 async def test_a_refusal_is_at_most_300_characters(fake: FakeErpnext) -> None:
