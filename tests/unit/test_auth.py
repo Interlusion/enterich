@@ -230,6 +230,25 @@ async def test_a_9_kib_token_is_refused(jwks: FakeJwks, signer: Signer) -> None:
     assert await refusal(verifier(jwks), t) == "token too long"
 
 
+def token_of_length(signer: Signer, length: int) -> str:
+    # Base64 grows in steps, so padding one claim skips some lengths; a second
+    # padded header field fills them.
+    for extra in range(3):
+        base = len(token(signer, headers={"x": "x" * extra}, padding=""))
+        n = max(0, (length - base) * 3 // 4 - 4)
+        while len(t := token(signer, headers={"x": "x" * extra}, padding="x" * n)) < length:
+            n += 1
+        if len(t) == length:
+            return t
+    raise AssertionError(f"no token of {length} characters")
+
+
+async def test_a_token_of_exactly_8_kib_is_accepted(jwks: FakeJwks, signer: Signer) -> None:
+    t = token_of_length(signer, 8 * 1024)
+    assert await verifier(jwks).verify_token(t) is not None
+    assert await refusal(verifier(jwks), t + "x") == "token too long"
+
+
 async def test_a_jku_header_causes_no_fetch(jwks: FakeJwks, signer: Signer) -> None:
     v = verifier(jwks)
     await v.verify_token(token(signer, {"jku": "https://attacker.example.net/keys"}))
