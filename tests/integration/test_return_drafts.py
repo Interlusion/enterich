@@ -321,7 +321,10 @@ def test_an_invoice_with_nothing_left_is_refused(mcp: Session, erp: FakeErpnext)
     [
         ({"items": [{"item_code": "SKU-1", "qty": 0}]}, "items.0.qty: "),
         ({"items": [{"item_code": "SKU-1", "qty": -1}]}, "items.0.qty: "),
-        ({"items": [{"item_code": "SKU-1", "qty": 1.0001}]}, "items.0.qty: "),
+        (
+            {"items": [{"item_code": "SKU-1", "qty": 1.0001}]},
+            "items.0.qty: Decimal input should have no more than 3 decimal places",
+        ),
         ({"items": []}, "items: "),
         ({"items": [{"item_code": "SKU-1", "qty": 1}] * 21}, "items: "),
         ({"items": [{"item_code": "SKU-1", "qty": 1, "rate": 60}]}, "items.0.rate: Extra"),

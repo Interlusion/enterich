@@ -329,7 +329,10 @@ def test_another_companys_bank_transaction_answers_as_unknown(mcp: Session) -> N
     ("arguments", "says"),
     [
         ({"state": "draft"}, "state: "),
-        ({"from_date": "2026-10-31", "to_date": "2026-10-01"}, "from_date"),
+        (
+            {"from_date": "2026-10-31", "to_date": "2026-10-01"},
+            "from_date must not be after to_date",
+        ),
     ],
 )
 def test_a_bank_transaction_list_breaking_a_rule_is_refused(

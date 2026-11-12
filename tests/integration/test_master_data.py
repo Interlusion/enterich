@@ -103,7 +103,7 @@ def test_disabled_items_are_left_out_unless_asked_for(mcp: Session, erp: FakeErp
     [
         ({"limit": 101}, "limit"),
         ({"limit": 0}, "limit"),
-        ({"offset": 10001}, "offset"),
+        ({"offset": 10001}, "offset: Input should be less than or equal to 10000"),
         ({"search": ""}, "search"),
         ({"search": "x" * 141}, "search"),
         ({"doctype": "User"}, "doctype"),

@@ -268,7 +268,10 @@ def test_each_state_sends_exactly_its_filter(
     [
         ({"state": "submitted"}, "state"),
         ({"state": "Draft"}, "state"),
-        ({"from_date": "2026-10-02", "to_date": "2026-10-01"}, "from_date"),
+        (
+            {"from_date": "2026-10-02", "to_date": "2026-10-01"},
+            "from_date must not be after to_date",
+        ),
         ({"from_date": "2026-13-01"}, "from_date"),
         ({"from_date": "01.10.2026"}, "from_date"),
         ({"to_date": "2026-10-01T00:00:00"}, "to_date"),
