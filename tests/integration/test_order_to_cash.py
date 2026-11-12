@@ -180,6 +180,19 @@ def test_exactly_100_addresses_are_not_cut(mcp: Session, erp: FakeErpnext) -> No
     assert result["truncated"] == []
 
 
+def test_get_customer_uses_the_name_erpnext_answers_with(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-004-PRS-F001: addresses and link follow the stored name, not the input."""
+    # ERPNext finds names case-insensitively; the stored name is "CUST-0001".
+    erp.docs["Customer"]["cust-0001"] = erp.docs["Customer"]["CUST-0001"]
+    result = mcp.call("get_customer", {"name": "cust-0001"}).data
+    assert erp.received[1].param("filters") == [
+        ["Dynamic Link", "link_doctype", "=", "Customer"],
+        ["Dynamic Link", "link_name", "=", "CUST-0001"],
+    ]
+    assert [a["name"] for a in result["addresses"]] == ["CUST-0001-Billing"]
+    assert result["url"] == "https://erp.example.com/desk/customer/CUST-0001"
+
+
 def test_an_unknown_customer_names_the_input(mcp: Session) -> None:
     result = mcp.call("get_customer", {"name": "NOBODY"})
     assert result.error
