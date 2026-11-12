@@ -405,6 +405,35 @@ def test_a_debit_note_sends_erpnexts_return_with_the_credit_notes_number(
     assert data["outside_text"] == {"bill_no": "CN-77"}  # the supplier's text
 
 
+def test_a_debit_note_sends_the_given_posting_date_and_remarks_with_the_number(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    erp.docs["Purchase Invoice"].pop(PURCHASE_DRAFT)
+    mapped = erp.mapped_return("Purchase Invoice", BILL)
+    result = create(
+        mcp,
+        "create_draft_purchase_return",
+        items=[{"item_code": "SKU-1", "qty": 1}],
+        bill_no="CN-77",
+        bill_date="2026-10-25",
+        posting_date="2026-10-27",
+        remarks="Damaged",
+    )
+    assert not result.error, result.text
+    [post] = erp.writes(PURCHASES)
+    assert post.body == {
+        **stripped(mapped),
+        "items": lines(mapped, (0, 1)),
+        "bill_no": "CN-77",
+        "bill_date": "2026-10-25",
+        "posting_date": "2026-10-27",
+        "set_posting_time": 1,
+        "remarks": "Damaged",
+        "company": COMPANY,
+        "docstatus": 0,
+    }
+
+
 def test_a_debit_note_without_a_number_keeps_the_invoices(mcp: Session, erp: FakeErpnext) -> None:
     erp.docs["Purchase Invoice"].pop(PURCHASE_DRAFT)
     result = create(mcp, "create_draft_purchase_return")
@@ -454,17 +483,21 @@ def test_an_update_with_items_sends_the_rows_of_erpnexts_return(
     assert [(r["item_code"], r["qty"]) for r in result.data["items"]] == [("SKU-1", -2)]
 
 
-def test_an_update_without_items_sends_no_rows(mcp: Session, erp: FakeErpnext) -> None:
-    result = update(mcp, posting_date="2026-10-27", remarks="")
+@pytest.mark.parametrize("doctype", SIDES)
+def test_an_update_without_items_sends_no_rows(
+    mcp: Session, erp: FakeErpnext, doctype: str
+) -> None:
+    result = update(mcp, tool(doctype, "update"), posting_date="2026-10-27", remarks="")
     assert not result.error, result.text
-    [put] = erp.writes(SALES)
+    [put] = erp.writes(f"/api/resource/{doctype}")
     assert put.body == {
         "posting_date": "2026-10-27",
         "set_posting_time": 1,
         "remarks": "",
         "modified": MODIFIED,
     }
-    assert [r for r in erp.received if r.path == SALES_RETURN_METHOD] == []
+    methods = (SALES_RETURN_METHOD, DEBIT_NOTE_METHOD)
+    assert [r for r in erp.received if r.path in methods] == []
 
 
 def test_an_update_of_a_debit_note_sends_the_credit_notes_number(
