@@ -114,6 +114,21 @@ def test_triage_reports_confirmed_findings_by_class(tmp_path: Path) -> None:
     assert "## Proposal (0)" in report
 
 
+def test_triage_hands_the_fix_stage_each_fix_with_its_mutants(tmp_path: Path) -> None:
+    survivor = {"id": MUTANT, "module": "enterich.shapes", "filter": None, "diff": "-a\n+b"}
+    _write(tmp_path / "survivors.jsonl", [survivor])
+    proposal = {**DOD_GAP, "verdict": {**FINDING["verdict"], "class": "proposal"}}
+    assert _triage(tmp_path, [FINDING, proposal]) == 0
+    fixes = [json.loads(line) for line in (tmp_path / "fixes.jsonl").read_text().splitlines()]
+    assert [(f["key"], f["slug"]) for f in fixes] == [(triage.key(FINDING), "shapes-to-text-6")]
+    # A mutant gone from survivors.jsonl has no diff to hand over
+    assert fixes[0]["diffs"] == {MUTANT: "-a\n+b"}
+
+
+def test_a_definition_of_done_gaps_slug_names_its_item() -> None:
+    assert triage.slug(DOD_GAP) == "req-001-prs-nf003-item-2"
+
+
 def test_a_finding_is_tracked_while_its_backlog_item_is_open(tmp_path: Path) -> None:
     """A suppression naming a backlog item lapses once the item is archived."""
     (tmp_path / "backlog" / "archive").mkdir(parents=True)
