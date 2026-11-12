@@ -138,6 +138,8 @@ IANA = "must be an IANA time zone name, e.g. Europe/Berlin"
         ("RESOURCE_URL", "https://erp.example.com/./mcp", PLAIN_PATH),
         ("RESOURCE_URL", "https://erp.example.com/mcp;x", PLAIN_PATH),
         ("RESOURCE_URL", "https://erp.example.com//mcp", PLAIN_PATH),
+        ("RESOURCE_URL", "https://999.1.1.1/mcp", "must be a URL the metadata can publish"),
+        ("RESOURCE_URL", "https://1.1/mcp", "must be in the form the metadata publishes"),
         ("ISSUER", "https://id exa.com/realms/example", VALID_HOST),
         ("ISSUER", "https://ID.example.com/realms/example", CANONICAL),
         ("JWKS_URL", "https://id exa.com/certs", VALID_HOST),
