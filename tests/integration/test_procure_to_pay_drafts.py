@@ -391,6 +391,8 @@ def test_a_replaced_expense_account_warns(mcp: Session, erp: FakeErpnext) -> Non
     assert STOCK_NOT_BILLED in warning
     [comment] = erp.comments
     assert comment["reference_doctype"] == "Purchase Invoice"
+    assert comment["reference_name"] == result["name"]
+    assert comment["content"].endswith(f"<br>{warning}")
 
 
 @pytest.mark.parametrize(
@@ -591,6 +593,7 @@ def test_an_update_warns_where_an_expense_account_was_replaced(
     assert STOCK_NOT_BILLED in warning
     [comment] = erp.comments
     assert comment["reference_name"] == DRAFT
+    assert comment["content"].endswith(f"<br>{warning}")
 
 
 def test_an_update_of_the_bill_date_recounts_the_due_date(mcp: Session, erp: FakeErpnext) -> None:
