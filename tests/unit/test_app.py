@@ -9,7 +9,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.routing import Route
 from starlette.testclient import TestClient
-from starlette.types import Receive, Scope, Send
+from starlette.types import Message, Receive, Scope, Send
 from starlette.websockets import WebSocketDisconnect
 
 from enterich import log
@@ -51,6 +51,29 @@ def test_the_error_line_carries_the_traceback_and_is_written_once() -> None:
     lines = [line for line in lines if line.get("logger") != "httpx2"]  # the test client's own
     assert [line["event"] for line in lines] == ["error"]
     assert "raw failure" in lines[0]["traceback"]
+
+
+@pytest.mark.anyio
+async def test_a_client_gone_mid_body_hands_the_inner_app_what_arrived() -> None:
+    received: list[bytes] = []
+
+    async def inner(scope: Scope, receive: Receive, send: Send) -> None:
+        received.append((await receive())["body"])
+
+    messages = [
+        {"type": "http.request", "body": b'{"a"', "more_body": True},
+        {"type": "http.disconnect"},
+    ]
+
+    async def receive() -> Message:
+        return messages.pop(0)
+
+    async def send(message: Message) -> None:
+        pass
+
+    scope: Scope = {"type": "http", "method": "POST", "path": "/mcp", "headers": []}
+    await Wrapper(inner, "/mcp")(scope, receive, send)
+    assert received == [b'{"a"']
 
 
 @pytest.mark.parametrize("method", ["POST", "DELETE"])
