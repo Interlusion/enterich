@@ -93,6 +93,15 @@ def test_list_suppliers_sends_exactly_the_catalogued_call(mcp: Session, erp: Fak
     ]
 
 
+def test_disabled_suppliers_only_when_asked_for(mcp: Session, erp: FakeErpnext) -> None:
+    records = mcp.call("list_suppliers", {"include_disabled": True}).data["records"]
+    assert [(r["name"], r["disabled"]) for r in records] == [
+        ("SUPP-0001", False),
+        ("SUPP-OLD", True),
+    ]
+    assert erp.received[0].param("filters") == []
+
+
 def test_get_supplier_returns_only_its_own_addresses(mcp: Session, erp: FakeErpnext) -> None:
     result = mcp.call("get_supplier", {"name": "SUPP-0001"}).data
     first, second = erp.received
@@ -287,6 +296,16 @@ def test_only_purchase_templates_are_listed(mcp: Session, erp: FakeErpnext) -> N
     assert call.path == "/api/resource/Purchase Taxes and Charges Template"
     assert call.param("filters") == [["company", "=", COMPANY], ["disabled", "=", 0]]
     assert [r["name"] for r in result["records"]] == ["Input VAT 19% - EX"]
+
+
+def test_disabled_purchase_templates_only_when_asked_for(mcp: Session, erp: FakeErpnext) -> None:
+    erp.add(
+        "Purchase Taxes and Charges Template",
+        purchase_tax_template("Old Input VAT - EX", disabled=1),
+    )
+    records = mcp.call("list_purchase_tax_templates", {"include_disabled": True}).data["records"]
+    assert [r["name"] for r in records] == ["Input VAT 19% - EX", "Old Input VAT - EX"]
+    assert erp.received[0].param("filters") == [["company", "=", COMPANY]]
 
 
 # report_accounts_payable
