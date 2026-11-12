@@ -471,7 +471,7 @@ def test_a_ledger_without_its_summary_rows_is_a_faulty_answer(
     erp.reports["General Ledger"] = answers[broken]
     result = mcp.call("report_general_ledger", {"from_date": "2026-10-01", "to_date": "2026-10-31"})
     assert result.error
-    assert "General Ledger" in result.text
+    assert "General Ledger lacks its opening, total and closing rows" in result.text
 
 
 def test_a_leap_year_fits_and_a_longer_range_is_refused(mcp: Session, erp: FakeErpnext) -> None:
@@ -589,7 +589,7 @@ def test_trial_balance_rows_and_totals(mcp: Session, erp: FakeErpnext) -> None:
         "outside_text": {},
     }
     assert result["records"][0]["is_group"] is True
-    # Sums of decimals over the root rows: 0.3, not ERPNext's float total.
+    # Sums over the root rows.
     assert result["totals"] == {
         "opening_debit": 1000.0,
         "opening_credit": 1000.0,
@@ -599,6 +599,27 @@ def test_trial_balance_rows_and_totals(mcp: Session, erp: FakeErpnext) -> None:
         "closing_credit": 1000.3,
     }
     assert report_call(erp, "Trial Balance").param("filters")["show_zero_values"] == 1
+
+
+def test_trial_balance_totals_are_decimal_sums_over_every_root(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    rows = [
+        balance_row("1000 - Assets - EX", None, True, debit=0.1),
+        balance_row("1200 - Bank - EX", "1000 - Assets - EX", False, debit=0.1),
+        balance_row("3000 - Equity - EX", None, True, debit=0.2),
+    ]
+    total = balance_total(rows)
+    # ERPNext's total row is a float sum: 0.1 + 0.2 isn't 0.3.
+    assert total["debit"] != 0.3
+    erp.reports["Trial Balance"] = [*rows, {}, total]
+    result = mcp.call(
+        "report_trial_balance", {"from_date": "2026-01-01", "to_date": "2026-10-31", "limit": 1}
+    ).data
+    assert [r["account"] for r in result["records"]] == ["1000 - Assets - EX"]
+    # The page holds one root; the totals cover every root, summed as decimals.
+    assert result["totals"]["debit"] == 0.3
+    assert result["totals"]["closing_debit"] == 0.3
 
 
 def test_a_year_of_the_company_comes_before_one_of_every_company(
@@ -620,6 +641,20 @@ def test_a_year_of_other_companies_only_doesnt_count(mcp: Session, erp: FakeErpn
     assert result.text.startswith("from_date:")
     assert "fiscal year" in result.text
     assert not [r for r in erp.received if r.path == REPORT]
+
+
+@pytest.mark.parametrize("companies", [(COMPANY, "Other AG"), ("Other AG", COMPANY)])
+def test_a_year_of_the_company_and_others_counts(
+    mcp: Session, erp: FakeErpnext, companies: tuple[str, str]
+) -> None:
+    # ERPNext lists the year once per company row; any of them may be the company's.
+    erp.add("Fiscal Year", fiscal_year("2027-SH", "2027-01-01", "2027-12-31", *companies))
+    erp.reports["Trial Balance"] = balances()
+    result = mcp.call(
+        "report_trial_balance", {"from_date": "2027-01-01", "to_date": "2027-03-31"}
+    ).data
+    assert result["fiscal_year"] == "2027-SH"
+    assert report_call(erp, "Trial Balance").param("filters")["fiscal_year"] == "2027-SH"
 
 
 def test_dates_in_two_fiscal_years_are_refused(mcp: Session, erp: FakeErpnext) -> None:

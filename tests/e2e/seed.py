@@ -176,6 +176,8 @@ class Seed:
     purchase_template: str
     bank_ledger: str
     bank_account: str
+    # In another currency than the company's, without entries
+    foreign_ledger: str
     # Submitted, for the reads and reports; all posted on `posted`.
     sales_invoice: str
     # Submitted, unpaid and posted on `past_posted`, well before the first run's today, to
@@ -241,6 +243,14 @@ def seed(site: Site) -> Seed:
     sales_template = tax_template(site, "Sales Taxes and Charges Template", SALES_VAT)
     purchase_template = tax_template(site, "Purchase Taxes and Charges Template", INPUT_VAT)
     bank_ledger, bank_account = bank(site)
+    foreign_ledger = ensure(
+        site,
+        "Account",
+        {"account_name": "Example Bank USD", "company": COMPANY},
+        account_number="1220",
+        parent_account=BANK_GROUP,
+        account_currency="USD",
+    )
     vouchers = Vouchers(site, item, bank_ledger, bank_account)
     sales_invoice = vouchers.sales_invoice(customer, sales_template)
     fiscal_year(site, vouchers.past.year)
@@ -266,6 +276,7 @@ def seed(site: Site) -> Seed:
         purchase_template=purchase_template,
         bank_ledger=bank_ledger,
         bank_account=bank_account,
+        foreign_ledger=foreign_ledger,
         sales_invoice=sales_invoice,
         past_customer=past_customer,
         past_sales_invoice=past_sales_invoice,

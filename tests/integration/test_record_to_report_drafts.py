@@ -280,6 +280,17 @@ def test_a_create_with_the_drafts_rows_is_refused_naming_it(mcp: Session, erp: F
     [
         {"accounts": [{"account": RENT, "debit": 501}, {"account": BANK, "credit": 501}]},
         {
+            "accounts": [
+                {"account": RENT, "debit": 500},
+                {
+                    "account": DEBTORS,
+                    "credit": 500,
+                    "party_type": "Customer",
+                    "party": "CUST-0001",
+                },
+            ]
+        },
+        {
             "accounts": [{"account": RENT, "debit": 500}, {"account": BANK, "credit": 500}],
             "posting_date": "2026-11-02",
         },
@@ -385,6 +396,8 @@ def test_a_date_for_a_draft_with_a_reference_goes_through(mcp: Session, erp: Fak
     dated = update(mcp, cheque_no="TX-1", cheque_date="2026-10-28").data
     result = update(mcp, modified=dated["modified"], cheque_date="2026-10-27")
     assert not result.error, result.text
+    put = erp.writes(PATH)[-1]
+    assert put.body == {"cheque_date": "2026-10-27", "modified": dated["modified"]}
 
 
 @pytest.mark.parametrize(
@@ -512,6 +525,22 @@ def test_an_update_warns_where_totals_were_rounded_apart(mcp: Session, erp: Fake
     assert "total debit of 15 against a total credit of 15.01;" in warning
     [comment] = erp.comments
     assert comment["reference_name"] == DRAFT
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"accounts": [{"account": RENT, "debit": 650}, {"account": BANK, "credit": 650}]},
+        {"user_remark": "Rent November"},
+    ],
+)
+def test_an_update_with_equal_totals_warns_nothing(
+    mcp: Session, erp: FakeErpnext, arguments: dict[str, Any]
+) -> None:
+    result = update(mcp, **arguments)
+    assert not result.error, result.text
+    assert result.data["warnings"] == []
+    assert [c["content"].count("<br>") for c in erp.comments] == [0]
 
 
 def test_a_draft_without_rows_matches_nothing(mcp: Session, erp: FakeErpnext) -> None:

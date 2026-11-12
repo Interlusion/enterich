@@ -7,6 +7,8 @@ from decimal import Decimal
 from tests.e2e.seed import BANK_GROUP, CAPITAL, DEBTORS, SALES_VAT, Seed
 from tests.integration.mcp import Session
 
+SALES = "4110 - Sales - EX"
+
 
 def year(seeded: Seed) -> dict[str, str]:
     y = seeded.posted.year
@@ -66,12 +68,19 @@ def test_general_ledger_of_a_voucher(mcp: Session, seeded: Seed) -> None:
     report = mcp.call(
         "report_general_ledger", {**year(seeded), "voucher_no": seeded.sales_invoice}
     ).data
-    rows = {(r["account"], r["debit"], r["credit"]) for r in report["records"]}
-    assert rows == {
-        (DEBTORS, 119, 0),
-        (SALES_VAT[1], 0, 19),
-        ("4110 - Sales - EX", 0, 100),
+    rows = {
+        (r["account"], r["debit"], r["credit"], r["outside_text"]["against"])
+        for r in report["records"]
     }
+    assert rows == {
+        (DEBTORS, 119, 0, SALES),
+        (SALES_VAT[1], 0, 19, seeded.customer),
+        (SALES, 0, 100, seeded.customer),
+    }
+    assert {
+        (r["posting_date"], r["voucher_type"], r["outside_text"]["remarks"])
+        for r in report["records"]
+    } == {(seeded.posted.isoformat(), "Sales Invoice", "Against Customer Order SEED-SI-1")}
     # Without an account or a party, no running balance
     assert {r["balance"] for r in report["records"]} == {None}
     assert report["totals"] == {"debit": 119, "credit": 119, "balance": 0}
@@ -85,6 +94,14 @@ def test_general_ledger_of_an_account_runs_its_balance(mcp: Session, seeded: See
     assert records[-1]["balance"] == 1050
     assert report["opening"] == {"debit": 0, "credit": 0, "balance": 0}
     assert report["closing"] == {"debit": 1050, "credit": 0, "balance": 1050}
+    assert report["currency"] == "EUR"
+
+
+def test_general_ledger_of_an_account_in_another_currency(mcp: Session, seeded: Seed) -> None:
+    report = mcp.call(
+        "report_general_ledger", {**year(seeded), "account": seeded.foreign_ledger}
+    ).data
+    assert (report["records"], report["currency"]) == ([], "USD")
 
 
 def test_general_ledger_of_a_party(mcp: Session, seeded: Seed) -> None:
@@ -106,11 +123,27 @@ def test_trial_balance_of_the_year(mcp: Session, seeded: Seed) -> None:
     assert not report["has_more"]
     accounts = {r["account"]: r for r in report["records"]}
     bank = accounts[seeded.bank_ledger]
-    assert (bank["is_group"], bank["debit"], bank["closing_debit"]) == (False, 1050, 1050)
+    assert (bank["account_name"], bank["parent_account"], bank["is_group"]) == (
+        "1210 - Example Bank",
+        BANK_GROUP,
+        False,
+    )
+    assert {k: bank[k] for k in report["totals"]} == {
+        "opening_debit": 0,
+        "opening_credit": 0,
+        "debit": 1050,
+        "credit": 0,
+        "closing_debit": 1050,
+        "closing_credit": 0,
+    }
     assert accounts[BANK_GROUP]["is_group"] is True
     totals = {k: Decimal(str(v)) for k, v in report["totals"].items()}
     assert totals["debit"] == totals["credit"] > 0
     assert totals["closing_debit"] == totals["closing_credit"]
+    # The sums of the root accounts' rows, which ERPNext gives no parent; sent as numbers
+    roots = [r for r in report["records"] if r["parent_account"] is None]
+    sums = {k: float(sum(Decimal(str(r[k])) for r in roots)) for k in totals}
+    assert sums == report["totals"]
 
 
 def test_trial_balance_shows_accounts_without_values_when_asked(mcp: Session, seeded: Seed) -> None:
