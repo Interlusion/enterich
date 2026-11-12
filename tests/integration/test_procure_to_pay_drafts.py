@@ -376,7 +376,7 @@ def test_without_a_bill_the_items_match(mcp: Session, erp: FakeErpnext) -> None:
     ]
 
 
-# Warnings (REQ-005-PRS-F007, REQ-001-PRS-F016)
+# Warnings (REQ-005-PRS-F007, REQ-001-PRS-F012, REQ-001-PRS-F016)
 
 
 def test_a_replaced_expense_account_warns(mcp: Session, erp: FakeErpnext) -> None:
@@ -416,6 +416,21 @@ def test_a_buying_pricing_rule_that_replaced_a_rate_warns(mcp: Session, erp: Fak
     [warning] = result["warnings"]
     assert "20" in warning
     assert "18" in warning
+
+
+def test_a_purchase_template_without_tax_warns_on_create_and_update(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    erp.add(
+        "Purchase Taxes and Charges Template",
+        purchase_tax_template("Zero - EX", taxes=[{**VAT_ROWS[0], "rate": 0.0}]),
+    )
+    warning = (
+        "Tax template Zero - EX was given, but the tax total is 0; check the template and the "
+        "items' tax templates."
+    )
+    assert create(mcp, taxes_and_charges="Zero - EX").data["warnings"] == [warning]
+    assert update(mcp, taxes_and_charges="Zero - EX").data["warnings"] == [warning]
 
 
 # update_draft_purchase_invoice
