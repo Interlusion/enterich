@@ -795,6 +795,13 @@ def test_an_update_of_a_large_draft_cuts_its_references(mcp: Session, erp: FakeE
     assert len(erp.docs["Payment Entry"][DRAFT]["references"]) == 101
 
 
+def test_an_update_warns_of_two_currencies(mcp: Session, erp: FakeErpnext) -> None:
+    erp.add("Account", account(BANK, account_currency="USD"))
+    result = update(mcp, reference_no="TX-4801").data
+    [warning] = result["warnings"]
+    assert "The bank account is in USD, the party's account in EUR" in warning
+
+
 # Drafts per hour (REQ-001-PRS-F019)
 
 
