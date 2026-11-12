@@ -124,6 +124,26 @@ async def test_a_content_length_over_1_mib_or_not_a_number_gets_413_unread(
     assert (read, statuses, len(messages)) == ([], [413], 1)
 
 
+@pytest.mark.anyio
+@pytest.mark.parametrize("declared", [True, False], ids=["content-length", "parts"])
+@pytest.mark.parametrize("size", [1024 * 1024, 1024 * 1024 + 1], ids=["1-mib", "one-byte-more"])
+async def test_exactly_1_mib_reaches_the_inner_app_and_one_byte_more_gets_413(
+    declared: bool, size: int
+) -> None:
+    # REQ-002-PRS-NF011: only a body over 1 MiB is refused, whether declared or counted.
+    half = size // 2
+    messages: list[Message] = [
+        {"type": "http.request", "body": b"x" * half, "more_body": True},
+        {"type": "http.request", "body": b"x" * (size - half), "more_body": False},
+    ]
+    headers = [(b"content-length", str(size).encode())] if declared else None
+    read, statuses = await posted(messages, headers)
+    if size == 1024 * 1024:
+        assert (read, statuses) == ([b"x" * size], [])
+    else:
+        assert (read, statuses) == ([], [413])
+
+
 @pytest.mark.parametrize("method", ["POST", "DELETE"])
 def test_healthz_allows_only_get_and_head(method: str) -> None:
     response = wrapped().request(method, "/healthz")
