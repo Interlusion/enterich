@@ -145,6 +145,10 @@ def test_groups_and_disabled_accounts_only_when_asked_for(mcp: Session, erp: Fak
         BANK,
         "1300 - Old Bank - EX",
     ]
+    # 1 == True in Python: check the JSON types, not only the values
+    flags = [(r["is_group"], r["disabled"]) for r in result["records"]]
+    assert {type(flag) for pair in flags for flag in pair} == {bool}
+    assert flags == [(True, False), (False, False), (False, True)]
 
 
 def test_list_cost_centers_sends_exactly_the_catalogued_call(
@@ -167,6 +171,7 @@ def test_list_cost_centers_sends_exactly_the_catalogued_call(
     assert (call.param("limit_start"), call.param("limit_page_length")) == ("0", "21")
     assert [r["name"] for r in result["records"]] == ["Main - EX"]
     assert result["records"][0]["is_group"] is False
+    assert result["records"][0]["disabled"] is False
 
 
 # list_journal_entries, get_journal_entry (REQ-006-PRS-F002)
