@@ -321,24 +321,25 @@ def test_amounts_take_cents(mcp: Session, erp: FakeErpnext) -> None:
 
 
 @pytest.mark.parametrize(
-    "invoice",
+    ("invoice", "says"),
     [
-        "ACC-SINV-2026-00003",  # another customer's
-        "ACC-SINV-2026-00004",  # a draft
-        "ACC-SINV-2026-00005",  # cancelled
-        "ACC-SINV-2026-00006",  # paid
-        "ACC-SINV-2026-00007",  # a return
-        "ACC-SINV-2026-00008",  # another company's
-        "ACC-SINV-2026-09999",
+        ("ACC-SINV-2026-00003", "is CUST-0002's invoice, not CUST-0001's"),
+        ("ACC-SINV-2026-00004", "is a draft; only submitted invoices are paid"),
+        ("ACC-SINV-2026-00005", "is cancelled; only submitted invoices are paid"),
+        ("ACC-SINV-2026-00006", "has nothing outstanding"),
+        ("ACC-SINV-2026-00007", "is a return; it takes no payment"),
+        ("ACC-SINV-2026-00008", "doesn't exist"),  # another company's
+        ("ACC-SINV-2026-09999", "doesn't exist"),
     ],
 )
 def test_only_the_partys_open_invoices_take_a_payment(
-    mcp: Session, erp: FakeErpnext, invoice: str
+    mcp: Session, erp: FakeErpnext, invoice: str, says: str
 ) -> None:
     result = create(mcp, references=[{"reference_name": invoice, "allocated_amount": 10}])
     assert result.error
     assert result.text.startswith("references: ")
     assert invoice in result.text
+    assert says in result.text
     assert erp.writes() == []
 
 
