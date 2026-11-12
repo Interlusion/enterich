@@ -473,6 +473,9 @@ def test_disabled_templates_only_when_asked_for(mcp: Session, erp: FakeErpnext) 
     records = mcp.call("list_sales_tax_templates", {"include_disabled": True}).data["records"]
     assert [r["name"] for r in records] == ["Old VAT - EX", "VAT 19% - EX"]
     assert erp.received[0].param("filters") == [["company", "=", COMPANY]]
+    # REQ-001-PRS-F014: yes/no fields are booleans, not ERPNext's 0 and 1.
+    assert [r["disabled"] for r in records] == [True, False]
+    assert {type(r[f]) for r in records for f in ("is_default", "disabled")} == {bool}
 
 
 def test_template_paging_reports_more(mcp: Session, erp: FakeErpnext) -> None:
