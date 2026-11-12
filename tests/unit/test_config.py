@@ -121,6 +121,8 @@ IANA = "must be an IANA time zone name, e.g. Europe/Berlin"
         ("RESOURCE_URL", "https://erp.example.com/mcp/", PLAIN_PATH),
         ("RESOURCE_URL", "HTTPS://erp.example.com/mcp", CANONICAL),
         ("RESOURCE_URL", "https://erp.example.com:443/mcp", CANONICAL),
+        ("RESOURCE_URL", "http://127.0.0.1:80/mcp", CANONICAL),
+        ("RESOURCE_URL", "https://erp.example.COM/mcp", CANONICAL),
         ("RESOURCE_URL", "https://erp.example.com", PLAIN_PATH),
         ("RESOURCE_URL", "https://erp.example.com/mcp?x=1", "must not have a query or fragment"),
         ("RESOURCE_URL", "https://erp.example.com/mcp#top", "must not have a query or fragment"),
