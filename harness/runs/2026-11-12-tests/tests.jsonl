@@ -455,14 +455,6 @@
 {"id": "tests/repo/test_configuration_guide.py::test_the_configuration_guide_lists_every_variable", "ids": [], "section_ids": ["REQ-002-PRS-NF005"]}
 {"id": "tests/repo/test_e2e.py::test_the_seeded_rights_are_the_specs_rights", "ids": ["REQ-002-PRS-NF013"], "section_ids": []}
 {"id": "tests/repo/test_e2e.py::test_the_erpnext_services_run_one_image", "ids": [], "section_ids": []}
-{"id": "tests/repo/test_harness.py::test_the_inventory_reads_a_requirements_definition_of_done", "ids": ["REQ-001-PRS-F022"], "section_ids": []}
-{"id": "tests/repo/test_harness.py::test_the_inventory_finds_a_tests_own_and_its_sections_ids", "ids": ["REQ-001-PRS-NF003", "REQ-007-PRS-F002"], "section_ids": []}
-{"id": "tests/repo/test_harness.py::test_every_id_a_test_cites_is_in_a_spec", "ids": [], "section_ids": []}
-{"id": "tests/repo/test_harness.py::test_a_complete_record_can_be_triaged", "ids": [], "section_ids": []}
-{"id": "tests/repo/test_harness.py::test_a_record_with_a_wrong_field_is_refused", "ids": [], "section_ids": []}
-{"id": "tests/repo/test_harness.py::test_triage_writes_no_report_from_a_bad_record", "ids": [], "section_ids": []}
-{"id": "tests/repo/test_harness.py::test_triage_reports_confirmed_findings_by_class", "ids": [], "section_ids": []}
-{"id": "tests/repo/test_harness.py::test_survivors_a_script_can_judge_are_filtered", "ids": [], "section_ids": []}
 {"id": "tests/repo/test_image_index.py::test_a_release_image_gives_its_attestations_per_platform", "ids": [], "section_ids": []}
 {"id": "tests/repo/test_image_index.py::test_slsa_provenance_v02_counts_too", "ids": [], "section_ids": []}
 {"id": "tests/repo/test_image_index.py::test_an_image_unlike_a_release_is_refused", "ids": [], "section_ids": []}

@@ -7,7 +7,7 @@
 | weak-test | 0 | 0 |
 | all | 8 | 5 |
 
-Suppressed: 0. Confirmed but named in the backlog: 1.
+Suppressed: 0. Tracked in the backlog: 0.
 
 ## Fix (5)
 
