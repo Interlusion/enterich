@@ -289,8 +289,8 @@ def test_only_a_submitted_invoice_of_the_company_takes_a_return(
     ("items", "says"),
     [
         ([{"item_code": "SKU-9", "qty": 1}], "SKU-9 isn't on"),
-        ([{"item_code": "SKU-1", "qty": 5}], "4 left"),
-        ([{"item_code": "SKU-2", "qty": 1}], "0 left"),
+        ([{"item_code": "SKU-1", "qty": 5}], "5 of SKU-1 can't be returned; 4 left"),
+        ([{"item_code": "SKU-2", "qty": 1}], "1 of SKU-2 can't be returned; 0 left"),
         ([{"item_code": "SKU-1", "qty": 1}] * 2, "once"),
     ],
 )
@@ -502,6 +502,7 @@ def test_an_update_beyond_what_is_left_is_refused(mcp: Session, erp: FakeErpnext
     result = update(mcp, items=[{"item_code": "SKU-1", "qty": 5}])
     assert result.error
     assert result.text.startswith("items: ")
+    assert "5 of SKU-1 can't be returned; 4 left" in result.text
     assert erp.writes() == []
 
 
