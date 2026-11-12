@@ -919,6 +919,29 @@ def test_only_a_submitted_purchase_invoice_of_the_company_takes_a_return(
     assert [r for r in erp.received if r.path == DEBIT_NOTE_METHOD] == []
 
 
+@pytest.mark.parametrize("kind", ["create", "update"])
+@pytest.mark.parametrize(
+    ("items", "says"),
+    [
+        ([{"item_code": "SKU-9", "qty": 1}], "SKU-9 isn't on"),
+        ([{"item_code": "SKU-1", "qty": 3}], "3 of SKU-1 can't be returned; 2 left"),
+    ],
+)
+def test_a_debit_note_returns_items_at_most_as_far_as_left(
+    mcp: Session, erp: FakeErpnext, kind: str, items: list[dict[str, Any]], says: str
+) -> None:
+    if kind == "create":
+        erp.docs["Purchase Invoice"].pop(PURCHASE_DRAFT)
+        result = create(mcp, "create_draft_purchase_return", items=items)
+    else:
+        result = update(mcp, "update_draft_purchase_return", items=items)
+    assert result.error
+    assert result.text.startswith("items: ")
+    assert says in result.text
+    assert BILL in result.text
+    assert erp.writes() == []
+
+
 def test_a_purchase_invoice_with_nothing_left_is_refused(mcp: Session, erp: FakeErpnext) -> None:
     erp.docs["Purchase Invoice"][PURCHASE_DRAFT].update(docstatus=1, status="Return")
     erp.docs["Purchase Invoice"][PURCHASE_DRAFT]["items"][0]["qty"] = -2.0
