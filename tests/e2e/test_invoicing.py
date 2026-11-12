@@ -234,8 +234,13 @@ def test_accounts_receivable_ages_the_open_part_by_due_date(mcp: Session, seeded
         0,
         69,
     )
-    assert (record["due_date"], record["currency"]) == (seeded.sales_due.isoformat(), "EUR")
-    # Not yet due on the day it was posted
+    assert (record["posting_date"], record["due_date"], record["currency"]) == (
+        seeded.posted.isoformat(),
+        seeded.sales_due.isoformat(),
+        "EUR",
+    )
+    # Not yet due on the day it was posted: aged by due date, the age is negative
+    assert record["age"] == (seeded.posted - seeded.sales_due).days
     assert record["ageing"] == {
         "range0": 69,
         **dict.fromkeys(("range1", "range2", "range3", "range4", "range5"), 0),
