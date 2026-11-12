@@ -633,3 +633,43 @@ def test_a_fiscal_year_list_without_its_fields_is_refused(mcp: Session, erp: Fak
     assert "Fiscal Year" in result.text
     assert "year_end_date" in result.text
     assert not [r for r in erp.received if r.path == REPORT]
+
+
+# Paging (REQ-001-PRS-F014)
+
+
+@pytest.mark.parametrize(
+    ("tool", "inputs", "expected"),
+    [
+        ("list_accounts", {"include_groups": True, "include_disabled": True}, (1, 1, True)),
+        ("list_cost_centers", {}, (0, 1, False)),
+        ("list_journal_entries", {}, (0, 1, False)),
+        (
+            "report_general_ledger",
+            {"from_date": "2026-10-01", "to_date": "2026-10-31"},
+            (1, 1, True),
+        ),
+        (
+            "report_trial_balance",
+            {"from_date": "2026-01-01", "to_date": "2026-10-31"},
+            (1, 1, True),
+        ),
+    ],
+)
+def test_lists_and_reports_carry_the_given_offset(
+    mcp: Session,
+    erp: FakeErpnext,
+    tool: str,
+    inputs: dict[str, Any],
+    expected: tuple[int, int, bool],
+) -> None:
+    erp.reports["General Ledger"] = ledger(
+        [
+            ledger_entry("ACC-JV-2026-00001", 100.0, 0.0),
+            ledger_entry("ACC-JV-2026-00002", 200.0, 0.0, posting_date="2026-10-02"),
+            ledger_entry("ACC-JV-2026-00003", 0.0, 300.0, posting_date="2026-10-03"),
+        ]
+    )
+    erp.reports["Trial Balance"] = balances()
+    result = mcp.call(tool, {**inputs, "limit": 1, "offset": 1}).data
+    assert (result["count"], result["offset"], result["has_more"]) == expected
