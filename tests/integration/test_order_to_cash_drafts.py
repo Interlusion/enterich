@@ -532,6 +532,8 @@ def test_kept_rates_and_free_items_dont_warn(mcp: Session, erp: FakeErpnext) -> 
         ("SKU-1", 48, False),
         ("GIFT", 0, True),
     ]
+    # ERPNext answers 0 and 1; the result has booleans (REQ-001-PRS-F014)
+    assert [type(r["is_free_item"]) for r in result["items"]] == [bool, bool]
     assert result["warnings"] == []
     assert [c["content"].count("<br>") for c in erp.comments] == [0]
 
