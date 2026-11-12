@@ -195,6 +195,17 @@ def test_rejection_lines_stay_short_whatever_the_claims(
     assert len(lines[0]) <= 300
 
 
+def test_a_long_subject_and_client_are_cut_to_64_characters(
+    jwks: FakeJwks, signer: Signer, logs: Logs
+) -> None:
+    subject, client_id = "s" * 64 + "!", "c" * 64 + "!"
+    with client(jwks) as c:
+        c.post("/mcp", headers=bearer(token(signer, sub=subject, azp=client_id)), json={})
+    assert [
+        (r["status"], r["reason"], r["sub"], r["client"]) for r in logs.events("rejection")
+    ] == [(401, "wrong client", "s" * 64, "c" * 64)]
+
+
 def test_a_kid_with_a_newline_forges_no_log_line(jwks: FakeJwks, logs: Logs) -> None:
     # Written raw into the log, this kid would start a line of its own.
     forger = rsa_signer('x"\n{"event": "start", "sub": "forged"}', key=1)
