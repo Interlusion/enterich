@@ -665,6 +665,28 @@ def test_a_partly_returned_invoice_with_a_fixed_amount_takes_no_return(
     assert erp.writes() == []
 
 
+@pytest.mark.parametrize("doctype", SIDES)
+@pytest.mark.parametrize(
+    ("taken", "says", "not_says"),
+    [(1.0, "fixed", "nothing left"), (2.0, "nothing left", "fixed")],
+    ids=["one-left", "none-left"],
+)
+def test_a_returned_invoice_with_a_fixed_amount_is_refused_down_to_its_last_unit(
+    mcp: Session, erp: FakeErpnext, doctype: str, taken: float, says: str, not_says: str
+) -> None:
+    name, before = numbered(doctype, 8), numbered(doctype, 9)
+    invoice(erp, doctype, name, [("x1", "SKU-1", 2.0)], discount_amount=10.0)
+    link = "sales_invoice_item" if doctype == "Sales Invoice" else "purchase_invoice_item"
+    factory = sales_invoice if doctype == "Sales Invoice" else purchase_invoice
+    erp.add(doctype, factory(before, **returned(before, name, link, [("x1", "SKU-1", taken)])))
+    result = mcp.call(tool(doctype), {"return_against": name})
+    assert result.error
+    assert result.text.startswith(f"return_against: {name} ")
+    assert says in result.text
+    assert not_says not in result.text
+    assert erp.writes() == []
+
+
 def test_a_discount_given_as_a_percentage_is_returned_in_part(
     mcp: Session, erp: FakeErpnext
 ) -> None:
