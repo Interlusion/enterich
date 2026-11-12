@@ -188,6 +188,8 @@ def test_list_bank_transactions_sends_exactly_the_catalogued_call(
         "bank_account": MAIN,
         "from_date": "2026-10-01",
         "to_date": "2026-10-31",
+        "limit": 5,
+        "offset": 5,
     }
     if state is not None:
         arguments["state"] = state
@@ -203,6 +205,7 @@ def test_list_bank_transactions_sends_exactly_the_catalogued_call(
         ["date", "<=", "2026-10-31"],
     ]
     assert call.param("order_by") == "date desc, name desc"
+    assert (call.param("limit_start"), call.param("limit_page_length")) == ("5", "6")
 
 
 @pytest.mark.parametrize(
@@ -354,6 +357,8 @@ def test_list_payment_entries_sends_exactly_the_catalogued_call(
             "state": state,
             "from_date": "2026-10-01",
             "to_date": "2026-10-31",
+            "limit": 5,
+            "offset": 5,
         },
     )
     [call] = erp.received
@@ -369,6 +374,7 @@ def test_list_payment_entries_sends_exactly_the_catalogued_call(
         ["posting_date", "<=", "2026-10-31"],
     ]
     assert call.param("order_by") == "posting_date desc, name desc"
+    assert (call.param("limit_start"), call.param("limit_page_length")) == ("5", "6")
 
 
 def test_list_payment_entries_without_inputs_filters_by_company_only(
@@ -465,3 +471,19 @@ def test_another_companys_payment_entry_answers_as_unknown(mcp: Session) -> None
 def test_each_list_returns_the_offset_it_was_asked_for(mcp: Session, tool: str) -> None:
     result = mcp.call(tool, {"offset": 5}).data
     assert (result["offset"], result["records"], result["has_more"]) == (5, [], False)
+
+
+@pytest.mark.parametrize(
+    ("tool", "arguments"),
+    [
+        ("list_bank_accounts", {"include_disabled": True}),
+        ("list_bank_transactions", {"state": "all"}),
+        ("list_payment_entries", {}),
+    ],
+)
+def test_each_list_reports_more_than_its_limit(
+    mcp: Session, erp: FakeErpnext, tool: str, arguments: dict[str, Any]
+) -> None:
+    erp.add("Payment Entry", payment_entry("ACC-PAY-2026-00003"))
+    result = mcp.call(tool, {**arguments, "limit": 1}).data
+    assert (result["count"], len(result["records"]), result["has_more"]) == (1, 1, True)
