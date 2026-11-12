@@ -41,6 +41,8 @@ def test_start_logs_the_settings_and_runs_uvicorn(
     __main__.main()
     line = json.loads(capsys.readouterr().out)
     assert line["event"] == "start"
+    assert line["level"] == "info"
+    assert line["warnings"] == []
     assert line["version"] == version("enterich")
     assert line["resource_url"] == ENV["ENTERICH_RESOURCE_URL"]
     assert line["issuer"] == ENV["ENTERICH_ISSUER"]
