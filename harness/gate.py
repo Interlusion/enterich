@@ -1,5 +1,6 @@
 """The fix stage's gate (ADR-008): a fix branch passes when it is an `auto/` branch whose
-first commit is a `test:`, changes nothing the pipeline may not change, and passes every
+first commit is a `test:` and whose every other change comes right after its `test:`,
+changes nothing the pipeline may not change, and passes every
 check, the end-to-end tests included. Each branch is checked in a worktree of its own;
 the results go to the run's `gates.jsonl`. With `--push`, a branch that passed is pushed.
 
@@ -15,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from itertools import pairwise
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -57,6 +59,13 @@ def problems(branch: str, subjects: list[str], paths: list[str]) -> list[str]:
     found += [f"{s!r} is not a Conventional Commit" for s in subjects if not COMMIT.match(s)]
     if not subjects[0].startswith("test"):
         found.append("the first commit is not a test: first, the failing test")
+    # A survey's branch holds one finding after another: each change right after its test
+    found += [
+        f"{s!r} is not a fix:, feat: or refactor: right after its test: commit"
+        for before, s in pairwise(subjects)
+        if not s.startswith("test")
+        and not (before.startswith("test") and s.startswith(("fix", "feat", "refactor")))
+    ]
     for path in paths:
         if prefix := next((f for f in FORBIDDEN if path == f or path.startswith(f)), None):
             found.append(f"{path} is outside what the pipeline may change ({prefix})")
