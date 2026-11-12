@@ -251,7 +251,7 @@ def test_the_return_tools_carry_their_annotations_and_say_how_to_retry(mcp: Sess
     [
         ("ACC-SINV-2026-00003", "a draft"),
         ("ACC-SINV-2026-00004", "cancelled"),
-        ("ACC-SINV-2026-00002", "a return"),
+        ("ACC-SINV-2026-00002", f"a return itself; give the invoice it returns ({INVOICE})."),
         ("ACC-SINV-2026-00005", "POS"),
         ("ACC-SINV-2026-00006", "stock"),
         ("ACC-SINV-2026-00007", "doesn't exist"),
@@ -774,7 +774,10 @@ def test_a_return_without_its_invoice_is_refused_without_naming_none(
     [
         ({"docstatus": 0, "status": "Draft"}, "a draft"),
         ({"docstatus": 2, "status": "Cancelled"}, "cancelled"),
-        ({"is_return": 1, "return_against": "ACC-PINV-2026-00002"}, "a return"),
+        (
+            {"is_return": 1, "return_against": "ACC-PINV-2026-00002"},
+            "a return itself; give the invoice it returns (ACC-PINV-2026-00002).",
+        ),
         ({"company": "Other AG"}, "doesn't exist"),
         ({"on_hold": 1, "release_date": "2026-11-30"}, "on hold"),
     ],
