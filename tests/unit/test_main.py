@@ -1,11 +1,12 @@
-"""Start-up: REQ-002-PRS-NF005 (refusal) and the start line of REQ-002-PRS-NF008."""
+"""Start-up: REQ-002-PRS-NF005 (refusal), and the start line and log level of REQ-002-PRS-NF008."""
 
 import json
+import logging
 from importlib.metadata import version
 
 import pytest
 
-from enterich import __main__, tools
+from enterich import __main__, log, tools
 from tests.fakes.settings import API_SECRET, ENV
 
 
@@ -78,3 +79,22 @@ def test_start_carries_the_warnings(
         "ENTERICH_TOOL is not a known variable and is ignored",
         "ENTERICH_ERPNEXT_URL uses http: the API key travels unencrypted",
     ]
+
+
+def test_the_log_level_variable_filters_library_lines_only(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    for name, value in ENV.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("ENTERICH_LOG_LEVEL", "error")
+
+    def serve(app: object, **kw: object) -> None:
+        log.event("rejection", logging.WARNING, status=401)
+        logging.getLogger("uvicorn.error").warning("noise")
+        logging.getLogger("uvicorn.error").error("trouble")
+
+    monkeypatch.setattr(__main__.uvicorn, "run", serve)
+    __main__.main()
+    lines = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert [line["event"] for line in lines] == ["start", "rejection", "library"]
+    assert lines[2]["message"] == "trouble"
