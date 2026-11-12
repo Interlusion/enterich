@@ -53,27 +53,62 @@ def test_the_error_line_carries_the_traceback_and_is_written_once() -> None:
     assert "raw failure" in lines[0]["traceback"]
 
 
-@pytest.mark.anyio
-async def test_a_client_gone_mid_body_hands_the_inner_app_what_arrived() -> None:
-    received: list[bytes] = []
+async def posted(messages: list[Message]) -> tuple[list[bytes], list[int]]:
+    """POST /mcp with these receive messages: the body the inner app read, the statuses sent."""
+    read: list[bytes] = []
+    statuses: list[int] = []
 
     async def inner(scope: Scope, receive: Receive, send: Send) -> None:
-        received.append((await receive())["body"])
-
-    messages = [
-        {"type": "http.request", "body": b'{"a"', "more_body": True},
-        {"type": "http.disconnect"},
-    ]
+        read.append((await receive())["body"])
 
     async def receive() -> Message:
         return messages.pop(0)
 
     async def send(message: Message) -> None:
-        pass
+        if message["type"] == "http.response.start":
+            statuses.append(message["status"])
 
     scope: Scope = {"type": "http", "method": "POST", "path": "/mcp", "headers": []}
     await Wrapper(inner, "/mcp")(scope, receive, send)
-    assert received == [b'{"a"']
+    return read, statuses
+
+
+@pytest.mark.anyio
+async def test_a_client_gone_mid_body_hands_the_inner_app_what_arrived() -> None:
+    read, _ = await posted(
+        [
+            {"type": "http.request", "body": b'{"a"', "more_body": True},
+            {"type": "http.disconnect"},
+        ]
+    )
+    assert read == [b'{"a"']
+
+
+@pytest.mark.anyio
+async def test_a_body_in_several_parts_reaches_the_inner_app_whole() -> None:
+    # Uvicorn splits a large body across messages; the last may carry no body key.
+    read, _ = await posted(
+        [
+            {"type": "http.request", "body": b'{"a":', "more_body": True},
+            {"type": "http.request", "body": b"1}", "more_body": True},
+            {"type": "http.request", "more_body": False},
+        ]
+    )
+    assert read == [b'{"a":1}']
+
+
+@pytest.mark.anyio
+async def test_parts_over_1_mib_together_get_413_without_a_content_length() -> None:
+    # REQ-002-PRS-NF011: no part is over 1 MiB on its own.
+    part = b"x" * (600 * 1024)
+    read, statuses = await posted(
+        [
+            {"type": "http.request", "body": part, "more_body": True},
+            {"type": "http.request", "body": part, "more_body": True},
+            {"type": "http.request", "body": b"", "more_body": False},
+        ]
+    )
+    assert (read, statuses) == ([], [413])
 
 
 @pytest.mark.parametrize("method", ["POST", "DELETE"])
