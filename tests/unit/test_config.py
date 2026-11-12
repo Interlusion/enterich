@@ -1,8 +1,11 @@
 """REQ-002-PRS-NF005: configuration from the environment."""
 
+from collections.abc import Mapping
+
 import pytest
 
-from enterich.config import ConfigError, load
+from enterich import config
+from enterich.config import KNOWN, ConfigError, load
 from tests.fakes.settings import API_KEY, API_SECRET, ENV
 
 REQUIRED = [
@@ -226,6 +229,39 @@ def test_unknown_enterich_variables_are_reported_as_warnings() -> None:
     s = load({**ENV, "ENTERICH_TOOL": "list_items"}, ("list_items",))
     assert s.warnings == ("ENTERICH_TOOL is not a known variable and is ignored",)
     assert s.tools == ("list_items",)
+
+
+class Recording(dict[str, str]):
+    """The variables, remembering each name looked up."""
+
+    def __init__(self, env: Mapping[str, str], read: set[str]) -> None:
+        super().__init__(env)
+        self.read = read
+
+    def __getitem__(self, key: str) -> str:
+        self.read.add(key)
+        return super().__getitem__(key)
+
+    def __contains__(self, key: object) -> bool:
+        self.read.add(str(key))
+        return super().__contains__(key)
+
+    def get(self, key: str, default: str | None = None, /) -> str | None:  # pyright: ignore[reportIncompatibleMethodOverride]
+        self.read.add(key)
+        return super().get(key, default)
+
+
+def test_the_code_reads_the_known_variables_and_no_other(monkeypatch: pytest.MonkeyPatch) -> None:
+    read: set[str] = set()
+
+    class Reader(config._Reader):  # pyright: ignore[reportPrivateUsage]
+        def __init__(self, env: Mapping[str, str]) -> None:
+            super().__init__(env)
+            self.env = Recording(self.env, read)
+
+    monkeypatch.setattr(config, "_Reader", Reader)
+    load(ENV, ("list_items",))
+    assert read == KNOWN
 
 
 def test_tools_set_limits_the_operations() -> None:
