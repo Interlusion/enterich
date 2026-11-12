@@ -189,6 +189,19 @@ def test_a_fix_branch_with_a_test_first_passes_the_gate() -> None:
     assert gate.problems("auto/tests-page-limit", subjects, paths) == []
 
 
+def test_a_survey_branch_of_several_findings_passes_the_gate() -> None:
+    subjects = ["test: a", "test: b", "fix: b", "test: c", "refactor: c"]
+    assert gate.problems("auto/tests-req-001-core", subjects, TESTS_ONLY) == []
+
+
+@pytest.mark.parametrize(
+    "subjects",
+    [["test: a", "fix: a", "fix: b"], ["test: a", "chore: tidy"], ["test: a", "docs: d"]],
+)
+def test_the_gate_refuses_a_change_not_right_after_its_test(subjects: list[str]) -> None:
+    assert any("right after" in p for p in gate.problems("auto/x", subjects, TESTS_ONLY))
+
+
 @pytest.mark.parametrize(
     ("branch", "subjects", "paths", "problem"),
     [
