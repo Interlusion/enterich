@@ -461,12 +461,14 @@ def test_summary_rows_are_found_by_position_in_any_language(mcp: Session, erp: F
     assert result["closing"]["debit"] == 570.0
 
 
-@pytest.mark.parametrize("broken", ["first", "last"])
+@pytest.mark.parametrize("broken", ["first", "last", "entry_last"])
 def test_a_ledger_without_its_summary_rows_is_a_faulty_answer(
     mcp: Session, erp: FakeErpnext, broken: str
 ) -> None:
     rows = ledger([ledger_entry("ACC-JV-2026-00001", 500.0, 0.0)])
-    erp.reports["General Ledger"] = rows[1:] if broken == "first" else rows[:-1]
+    # entry_last: the closing row replaced by an entry, so only the last row has a posting date
+    answers = {"first": rows[1:], "last": rows[:-1], "entry_last": [*rows[:-1], rows[1]]}
+    erp.reports["General Ledger"] = answers[broken]
     result = mcp.call("report_general_ledger", {"from_date": "2026-10-01", "to_date": "2026-10-31"})
     assert result.error
     assert "General Ledger" in result.text
