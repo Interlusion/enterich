@@ -185,6 +185,15 @@ def test_a_page_with_nothing_cut_names_nothing() -> None:
     }
 
 
+def test_a_page_has_more_only_beyond_its_limit() -> None:
+    """REQ-001-PRS-F014: of `limit + 1` fetched records, the last one says `has_more`."""
+    records: list[dict[str, Any]] = [{"name": n, "outside_text": {}} for n in "ABC"]
+    exactly = page(records[:2], offset=0, limit=2)
+    assert (exactly["count"], exactly["has_more"]) == (2, False)
+    beyond = page(records, offset=0, limit=2)
+    assert (beyond["count"], beyond["has_more"]) == (2, True)
+
+
 days = TypeAdapter(Day)
 
 
