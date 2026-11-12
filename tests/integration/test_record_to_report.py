@@ -101,7 +101,7 @@ def report_call(erp: FakeErpnext, name: str) -> Received:
 
 
 def test_list_accounts_sends_exactly_the_catalogued_call(mcp: Session, erp: FakeErpnext) -> None:
-    mcp.call("list_accounts", {"search": "1200", "root_type": "Asset"})
+    mcp.call("list_accounts", {"search": "1200", "root_type": "Asset", "limit": 5, "offset": 5})
     [call] = erp.received
     assert (call.method, call.path) == ("GET", "/api/resource/Account")
     assert call.param("fields") == ACCOUNT_FIELDS
@@ -117,6 +117,7 @@ def test_list_accounts_sends_exactly_the_catalogued_call(mcp: Session, erp: Fake
         ["account_number", "like", "%1200%"],
     ]
     assert call.param("order_by") == "name asc"
+    assert (call.param("limit_start"), call.param("limit_page_length")) == ("5", "6")
 
 
 def test_list_accounts_returns_the_companys_ledger_accounts(mcp: Session) -> None:
@@ -163,6 +164,7 @@ def test_list_cost_centers_sends_exactly_the_catalogued_call(
         ["cost_center_name", "like", "%main%"],
         ["cost_center_number", "like", "%main%"],
     ]
+    assert (call.param("limit_start"), call.param("limit_page_length")) == ("0", "21")
     assert [r["name"] for r in result["records"]] == ["Main - EX"]
     assert result["records"][0]["is_group"] is False
 
@@ -181,6 +183,8 @@ def test_list_journal_entries_sends_exactly_the_catalogued_call(
             "voucher_type": "Bank Entry",
             "from_date": "2026-10-01",
             "to_date": "2026-10-31",
+            "limit": 5,
+            "offset": 5,
         },
     )
     [call] = erp.received
@@ -194,6 +198,7 @@ def test_list_journal_entries_sends_exactly_the_catalogued_call(
         ["posting_date", "<=", "2026-10-31"],
     ]
     assert call.param("order_by") == "posting_date desc, name desc"
+    assert (call.param("limit_start"), call.param("limit_page_length")) == ("5", "6")
 
 
 def test_list_journal_entries_returns_the_remark_as_outside_text(mcp: Session) -> None:
