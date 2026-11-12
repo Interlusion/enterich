@@ -454,3 +454,14 @@ def test_another_companys_payment_entry_answers_as_unknown(mcp: Session) -> None
     assert other.error
     assert other.text.startswith("name: ")
     assert other.text.replace("00002", "") == unknown.text.replace("09999", "")
+
+
+# All three lists (REQ-001-PRS-F014)
+
+
+@pytest.mark.parametrize(
+    "tool", ["list_bank_accounts", "list_bank_transactions", "list_payment_entries"]
+)
+def test_each_list_returns_the_offset_it_was_asked_for(mcp: Session, tool: str) -> None:
+    result = mcp.call(tool, {"offset": 5}).data
+    assert (result["offset"], result["records"], result["has_more"]) == (5, [], False)
