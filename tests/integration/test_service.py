@@ -236,6 +236,19 @@ def test_a_long_subject_and_client_are_cut_to_64_characters(
     ] == [(401, "wrong client", "s" * 64, "c" * 64)]
 
 
+def test_rejection_lines_stay_short_with_non_ascii_claims(
+    jwks: FakeJwks, signer: Signer, logs: Logs
+) -> None:
+    # Cut by characters, the values stay short only if the line keeps them unescaped.
+    with client(jwks) as c:
+        c.post("/mcp", headers=bearer(token(signer, sub="ä" * 200, azp="€" * 200)), json={})
+    lines = [line for line in logs.stream.getvalue().splitlines() if '"rejection"' in line]
+    assert len(lines) == 1
+    assert len(lines[0]) <= 300
+    assert '"sub": "ää' in lines[0]
+    assert '"client": "€€' in lines[0]
+
+
 def test_a_kid_with_a_newline_forges_no_log_line(jwks: FakeJwks, logs: Logs) -> None:
     # Written raw into the log, this kid would start a line of its own.
     forger = rsa_signer('x"\n{"event": "start", "sub": "forged"}', key=1)

@@ -69,16 +69,17 @@ def token(signer: Signer, headers: dict[str, Any] | None = None, **overrides: An
 
 @dataclass
 class FakeJwks:
-    """Serves the signers' public keys; counts fetches; can be taken down."""
+    """Serves the signers' public keys; counts fetches and records each one's method and
+    URL; can be taken down."""
 
     signers: list[Signer]
     extra_keys: list[dict[str, Any]] = field(default_factory=list[dict[str, Any]])
     down: bool = False
     fetches: int = 0
-    requested: list[str] = field(default_factory=list[str])
+    requested: list[tuple[str, str]] = field(default_factory=list[tuple[str, str]])
 
     def handle(self, request: httpx2.Request) -> httpx2.Response:
-        self.requested.append(str(request.url))
+        self.requested.append((request.method, str(request.url)))
         self.fetches += 1
         if self.down:
             return httpx2.Response(503)

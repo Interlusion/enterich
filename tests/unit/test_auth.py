@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 import time
+from collections.abc import AsyncIterator
 from typing import Any
 
 import anyio
@@ -13,8 +14,9 @@ import httpx2
 import pytest
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
-from enterich.auth import JwksCache, KeysUnavailable, Verifier, last_refusal
+from enterich.auth import MAX_JWKS_BYTES, JwksCache, KeysUnavailable, Verifier, last_refusal
 from enterich.config import Settings
+from tests.conftest import Logs
 from tests.fakes.jwks import FakeJwks, Signer, claims, ec_signer, rsa_signer, token
 from tests.fakes.settings import CLIENT_ID, JWKS_URL, RESOURCE_URL, SUBJECT, settings
 
@@ -77,6 +79,16 @@ async def test_expires_at_carries_the_leeway(jwks: FakeJwks, signer: Signer) -> 
     access = await verifier(jwks).verify_token(token(signer, exp=exp))
     assert access is not None
     assert access.expires_at == exp + 5
+
+
+@pytest.mark.parametrize("scope", [["openid"], 123, None])
+async def test_a_scope_that_is_not_a_string_grants_no_scopes(
+    jwks: FakeJwks, signer: Signer, scope: Any
+) -> None:
+    # None drops the claim. The token stays valid; a required scope then gets 403.
+    access = await verifier(jwks).verify_token(token(signer, scope=scope))
+    assert access is not None
+    assert access.scopes == []
 
 
 @pytest.mark.parametrize(
@@ -218,10 +230,29 @@ async def test_a_9_kib_token_is_refused(jwks: FakeJwks, signer: Signer) -> None:
     assert await refusal(verifier(jwks), t) == "token too long"
 
 
+def token_of_length(signer: Signer, length: int) -> str:
+    # Base64 grows in steps, so padding one claim skips some lengths; a second
+    # padded header field fills them.
+    for extra in range(3):
+        base = len(token(signer, headers={"x": "x" * extra}, padding=""))
+        n = max(0, (length - base) * 3 // 4 - 4)
+        while len(t := token(signer, headers={"x": "x" * extra}, padding="x" * n)) < length:
+            n += 1
+        if len(t) == length:
+            return t
+    raise AssertionError(f"no token of {length} characters")
+
+
+async def test_a_token_of_exactly_8_kib_is_accepted(jwks: FakeJwks, signer: Signer) -> None:
+    t = token_of_length(signer, 8 * 1024)
+    assert await verifier(jwks).verify_token(t) is not None
+    assert await refusal(verifier(jwks), t + "x") == "token too long"
+
+
 async def test_a_jku_header_causes_no_fetch(jwks: FakeJwks, signer: Signer) -> None:
     v = verifier(jwks)
     await v.verify_token(token(signer, {"jku": "https://attacker.example.net/keys"}))
-    assert jwks.requested == [JWKS_URL]
+    assert jwks.requested == [("GET", JWKS_URL)]
 
 
 async def test_an_embedded_jwk_header_is_not_used(jwks: FakeJwks) -> None:
@@ -240,6 +271,18 @@ async def test_a_key_marked_for_encryption_never_verifies_a_token(signer: Signer
     encryption = rsa_signer("enc-2", key=1)
     jwks = FakeJwks([signer], extra_keys=[{**encryption.jwk(), "use": "enc"}])
     assert await refusal(verifier(jwks), token(encryption)) == "unknown key"
+
+
+async def test_a_key_without_use_verifies_tokens(signer: Signer) -> None:
+    no_use = {k: v for k, v in signer.jwk().items() if k != "use"}
+    jwks = FakeJwks([], extra_keys=[no_use])
+    assert await verifier(jwks).verify_token(token(signer)) is not None
+
+
+async def test_an_unusable_key_doesnt_hide_the_keys_after_it(signer: Signer) -> None:
+    broken = {"kty": "RSA", "kid": "broken", "n": "x", "e": "AQAB"}
+    jwks = FakeJwks([], extra_keys=[broken, signer.jwk()])
+    assert await verifier(jwks).verify_token(token(signer)) is not None
 
 
 async def test_jwks_is_cached_for_5_minutes(jwks: FakeJwks, signer: Signer) -> None:
@@ -304,6 +347,27 @@ async def test_cached_keys_work_until_5_minutes_then_503(jwks: FakeJwks, signer:
         await v.verify_token(token(signer))
 
 
+async def test_each_jwks_fetch_logs_its_outcome_and_keys(
+    jwks: FakeJwks, signer: Signer, logs: Logs
+) -> None:
+    """The `jwks` line of REQ-002-PRS-NF008."""
+    clock = Clock()
+    v = verifier(jwks, clock=clock)
+    assert await v.verify_token(token(signer)) is not None
+    jwks.down = True
+    clock.now += 301
+    with pytest.raises(KeysUnavailable):
+        await v.verify_token(token(signer))
+    lines = [
+        {k: value for k, value in line.items() if k not in ("time", "event")}
+        for line in logs.events("jwks")
+    ]
+    assert lines == [
+        {"level": "info", "outcome": "fetched", "keys": 1},
+        {"level": "warning", "outcome": "failed", "reason": "_JwksError", "keys": 0},
+    ]
+
+
 @pytest.mark.parametrize("keys", [[], [{"kty": "RSA", "kid": "broken", "n": "x", "e": "AQAB"}]])
 async def test_a_jwks_without_usable_keys_counts_as_unavailable(
     signer: Signer, keys: list[dict[str, Any]]
@@ -311,6 +375,53 @@ async def test_a_jwks_without_usable_keys_counts_as_unavailable(
     jwks = FakeJwks([], extra_keys=keys)
     with pytest.raises(KeysUnavailable):
         await verifier(jwks).verify_token(token(signer))
+
+
+@pytest.mark.parametrize("body", [[], None, "x", 1])
+async def test_a_jwks_that_is_not_a_json_object_counts_as_unavailable(
+    signer: Signer, body: object
+) -> None:
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, content=json.dumps(body).encode())
+
+    client = httpx2.AsyncClient(transport=httpx2.MockTransport(handle))
+    v = Verifier(settings(), JwksCache(JWKS_URL, client))
+    with pytest.raises(KeysUnavailable):
+        await v.verify_token(token(signer))
+
+
+# The JWKS body is read in chunks up to a cap (REQ-002-URS-NF009, bounded work).
+class Chunks(httpx2.AsyncByteStream):
+    def __init__(self, body: bytes, size: int = 64 * 1024) -> None:
+        self._parts = [body[i : i + size] for i in range(0, len(body), size)]
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        for part in self._parts:
+            yield part
+
+
+def chunked_jwks(signer: Signer, length: int) -> JwksCache:
+    """A JWKS of `length` bytes, padded with an extra member, sent in 64 KiB chunks."""
+    head = json.dumps({"keys": [signer.jwk()], "pad": ""}).encode()
+    body = head[:-2] + b" " * (length - len(head)) + head[-2:]
+
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, stream=Chunks(body))
+
+    return JwksCache(JWKS_URL, httpx2.AsyncClient(transport=httpx2.MockTransport(handle)))
+
+
+async def test_a_jwks_of_1_mib_in_chunks_is_read_whole(signer: Signer) -> None:
+    v = Verifier(settings(), chunked_jwks(signer, MAX_JWKS_BYTES))
+    assert await v.verify_token(token(signer)) is not None
+
+
+async def test_a_jwks_over_1_mib_counts_as_unavailable(signer: Signer, logs: Logs) -> None:
+    v = Verifier(settings(), chunked_jwks(signer, MAX_JWKS_BYTES + 1))
+    with pytest.raises(KeysUnavailable):
+        await v.verify_token(token(signer))
+    [line] = logs.events("jwks")
+    assert line["outcome"] == "failed"
 
 
 async def test_an_empty_refresh_keeps_the_known_keys(jwks: FakeJwks, signer: Signer) -> None:
