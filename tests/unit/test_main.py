@@ -21,6 +21,8 @@ def test_an_invalid_configuration_stops_enterich(
     out = capsys.readouterr().out
     line = json.loads(out)
     assert line["event"] == "error"
+    assert line["level"] == "error"
+    assert line["exception"] == "ConfigError"
     assert line["problems"] == [
         "ENTERICH_ISSUER: required",
         "ENTERICH_CLOCK_LEEWAY: must be from 0 to 60",
