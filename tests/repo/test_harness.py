@@ -114,6 +114,12 @@ def test_triage_reports_confirmed_findings_by_class(tmp_path: Path) -> None:
     assert "## Proposal (0)" in report
 
 
+def test_a_quoted_filter_list_reads_as_no_wiki_link_in_the_report(tmp_path: Path) -> None:
+    quoted = {**FINDING, "proposal": 'Assert filters == [["company", "=", COMPANY]]'}
+    assert _triage(tmp_path, [quoted]) == 0
+    assert "[[" not in (tmp_path / "report.md").read_text()
+
+
 def test_triage_hands_the_fix_stage_each_fix_with_its_mutants(tmp_path: Path) -> None:
     survivor = {"id": MUTANT, "module": "enterich.shapes", "filter": None, "diff": "-a\n+b"}
     _write(tmp_path / "survivors.jsonl", [survivor])
