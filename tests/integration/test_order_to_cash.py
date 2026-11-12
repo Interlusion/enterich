@@ -160,6 +160,9 @@ def test_get_customer_returns_only_its_own_addresses(mcp: Session) -> None:
         "truncated": [],
         "outside_text": {"customer_name": "Customer CUST-0001", "tax_id": "DE123456789"},
     }
+    # REQ-001-PRS-F014: yes/no fields are booleans, not ERPNext's 0 and 1.
+    assert type(result["disabled"]) is bool
+    assert type(result["addresses"][0]["is_primary_address"]) is bool
 
 
 def test_addresses_are_cut_to_100(mcp: Session, erp: FakeErpnext) -> None:
