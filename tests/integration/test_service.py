@@ -2,9 +2,13 @@
 REQ-002-PRS-NF003, REQ-002-PRS-NF008, REQ-002-PRS-NF009, REQ-002-PRS-NF010,
 REQ-002-PRS-NF011, REQ-002-PRS-NF012."""
 
+import base64
+import hashlib
+import hmac
 import json
 import threading
-from collections.abc import Iterator
+import time
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.metadata import version as installed
@@ -12,6 +16,7 @@ from typing import Any
 
 import httpx2
 import pytest
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from starlette.testclient import TestClient
 
 from enterich.app import create_app
@@ -19,7 +24,7 @@ from enterich.auth import Verifier
 from enterich.tools import names
 from tests.conftest import Logs
 from tests.fakes.erpnext import FakeErpnext
-from tests.fakes.jwks import FakeJwks, Signer, rsa_signer, token
+from tests.fakes.jwks import FakeJwks, Signer, claims, rsa_signer, token
 from tests.fakes.settings import API_KEY, API_SECRET, ISSUER, RESOURCE_URL, settings
 from tests.integration.mcp import ACCEPT, BASE, METADATA, VERSION, bearer, client
 
@@ -401,24 +406,63 @@ def test_unreachable_jwks_gets_503_not_401(jwks: FakeJwks, signer: Signer, logs:
     assert logs.events("jwks")[0]["outcome"] == "failed"
 
 
-def test_no_token_part_reaches_the_log_or_responses(
-    jwks: FakeJwks, signer: Signer, logs: Logs
-) -> None:
-    tokens = [
-        token(signer),
-        token(signer, sub="someone-else"),
-        token(rsa_signer("key-1", key=1), sub="forged"),
-        token(signer, exp=1),
-    ]
-    bodies: list[str] = []
-    with client(jwks) as c:
-        for t in tokens:
-            response = c.post("/mcp", headers=bearer(t), json={})
-            bodies.append(response.text + json.dumps(dict(response.headers)))
-    text = logs.stream.getvalue() + "".join(bodies)
-    for t in tokens:
-        _, payload, signature = t.split(".")
-        assert payload not in text
+def b64(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+def unsigned(signer: Signer) -> str:
+    header = json.dumps({"alg": "none", "kid": signer.kid}).encode()
+    return f"{b64(header)}.{b64(json.dumps(claims()).encode())}."
+
+
+def hs256_with_the_public_key(signer: Signer) -> str:
+    pem = signer.key.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
+    header = json.dumps({"alg": "HS256", "kid": signer.kid}).encode()
+    signing_input = f"{b64(header)}.{b64(json.dumps(claims()).encode())}"
+    return f"{signing_input}.{b64(hmac.new(pem, signing_input.encode(), hashlib.sha256).digest())}"
+
+
+def not_a_jwt(signer: Signer) -> str:
+    _, payload, signature = token(signer).split(".")
+    return f"!.{payload}.{signature}"
+
+
+# Every token case of REQ-002-PRS-NF001, with the status it gets.
+TOKEN_CASES: dict[str, tuple[Callable[[Signer], str], int]] = {
+    "valid": (lambda s: token(s), 200),
+    "header typ application/at+jwt": (
+        lambda s: token(s, headers={"typ": "application/at+jwt"}, typ=None),
+        200,
+    ),
+    "jku header": (lambda s: token(s, headers={"jku": "https://attacker.example.net/"}), 200),
+    "wrong issuer": (lambda s: token(s, iss="https://id.example.com/realms/other"), 401),
+    "wrong audience": (lambda s: token(s, aud="https://erp.example.com/other"), 401),
+    "wrong client": (lambda s: token(s, azp="another-client"), 401),
+    "wrong subject": (lambda s: token(s, sub="someone-else"), 401),
+    "wrong key": (lambda _: token(rsa_signer("key-1", key=1), sub="forged"), 401),
+    "claim typ ID": (lambda s: token(s, typ="ID"), 401),
+    "claim typ Refresh": (lambda s: token(s, typ="Refresh"), 401),
+    "no access-token marker": (lambda s: token(s, typ=None), 401),
+    "no azp and no client_id": (lambda s: token(s, azp=None), 401),
+    "azp and client_id differ": (lambda s: token(s, client_id="another-client"), 401),
+    "expired": (lambda s: token(s, exp=1), 401),
+    "nbf in the future": (lambda s: token(s, nbf=int(time.time()) + 100), 401),
+    "iat in the future": (lambda s: token(s, iat=int(time.time()) + 100), 401),
+    "alg none": (unsigned, 401),
+    "HS256 keyed with the public key": (hs256_with_the_public_key, 401),
+    "unknown kid": (lambda _: token(rsa_signer("key-2", key=1)), 401),
+    "kid with a newline": (lambda _: token(rsa_signer('x"\n{"event": "start"}', key=1)), 401),
+    "not a JWT": (not_a_jwt, 401),
+    "9 KiB": (lambda s: token(s, padding="x" * 9 * 1024), 401),
+}
+
+
+def assert_no_part_of(t: str, logs: Logs, response: httpx2.Response) -> None:
+    text = logs.stream.getvalue() + response.text + json.dumps(dict(response.headers))
+    _, payload, signature = t.split(".")
+    assert payload
+    assert payload not in text
+    if signature:  # alg none has none
         assert signature not in text
 
 
@@ -440,3 +484,28 @@ def test_an_exception_in_the_mcp_app_is_logged_without_the_api_key_and_secret(
     assert "key *** secret ***" in line["traceback"]
     assert API_KEY not in line["traceback"]
     assert API_SECRET not in line["traceback"]
+
+
+@pytest.mark.parametrize("case", list(TOKEN_CASES))
+def test_no_token_part_reaches_the_log_or_responses(
+    jwks: FakeJwks, signer: Signer, logs: Logs, case: str
+) -> None:
+    make, status = TOKEN_CASES[case]
+    t = make(signer)
+    with client(jwks) as c:
+        response = list_tools(c, t, VERSION)
+    assert response.status_code == status
+    assert_no_part_of(t, logs, response)
+
+
+@pytest.mark.parametrize("status", [403, 503])
+def test_no_token_part_reaches_the_log_or_responses_of_a_403_or_503(
+    jwks: FakeJwks, signer: Signer, logs: Logs, status: int
+) -> None:
+    s = settings(required_scopes="openid enterich")
+    jwks.down = status == 503
+    t = token(signer)
+    with client(jwks, s) as c:
+        response = list_tools(c, t, VERSION)
+    assert response.status_code == status
+    assert_no_part_of(t, logs, response)
