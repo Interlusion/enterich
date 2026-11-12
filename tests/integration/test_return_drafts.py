@@ -901,6 +901,21 @@ def test_a_debit_note_update_with_a_known_number_warns(mcp: Session, erp: FakeEr
     assert "ACC-PINV-2026-00009" in warning
 
 
+def test_a_debit_notes_own_number_doesnt_warn(mcp: Session, erp: FakeErpnext) -> None:
+    erp.docs["Purchase Invoice"][PURCHASE_DRAFT]["bill_no"] = "CN-80"
+    result = update(mcp, "update_draft_purchase_return", bill_no="CN-80")
+    assert not result.error, result.text
+    assert result.data["warnings"] == []
+    [check] = [r for r in erp.lists(PURCHASES) if ["bill_no", "=", "CN-80"] in r.param("filters")]
+    assert check.param("filters") == [
+        ["company", "=", COMPANY],
+        ["docstatus", "in", [0, 1]],
+        ["supplier", "=", "SUPP-0001"],
+        ["bill_no", "=", "CN-80"],
+        ["name", "!=", PURCHASE_DRAFT],
+    ]
+
+
 def test_an_empty_bill_no_clears_a_debit_notes_number(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp, "update_draft_purchase_return", bill_no="")
     assert not result.error, result.text
