@@ -985,11 +985,17 @@ def test_an_update_to_a_template_without_tax_warns(mcp: Session) -> None:
 
 
 def test_an_update_of_a_large_draft_cuts_its_rows(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-001-PRS-NF003: items, taxes and the tax summary, each named in `truncated`."""
     rows = [invoice_row(f"SKU-{n % 3 + 1}", 1, 10.0) for n in range(150)]
-    erp.docs["Sales Invoice"][DRAFT]["items"] = rows
+    taxes = [
+        {**VAT_ROWS[0], "name": f"tax-{n}", "account_head": f"1776-{n} - VAT 19% - EX"}
+        for n in range(150)
+    ]
+    erp.docs["Sales Invoice"][DRAFT].update(items=rows, taxes=taxes)
     result = update(mcp, remarks="Checked").data
-    assert len(result["items"]) == 100
-    assert result["truncated"] == ["items"]
+    tables = ["items", "taxes", "tax_summary"]
+    assert [len(result[t]) for t in tables] == [100, 100, 100]
+    assert result["truncated"] == tables
     assert len(erp.docs["Sales Invoice"][DRAFT]["items"]) == 150
 
 
