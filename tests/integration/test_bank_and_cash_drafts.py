@@ -501,12 +501,18 @@ def test_a_payment_without_references_doesnt_warn(mcp: Session) -> None:
     assert result["warnings"] == []
 
 
-def test_two_currencies_warn(mcp: Session, erp: FakeErpnext) -> None:
+@pytest.mark.parametrize(
+    "party",
+    [
+        {"party_type": "Customer", "party": "CUST-0001"},  # the bank is paid_to
+        {"party_type": "Supplier", "party": "SUPP-0001"},  # the bank is paid_from
+    ],
+)
+def test_two_currencies_warn(mcp: Session, erp: FakeErpnext, party: dict[str, str]) -> None:
     erp.add("Account", account(BANK, account_currency="USD"))
-    result = create(mcp).data
+    result = create(mcp, **party).data
     [warning] = result["warnings"]
-    assert "USD" in warning
-    assert "EUR" in warning
+    assert "The bank account is in USD, the party's account in EUR" in warning
     assert "received_amount" in warning
     assert "exchange rates" in warning
     assert "sent" not in warning
