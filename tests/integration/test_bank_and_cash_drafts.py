@@ -481,12 +481,15 @@ def test_allow_duplicate_warns(mcp: Session, erp: FakeErpnext) -> None:
 # Warnings (REQ-007-PRS-F007)
 
 
-def test_a_part_not_allocated_warns(mcp: Session, erp: FakeErpnext) -> None:
-    references = [{"reference_name": INVOICE, "allocated_amount": 20}]
+@pytest.mark.parametrize(("allocated", "unallocated"), [(20, 10), (29.5, 0.5)])
+def test_a_part_not_allocated_warns(
+    mcp: Session, erp: FakeErpnext, allocated: float, unallocated: float
+) -> None:
+    references = [{"reference_name": INVOICE, "allocated_amount": allocated}]
     result = create(mcp, paid_amount=30, references=references).data
-    assert result["unallocated_amount"] == 10
+    assert result["unallocated_amount"] == unallocated
     [warning] = result["warnings"]
-    assert "10" in warning
+    assert warning.startswith(f"{unallocated} of the paid amount")
     assert "advance" in warning
     [comment] = erp.comments
     assert comment["reference_doctype"] == "Payment Entry"
