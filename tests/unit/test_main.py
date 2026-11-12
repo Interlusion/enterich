@@ -1,10 +1,11 @@
 """Start-up: REQ-002-PRS-NF005 (refusal) and the start line of REQ-002-PRS-NF008."""
 
 import json
+from importlib.metadata import version
 
 import pytest
 
-from enterich import __main__
+from enterich import __main__, tools
 from tests.fakes.settings import API_SECRET, ENV
 
 
@@ -21,6 +22,8 @@ def test_an_invalid_configuration_stops_enterich(
     out = capsys.readouterr().out
     line = json.loads(out)
     assert line["event"] == "error"
+    assert line["level"] == "error"
+    assert line["exception"] == "ConfigError"
     assert line["problems"] == [
         "ENTERICH_ISSUER: required",
         "ENTERICH_CLOCK_LEEWAY: must be from 0 to 60",
@@ -33,15 +36,29 @@ def test_start_logs_the_settings_and_runs_uvicorn(
 ) -> None:
     for name, value in ENV.items():
         monkeypatch.setenv(name, value)
+    monkeypatch.setenv("ENTERICH_HOST", "127.0.0.2")
     ran: dict[str, object] = {}
-    monkeypatch.setattr(__main__.uvicorn, "run", lambda app, **kw: ran.update(kw))  # pyright: ignore[reportUnknownLambdaType, reportUnknownArgumentType]
+    monkeypatch.setattr(__main__.uvicorn, "run", lambda app, **kw: ran.update(kw, app=app))  # pyright: ignore[reportUnknownLambdaType, reportUnknownArgumentType]
     __main__.main()
     line = json.loads(capsys.readouterr().out)
     assert line["event"] == "start"
+    assert line["level"] == "info"
+    assert line["warnings"] == []
+    assert line["version"] == version("enterich")
+    assert line["resource_url"] == ENV["ENTERICH_RESOURCE_URL"]
+    assert line["issuer"] == ENV["ENTERICH_ISSUER"]
+    assert line["client"] == ENV["ENTERICH_CLIENT_ID"]
     assert line["subject"] == ENV["ENTERICH_SUBJECT"]
+    assert line["company"] == ENV["ENTERICH_COMPANY"]
     assert line["leeway"] == 5
+    assert line["operations"] == list(tools.names())
     assert API_SECRET not in json.dumps(line)
+    assert ran["app"] is not None
+    assert callable(ran["app"])
+    assert ran["host"] == "127.0.0.2"
     assert ran["port"] == 8000
+    assert ran["log_config"] is None
+    assert ran["access_log"] is False
     assert ran["proxy_headers"] is False
     assert ran["server_header"] is False
 

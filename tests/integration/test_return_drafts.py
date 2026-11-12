@@ -266,7 +266,7 @@ def test_the_return_tools_carry_their_annotations_and_say_how_to_retry(mcp: Sess
     [
         ("ACC-SINV-2026-00003", "a draft"),
         ("ACC-SINV-2026-00004", "cancelled"),
-        ("ACC-SINV-2026-00002", "a return"),
+        ("ACC-SINV-2026-00002", f"a return itself; give the invoice it returns ({INVOICE})."),
         ("ACC-SINV-2026-00005", "POS"),
         ("ACC-SINV-2026-00006", "stock"),
         ("ACC-SINV-2026-00007", "doesn't exist"),
@@ -678,6 +678,25 @@ def test_a_debit_note_row_is_received_as_returned(mcp: Session, erp: FakeErpnext
     )
 
 
+@pytest.mark.parametrize("doctype", SIDES)
+@pytest.mark.parametrize(("factor", "stock_qty"), [(12.0, -12), (None, -1)], ids=["box", "none"])
+def test_a_rows_stock_quantity_is_what_is_taken_in_the_stock_uom(
+    mcp: Session, erp: FakeErpnext, doctype: str, factor: float | None, stock_qty: float
+) -> None:
+    name = numbered(doctype, 8)
+    invoice(erp, doctype, name, [("u1", "SKU-1", 2.0)])
+    [line] = erp.docs[doctype][name]["items"]
+    del line["conversion_factor"]
+    if factor:
+        line.update(uom="Box", conversion_factor=factor, stock_qty=2.0 * factor)
+    result = mcp.call(
+        tool(doctype), {"return_against": name, "items": [{"item_code": "SKU-1", "qty": 1}]}
+    )
+    assert not result.error, result.text
+    [post] = erp.writes(f"/api/resource/{doctype}")
+    assert [(r["qty"], r["stock_qty"]) for r in post.body["items"]] == [(-1, stock_qty)]
+
+
 # Fixed discounts and charges
 
 
@@ -724,6 +743,28 @@ def test_a_partly_returned_invoice_with_a_fixed_amount_takes_no_return(
     assert result.error
     assert result.text.startswith("return_against: ")
     assert "fixed" in result.text
+    assert erp.writes() == []
+
+
+@pytest.mark.parametrize("doctype", SIDES)
+@pytest.mark.parametrize(
+    ("taken", "says", "not_says"),
+    [(1.0, "fixed", "nothing left"), (2.0, "nothing left", "fixed")],
+    ids=["one-left", "none-left"],
+)
+def test_a_returned_invoice_with_a_fixed_amount_is_refused_down_to_its_last_unit(
+    mcp: Session, erp: FakeErpnext, doctype: str, taken: float, says: str, not_says: str
+) -> None:
+    name, before = numbered(doctype, 8), numbered(doctype, 9)
+    invoice(erp, doctype, name, [("x1", "SKU-1", 2.0)], discount_amount=10.0)
+    link = "sales_invoice_item" if doctype == "Sales Invoice" else "purchase_invoice_item"
+    factory = sales_invoice if doctype == "Sales Invoice" else purchase_invoice
+    erp.add(doctype, factory(before, **returned(before, name, link, [("x1", "SKU-1", taken)])))
+    result = mcp.call(tool(doctype), {"return_against": name})
+    assert result.error
+    assert result.text.startswith(f"return_against: {name} ")
+    assert says in result.text
+    assert not_says not in result.text
     assert erp.writes() == []
 
 
@@ -836,7 +877,10 @@ def test_a_return_without_its_invoice_is_refused_without_naming_none(
     [
         ({"docstatus": 0, "status": "Draft"}, "a draft"),
         ({"docstatus": 2, "status": "Cancelled"}, "cancelled"),
-        ({"is_return": 1, "return_against": "ACC-PINV-2026-00002"}, "a return"),
+        (
+            {"is_return": 1, "return_against": "ACC-PINV-2026-00002"},
+            "a return itself; give the invoice it returns (ACC-PINV-2026-00002).",
+        ),
         ({"company": "Other AG"}, "doesn't exist"),
         ({"on_hold": 1, "release_date": "2026-11-30"}, "on hold"),
     ],
