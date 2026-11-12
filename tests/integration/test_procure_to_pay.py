@@ -328,6 +328,24 @@ def test_the_payables_call_carries_exactly_the_fixed_filters(
     }
 
 
+def test_the_payables_call_carries_the_given_inputs(mcp: Session, erp: FakeErpnext) -> None:
+    mcp.call(
+        "report_accounts_payable",
+        {"as_of_date": "2026-09-30", "supplier": "SUPP-0001", "ageing_based_on": "posting_date"},
+    )
+    [call] = erp.received
+    assert call.params["report_name"] == "Accounts Payable"
+    assert call.param("filters") == {
+        "company": COMPANY,
+        "report_date": "2026-09-30",
+        "party_type": "Supplier",
+        "party": ["SUPP-0001"],
+        "ageing_based_on": "Posting Date",
+        "age_as_on": "Report Date",
+        "range": "30, 60, 90, 120",
+    }
+
+
 def test_payables_rows_carry_the_supplier_invoice(mcp: Session, erp: FakeErpnext) -> None:
     erp.reports["Accounts Payable"] = [
         payable("ACC-PINV-2026-00001", 238.0),
