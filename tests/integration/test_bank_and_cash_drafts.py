@@ -397,7 +397,8 @@ def test_an_allocation_above_the_outstanding_amount_is_refused(
     assert result.error
     assert result.text.startswith("references: ")
     assert "ACC-SINV-2026-00002" in result.text
-    assert "50" in result.text
+    assert "50.01" in result.text
+    assert " 50 " in result.text
     assert erp.writes() == []
 
 
