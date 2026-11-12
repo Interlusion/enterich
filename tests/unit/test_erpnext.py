@@ -69,6 +69,16 @@ async def test_a_redirect_is_a_refusal_not_a_second_request(fake: FakeErpnext) -
     assert len(fake.received) == 1
 
 
+@pytest.mark.parametrize("status", [300, 399])
+async def test_every_3xx_answer_is_a_redirect_even_with_a_json_body(
+    fake: FakeErpnext, status: int
+) -> None:
+    fake.raw = (status, b'{"message": {}}')
+    with pytest.raises(ErpnextError, match="redirect"):
+        await Erpnext(settings(), fake.transport()).get_doc("Item", "SKU-1")
+    assert len(fake.received) == 1
+
+
 @pytest.fixture
 async def local_erpnext() -> AsyncIterator[int]:
     """A minimal HTTP server on loopback, answering every request with an empty list."""
