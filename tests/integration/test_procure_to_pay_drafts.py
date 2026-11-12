@@ -376,7 +376,7 @@ def test_without_a_bill_the_items_match(mcp: Session, erp: FakeErpnext) -> None:
     ]
 
 
-# Warnings (REQ-005-PRS-F007, REQ-001-PRS-F016)
+# Warnings (REQ-005-PRS-F007, REQ-001-PRS-F012, REQ-001-PRS-F016)
 
 
 def test_a_replaced_expense_account_warns(mcp: Session, erp: FakeErpnext) -> None:
@@ -418,6 +418,21 @@ def test_a_buying_pricing_rule_that_replaced_a_rate_warns(mcp: Session, erp: Fak
     assert "18" in warning
 
 
+def test_a_purchase_template_without_tax_warns_on_create_and_update(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    erp.add(
+        "Purchase Taxes and Charges Template",
+        purchase_tax_template("Zero - EX", taxes=[{**VAT_ROWS[0], "rate": 0.0}]),
+    )
+    warning = (
+        "Tax template Zero - EX was given, but the tax total is 0; check the template and the "
+        "items' tax templates."
+    )
+    assert create(mcp, taxes_and_charges="Zero - EX").data["warnings"] == [warning]
+    assert update(mcp, taxes_and_charges="Zero - EX").data["warnings"] == [warning]
+
+
 # update_draft_purchase_invoice
 
 
@@ -447,6 +462,33 @@ def test_an_update_sends_exactly_the_catalogued_body(mcp: Session, erp: FakeErpn
         "remarks": "Corrected",
         "modified": MODIFIED,
     }
+
+
+def test_an_update_returns_the_draft_with_its_purchase_fields(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    result = update(mcp, remarks="Corrected").data
+    assert result["items"] == [
+        {
+            "item_code": "PAPER",
+            "qty": 5,
+            "rate": 20,
+            "amount": 100,
+            "expense_account": COST,
+            "is_free_item": False,
+            "outside_text": {},
+        }
+    ]
+    assert result["taxes"] == [
+        {
+            "account_head": "1576 - Input VAT 19% - EX",
+            "rate": 19.0,
+            "tax_amount": 19.0,
+            "add_deduct_tax": "Add",
+            "category": "Total",
+            "outside_text": {},
+        }
+    ]
 
 
 def test_an_update_with_a_template_sends_the_purchase_rows(mcp: Session, erp: FakeErpnext) -> None:

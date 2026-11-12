@@ -93,6 +93,15 @@ def test_list_suppliers_sends_exactly_the_catalogued_call(mcp: Session, erp: Fak
     ]
 
 
+def test_disabled_suppliers_only_when_asked_for(mcp: Session, erp: FakeErpnext) -> None:
+    records = mcp.call("list_suppliers", {"include_disabled": True}).data["records"]
+    assert [(r["name"], r["disabled"]) for r in records] == [
+        ("SUPP-0001", False),
+        ("SUPP-OLD", True),
+    ]
+    assert erp.received[0].param("filters") == []
+
+
 def test_get_supplier_returns_only_its_own_addresses(mcp: Session, erp: FakeErpnext) -> None:
     result = mcp.call("get_supplier", {"name": "SUPP-0001"}).data
     first, second = erp.received
@@ -122,7 +131,12 @@ def test_list_purchase_invoices_sends_exactly_the_catalogued_call(
 ) -> None:
     mcp.call(
         "list_purchase_invoices",
-        {"supplier": "SUPP-0001", "state": "overdue", "from_date": "2026-10-01"},
+        {
+            "supplier": "SUPP-0001",
+            "state": "overdue",
+            "from_date": "2026-10-01",
+            "to_date": "2026-10-31",
+        },
     )
     [call] = erp.received
     assert (call.method, call.path) == ("GET", "/api/resource/Purchase Invoice")
@@ -135,6 +149,7 @@ def test_list_purchase_invoices_sends_exactly_the_catalogued_call(
         ["outstanding_amount", ">", 0],
         ["due_date", "<", TODAY],
         ["posting_date", ">=", "2026-10-01"],
+        ["posting_date", "<=", "2026-10-31"],
     ]
     assert call.param("order_by") == "posting_date desc, name desc"
 
@@ -326,6 +341,16 @@ def test_only_purchase_templates_are_listed(mcp: Session, erp: FakeErpnext) -> N
     assert [r["name"] for r in result["records"]] == ["Input VAT 19% - EX"]
 
 
+def test_disabled_purchase_templates_only_when_asked_for(mcp: Session, erp: FakeErpnext) -> None:
+    erp.add(
+        "Purchase Taxes and Charges Template",
+        purchase_tax_template("Old Input VAT - EX", disabled=1),
+    )
+    records = mcp.call("list_purchase_tax_templates", {"include_disabled": True}).data["records"]
+    assert [r["name"] for r in records] == ["Input VAT 19% - EX", "Old Input VAT - EX"]
+    assert erp.received[0].param("filters") == [["company", "=", COMPANY]]
+
+
 # report_accounts_payable
 
 
@@ -341,6 +366,24 @@ def test_the_payables_call_carries_exactly_the_fixed_filters(
         "party_type": "Supplier",
         "party": ["SUPP-0001"],
         "ageing_based_on": "Due Date",
+        "age_as_on": "Report Date",
+        "range": "30, 60, 90, 120",
+    }
+
+
+def test_the_payables_call_carries_the_given_inputs(mcp: Session, erp: FakeErpnext) -> None:
+    mcp.call(
+        "report_accounts_payable",
+        {"as_of_date": "2026-09-30", "supplier": "SUPP-0001", "ageing_based_on": "posting_date"},
+    )
+    [call] = erp.received
+    assert call.params["report_name"] == "Accounts Payable"
+    assert call.param("filters") == {
+        "company": COMPANY,
+        "report_date": "2026-09-30",
+        "party_type": "Supplier",
+        "party": ["SUPP-0001"],
+        "ageing_based_on": "Posting Date",
         "age_as_on": "Report Date",
         "range": "30, 60, 90, 120",
     }

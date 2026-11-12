@@ -405,6 +405,35 @@ def test_a_debit_note_sends_erpnexts_return_with_the_credit_notes_number(
     assert data["outside_text"] == {"bill_no": "CN-77"}  # the supplier's text
 
 
+def test_a_debit_note_sends_the_given_posting_date_and_remarks_with_the_number(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    erp.docs["Purchase Invoice"].pop(PURCHASE_DRAFT)
+    mapped = erp.mapped_return("Purchase Invoice", BILL)
+    result = create(
+        mcp,
+        "create_draft_purchase_return",
+        items=[{"item_code": "SKU-1", "qty": 1}],
+        bill_no="CN-77",
+        bill_date="2026-10-25",
+        posting_date="2026-10-27",
+        remarks="Damaged",
+    )
+    assert not result.error, result.text
+    [post] = erp.writes(PURCHASES)
+    assert post.body == {
+        **stripped(mapped),
+        "items": lines(mapped, (0, 1)),
+        "bill_no": "CN-77",
+        "bill_date": "2026-10-25",
+        "posting_date": "2026-10-27",
+        "set_posting_time": 1,
+        "remarks": "Damaged",
+        "company": COMPANY,
+        "docstatus": 0,
+    }
+
+
 def test_a_debit_note_without_a_number_keeps_the_invoices(mcp: Session, erp: FakeErpnext) -> None:
     erp.docs["Purchase Invoice"].pop(PURCHASE_DRAFT)
     result = create(mcp, "create_draft_purchase_return")
@@ -440,31 +469,38 @@ def test_a_draft_debit_note_against_the_invoice_is_a_duplicate(
 # update_draft_sales_return, update_draft_purchase_return
 
 
+@pytest.mark.parametrize("doctype", SIDES)
 def test_an_update_with_items_sends_the_rows_of_erpnexts_return(
-    mcp: Session, erp: FakeErpnext
+    mcp: Session, erp: FakeErpnext, doctype: str
 ) -> None:
-    mapped = erp.mapped_return("Sales Invoice", INVOICE)
-    result = update(mcp, items=[{"item_code": "SKU-1", "qty": 2}])
+    against = INVOICE if doctype == "Sales Invoice" else BILL
+    method = SALES_RETURN_METHOD if doctype == "Sales Invoice" else DEBIT_NOTE_METHOD
+    mapped = erp.mapped_return(doctype, against)
+    result = update(mcp, tool(doctype, "update"), items=[{"item_code": "SKU-1", "qty": 2}])
     assert not result.error, result.text
-    [put] = erp.writes(SALES)
-    assert (put.method, put.path) == ("PUT", f"{SALES}/{SALES_DRAFT}")
+    [put] = erp.writes(f"/api/resource/{doctype}")
+    assert (put.method, put.path) == ("PUT", f"/api/resource/{doctype}/{numbered(doctype, 20)}")
     assert put.body == {"items": lines(mapped, (0, 2)), "modified": MODIFIED}
-    [mapping] = [r for r in erp.received if r.path == SALES_RETURN_METHOD]
-    assert mapping.params == {"source_name": INVOICE}
+    [mapping] = [r for r in erp.received if r.path == method]
+    assert mapping.params == {"source_name": against}
     assert [(r["item_code"], r["qty"]) for r in result.data["items"]] == [("SKU-1", -2)]
 
 
-def test_an_update_without_items_sends_no_rows(mcp: Session, erp: FakeErpnext) -> None:
-    result = update(mcp, posting_date="2026-10-27", remarks="")
+@pytest.mark.parametrize("doctype", SIDES)
+def test_an_update_without_items_sends_no_rows(
+    mcp: Session, erp: FakeErpnext, doctype: str
+) -> None:
+    result = update(mcp, tool(doctype, "update"), posting_date="2026-10-27", remarks="")
     assert not result.error, result.text
-    [put] = erp.writes(SALES)
+    [put] = erp.writes(f"/api/resource/{doctype}")
     assert put.body == {
         "posting_date": "2026-10-27",
         "set_posting_time": 1,
         "remarks": "",
         "modified": MODIFIED,
     }
-    assert [r for r in erp.received if r.path == SALES_RETURN_METHOD] == []
+    methods = (SALES_RETURN_METHOD, DEBIT_NOTE_METHOD)
+    assert [r for r in erp.received if r.path in methods] == []
 
 
 def test_an_update_of_a_debit_note_sends_the_credit_notes_number(
@@ -474,6 +510,30 @@ def test_an_update_of_a_debit_note_sends_the_credit_notes_number(
     assert not result.error, result.text
     [put] = erp.writes(PURCHASES)
     assert put.body == {"bill_no": "CN-78", "bill_date": "2026-10-26", "modified": MODIFIED}
+    assert result.data["outside_text"] == {"bill_no": "CN-78"}  # the supplier's text
+
+
+@pytest.mark.parametrize("kind", ["create", "update"])
+def test_a_debit_note_returns_what_a_purchase_invoice_draft_does(
+    mcp: Session, erp: FakeErpnext, kind: str
+) -> None:
+    for doc in erp.docs["Purchase Invoice"].values():
+        for line in doc["items"]:
+            line["expense_account"] = "5000 - Cost - EX"
+    if kind == "create":
+        erp.docs["Purchase Invoice"].pop(PURCHASE_DRAFT)
+        result = create(
+            mcp, "create_draft_purchase_return", items=[{"item_code": "SKU-1", "qty": 1}]
+        )
+    else:
+        result = update(mcp, "update_draft_purchase_return", remarks="Damaged")
+    assert not result.error, result.text
+    assert [(r["item_code"], r["expense_account"]) for r in result.data["items"]] == [
+        ("SKU-1", "5000 - Cost - EX")
+    ]
+    assert [
+        (t["account_head"], t["add_deduct_tax"], t["category"]) for t in result.data["taxes"]
+    ] == [("1576 - Input VAT 19% - EX", "Add", "Total")]
 
 
 def test_an_update_without_a_change_is_refused(mcp: Session, erp: FakeErpnext) -> None:
@@ -840,6 +900,21 @@ def test_a_debit_note_update_with_a_known_number_warns(mcp: Session, erp: FakeEr
     assert not result.error, result.text
     [warning] = result.data["warnings"]
     assert "ACC-PINV-2026-00009" in warning
+
+
+def test_a_debit_notes_own_number_doesnt_warn(mcp: Session, erp: FakeErpnext) -> None:
+    erp.docs["Purchase Invoice"][PURCHASE_DRAFT]["bill_no"] = "CN-80"
+    result = update(mcp, "update_draft_purchase_return", bill_no="CN-80")
+    assert not result.error, result.text
+    assert result.data["warnings"] == []
+    [check] = [r for r in erp.lists(PURCHASES) if ["bill_no", "=", "CN-80"] in r.param("filters")]
+    assert check.param("filters") == [
+        ["company", "=", COMPANY],
+        ["docstatus", "in", [0, 1]],
+        ["supplier", "=", "SUPP-0001"],
+        ["bill_no", "=", "CN-80"],
+        ["name", "!=", PURCHASE_DRAFT],
+    ]
 
 
 def test_an_empty_bill_no_clears_a_debit_notes_number(mcp: Session, erp: FakeErpnext) -> None:
