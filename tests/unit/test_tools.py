@@ -99,6 +99,27 @@ async def test_the_agent_gets_enterichs_text_without_a_prefix(
     assert operation["outcome"] == {"refusal": text}
 
 
+async def test_a_refusal_of_300_is_kept_whole_and_one_of_301_is_cut_to_300(
+    monkeypatch: pytest.MonkeyPatch, logs: Logs
+) -> None:
+    """REQ-001-PRS-F008: only a text over 300 characters is cut, to exactly 300."""
+
+    async def fits(inputs: Nothing, context: Context) -> dict[str, Any]:
+        raise tools.Refusal("x" * 300)
+
+    async def over(inputs: Nothing, context: Context) -> dict[str, Any]:
+        raise tools.Refusal("y" * 301)
+
+    _, whole = await call(monkeypatch, fits)
+    _, cut = await call(monkeypatch, over)
+    assert whole == "x" * 300
+    assert cut == "y" * 299 + "…"
+    assert [line["outcome"] for line in logs.events("operation")] == [
+        {"refusal": whole},
+        {"refusal": cut},
+    ]
+
+
 async def test_a_read_counts_rows_whatever_the_result_holds(
     monkeypatch: pytest.MonkeyPatch, logs: Logs
 ) -> None:
