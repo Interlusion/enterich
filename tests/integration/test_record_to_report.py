@@ -589,7 +589,7 @@ def test_trial_balance_rows_and_totals(mcp: Session, erp: FakeErpnext) -> None:
         "outside_text": {},
     }
     assert result["records"][0]["is_group"] is True
-    # Sums of decimals over the root rows: 0.3, not ERPNext's float total.
+    # Sums over the root rows.
     assert result["totals"] == {
         "opening_debit": 1000.0,
         "opening_credit": 1000.0,
@@ -599,6 +599,27 @@ def test_trial_balance_rows_and_totals(mcp: Session, erp: FakeErpnext) -> None:
         "closing_credit": 1000.3,
     }
     assert report_call(erp, "Trial Balance").param("filters")["show_zero_values"] == 1
+
+
+def test_trial_balance_totals_are_decimal_sums_over_every_root(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    rows = [
+        balance_row("1000 - Assets - EX", None, True, debit=0.1),
+        balance_row("1200 - Bank - EX", "1000 - Assets - EX", False, debit=0.1),
+        balance_row("3000 - Equity - EX", None, True, debit=0.2),
+    ]
+    total = balance_total(rows)
+    # ERPNext's total row is a float sum: 0.1 + 0.2 isn't 0.3.
+    assert total["debit"] != 0.3
+    erp.reports["Trial Balance"] = [*rows, {}, total]
+    result = mcp.call(
+        "report_trial_balance", {"from_date": "2026-01-01", "to_date": "2026-10-31", "limit": 1}
+    ).data
+    assert [r["account"] for r in result["records"]] == ["1000 - Assets - EX"]
+    # The page holds one root; the totals cover every root, summed as decimals.
+    assert result["totals"]["debit"] == 0.3
+    assert result["totals"]["closing_debit"] == 0.3
 
 
 def test_a_year_of_the_company_comes_before_one_of_every_company(
