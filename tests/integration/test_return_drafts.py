@@ -602,6 +602,25 @@ def test_a_debit_note_row_is_received_as_returned(mcp: Session, erp: FakeErpnext
     )
 
 
+@pytest.mark.parametrize("doctype", SIDES)
+@pytest.mark.parametrize(("factor", "stock_qty"), [(12.0, -12), (None, -1)], ids=["box", "none"])
+def test_a_rows_stock_quantity_is_what_is_taken_in_the_stock_uom(
+    mcp: Session, erp: FakeErpnext, doctype: str, factor: float | None, stock_qty: float
+) -> None:
+    name = numbered(doctype, 8)
+    invoice(erp, doctype, name, [("u1", "SKU-1", 2.0)])
+    [line] = erp.docs[doctype][name]["items"]
+    del line["conversion_factor"]
+    if factor:
+        line.update(uom="Box", conversion_factor=factor, stock_qty=2.0 * factor)
+    result = mcp.call(
+        tool(doctype), {"return_against": name, "items": [{"item_code": "SKU-1", "qty": 1}]}
+    )
+    assert not result.error, result.text
+    [post] = erp.writes(f"/api/resource/{doctype}")
+    assert [(r["qty"], r["stock_qty"]) for r in post.body["items"]] == [(-1, stock_qty)]
+
+
 # Fixed discounts and charges
 
 
