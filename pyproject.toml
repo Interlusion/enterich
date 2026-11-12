@@ -34,6 +34,9 @@ dev = [
     "ruff>=0.17.3",
     "zizmor>=1.31.1",
 ]
+harness = [
+    "mutmut>=3.8.1",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.6,<0.14"]
@@ -53,7 +56,7 @@ ignore = ["TRY003"]
 [tool.basedpyright]
 typeCheckingMode = "strict"
 pythonVersion = "3.14"
-include = ["src", "tests", "scripts"]
+include = ["src", "tests", "scripts", "harness"]
 
 [tool.pytest]
 testpaths = ["tests"]
@@ -62,3 +65,10 @@ addopts = ["--strict-markers"]
 [tool.coverage.run]
 branch = true
 source = ["enterich"]
+
+# Mutation testing for the improvement pipeline's tests lens (ADR-008): the unit and
+# integration tests, against a copy in mutants/ (harness/mutation.sh)
+[tool.mutmut]
+paths_to_mutate = ["src/enterich/"]
+tests_dir = ["tests"]
+pytest_add_cli_args = ["-p", "no:cacheprovider", "--ignore=tests/e2e", "--ignore=tests/repo"]

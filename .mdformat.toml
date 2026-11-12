@@ -1,6 +1,6 @@
 wrap = "no"
 number = true
-exclude = [".venv/**", ".pytest_cache/**", ".ruff_cache/**", ".idea/**", ".claude/**"]
+exclude = [".venv/**", ".pytest_cache/**", ".ruff_cache/**", ".idea/**", ".claude/**", "harness/runs/**"]
 
 [plugin.tables]
 compact_tables = true
