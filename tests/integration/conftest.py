@@ -17,11 +17,18 @@ def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def erpnext() -> Iterator[FakeErpnext]:
-    """The fake ERPNext; afterwards Enterich must have used none of its side doors
-    (REQ-001-PRS-F006), and each of its comments must be on a document of the DocType it
-    names (REQ-001-PRS-F015)."""
-    fake = FakeErpnext()
+    """The fake ERPNext, setting a session cookie as a real one does; afterwards every
+    request it received, read or write, must carry the agent's key, the configured Host,
+    English and no cookie (REQ-002-PRS-NF006), Enterich must have used none of its side
+    doors (REQ-001-PRS-F006), and each of its comments must be on a document of the DocType
+    it names (REQ-001-PRS-F015)."""
+    fake = FakeErpnext(set_cookie=True)
     yield fake
+    for received in fake.received:
+        assert received.headers["authorization"] == f"token {API_KEY}:{API_SECRET}"
+        assert received.headers["host"] == settings().erpnext_host
+        assert received.headers["accept-language"] == "en"
+        assert "cookie" not in received.headers
     assert fake.doors == []
     for comment in fake.comments:
         assert comment["reference_name"] in fake.docs.get(comment["reference_doctype"], {})
