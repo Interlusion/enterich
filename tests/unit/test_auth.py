@@ -250,6 +250,12 @@ async def test_a_key_without_use_verifies_tokens(signer: Signer) -> None:
     assert await verifier(jwks).verify_token(token(signer)) is not None
 
 
+async def test_an_unusable_key_doesnt_hide_the_keys_after_it(signer: Signer) -> None:
+    broken = {"kty": "RSA", "kid": "broken", "n": "x", "e": "AQAB"}
+    jwks = FakeJwks([], extra_keys=[broken, signer.jwk()])
+    assert await verifier(jwks).verify_token(token(signer)) is not None
+
+
 async def test_jwks_is_cached_for_5_minutes(jwks: FakeJwks, signer: Signer) -> None:
     clock = Clock()
     v = verifier(jwks, clock=clock)
