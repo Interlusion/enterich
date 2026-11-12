@@ -154,6 +154,7 @@ async def test_a_response_over_10_mib_is_refused(fake: FakeErpnext) -> None:
 @pytest.mark.parametrize(
     ("status", "exc_type", "message"),
     [
+        (400, "CSRFTokenError", "Invalid Request"),
         (403, "PermissionError", "No permission for Item"),
         (417, "ValidationError", "Posting Date cannot be before the fiscal year"),
         (417, "LinkValidationError", "Could not find Customer: Nobody GmbH"),
