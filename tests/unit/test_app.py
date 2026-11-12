@@ -9,7 +9,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.routing import Route
 from starlette.testclient import TestClient
-from starlette.types import Message, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from starlette.websockets import WebSocketDisconnect
 
 from enterich import log
@@ -51,6 +51,39 @@ def test_the_error_line_carries_the_traceback_and_is_written_once() -> None:
     lines = [line for line in lines if line.get("logger") != "httpx2"]  # the test client's own
     assert [line["event"] for line in lines] == ["error"]
     assert "raw failure" in lines[0]["traceback"]
+
+
+async def failing(inner: ASGIApp) -> tuple[list[int], bytes]:
+    """POST /mcp to an inner app that raises: the statuses and the body the wrapper sent."""
+    sent: list[Message] = []
+
+    async def receive() -> Message:
+        return {"type": "http.request", "body": b"{}", "more_body": False}
+
+    async def send(message: Message) -> None:
+        sent.append(message)
+
+    scope: Scope = {"type": "http", "method": "POST", "path": "/mcp", "headers": []}
+    await Wrapper(inner, "/mcp")(scope, receive, send)
+    starts = [m["status"] for m in sent if m["type"] == "http.response.start"]
+    return starts, b"".join(m.get("body", b"") for m in sent if m["type"] == "http.response.body")
+
+
+@pytest.mark.anyio
+async def test_the_500_held_back_from_starlette_reaches_the_client_once() -> None:
+    # The wrapper holds Starlette's 500 back in case it should become a 503, then sends it as is.
+    inner = Starlette(routes=[Route("/mcp", boom, methods=["POST"])])
+    assert await failing(inner) == ([500], b"Internal Server Error")
+
+
+@pytest.mark.anyio
+async def test_a_response_already_started_gets_no_second_start_when_the_app_raises() -> None:
+    async def started(scope: Scope, receive: Receive, send: Send) -> None:
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"{}"})
+        raise RuntimeError("late failure")
+
+    assert await failing(started) == ([200], b"{}")
 
 
 async def posted(
