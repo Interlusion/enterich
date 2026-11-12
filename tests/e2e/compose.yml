@@ -31,7 +31,7 @@ services:
   # from an earlier start is migrated when the image brings other versions, and one
   # whose creation didn't finish is refused: remove it with `down`.
   site:
-    image: frappe/erpnext:v16.52.1@sha256:88654c9f5fb8e47266b492932270239d4d7c3edd4af3966d0768616c0cd20a42
+    image: frappe/erpnext:v16.53.0@sha256:b961d69ed3265f44f712f40be58a3e6a22c8662f61a7e1a8097765534e3e9be2
     volumes: *sites
     depends_on:
       db:
@@ -68,7 +68,7 @@ services:
         echo "$$versions" > "$$stamp"
 
   backend:
-    image: frappe/erpnext:v16.52.1@sha256:88654c9f5fb8e47266b492932270239d4d7c3edd4af3966d0768616c0cd20a42
+    image: frappe/erpnext:v16.53.0@sha256:b961d69ed3265f44f712f40be58a3e6a22c8662f61a7e1a8097765534e3e9be2
     volumes: *sites
     depends_on:
       site:
@@ -82,7 +82,7 @@ services:
 
   # Background jobs, such as the setup wizard's.
   worker:
-    image: frappe/erpnext:v16.52.1@sha256:88654c9f5fb8e47266b492932270239d4d7c3edd4af3966d0768616c0cd20a42
+    image: frappe/erpnext:v16.53.0@sha256:b961d69ed3265f44f712f40be58a3e6a22c8662f61a7e1a8097765534e3e9be2
     volumes: *sites
     depends_on:
       site:
