@@ -244,6 +244,12 @@ async def test_a_key_marked_for_encryption_never_verifies_a_token(signer: Signer
     assert await refusal(verifier(jwks), token(encryption)) == "unknown key"
 
 
+async def test_a_key_without_use_verifies_tokens(signer: Signer) -> None:
+    no_use = {k: v for k, v in signer.jwk().items() if k != "use"}
+    jwks = FakeJwks([], extra_keys=[no_use])
+    assert await verifier(jwks).verify_token(token(signer)) is not None
+
+
 async def test_jwks_is_cached_for_5_minutes(jwks: FakeJwks, signer: Signer) -> None:
     clock = Clock()
     v = verifier(jwks, clock=clock)
