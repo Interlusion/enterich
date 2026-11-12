@@ -91,7 +91,9 @@ def check(record: dict[str, Any]) -> list[str]:
 
 def _row(record: dict[str, Any]) -> str:
     def cell(text: str) -> str:
-        return text.replace("|", "\\|").replace("\n", " ")
+        # An escaped [ keeps a quoted list such as [["company", "=", …]] from reading as
+        # a wiki link to the link check
+        return text.replace("|", "\\|").replace("\n", " ").replace("[", "\\[")
 
     requirement = record.get("requirement") or ""
     return (
