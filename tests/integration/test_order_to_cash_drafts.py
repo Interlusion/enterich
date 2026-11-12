@@ -334,6 +334,23 @@ def test_a_create_sent_again_is_refused_naming_the_first_draft(
 
 
 @pytest.mark.parametrize(
+    ("count", "more"), [(1, ""), (5, ""), (6, " and 1 more")], ids=["one", "five", "six"]
+)
+def test_a_refusal_names_up_to_five_drafts_and_counts_the_rest(
+    mcp: Session, erp: FakeErpnext, count: int, more: str
+) -> None:
+    made = sorted(create(mcp, allow_duplicate=True).data["name"] for _ in range(count))
+    again = create(mcp)
+    assert again.error
+    assert again.text == (
+        "allow_duplicate: a draft with the same customer, posting date and items exists "
+        f"({', '.join(made[:5])}{more}). Check it first; to create another anyway, repeat "
+        "with allow_duplicate true."
+    )
+    assert len(erp.writes(PATH)) == count
+
+
+@pytest.mark.parametrize(
     "changed",
     [
         {"items": [{"item_code": "SKU-1", "qty": 3}]},
