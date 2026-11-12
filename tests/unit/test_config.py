@@ -169,6 +169,12 @@ def test_http_erpnext_url_to_another_host_warns() -> None:
     assert s.warnings == ("ENTERICH_ERPNEXT_URL uses http: the API key travels unencrypted",)
 
 
+def test_http_erpnext_public_url_to_another_host_loads() -> None:
+    s = load({**ENV, "ENTERICH_ERPNEXT_PUBLIC_URL": "http://erp.internal"}, ())
+    assert s.erpnext_public_url == "http://erp.internal"
+    assert s.warnings == ()
+
+
 def test_unknown_enterich_variables_are_reported_as_warnings() -> None:
     s = load({**ENV, "ENTERICH_TOOL": "list_items"}, ("list_items",))
     assert s.warnings == ("ENTERICH_TOOL is not a known variable and is ignored",)
