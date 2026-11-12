@@ -320,6 +320,7 @@ def test_get_sales_invoice_returns_rows_with_outside_text_apart(
         "truncated": [],
         "outside_text": {"customer_name": "Customer CUST-0001", "remarks": "As agreed"},
     }
+    assert result["is_return"] is False
 
 
 def test_an_invoice_with_500_rows_returns_100(mcp: Session, erp: FakeErpnext) -> None:
