@@ -396,6 +396,8 @@ def test_a_date_for_a_draft_with_a_reference_goes_through(mcp: Session, erp: Fak
     dated = update(mcp, cheque_no="TX-1", cheque_date="2026-10-28").data
     result = update(mcp, modified=dated["modified"], cheque_date="2026-10-27")
     assert not result.error, result.text
+    put = erp.writes(PATH)[-1]
+    assert put.body == {"cheque_date": "2026-10-27", "modified": dated["modified"]}
 
 
 @pytest.mark.parametrize(
