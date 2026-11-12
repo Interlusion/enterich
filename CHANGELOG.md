@@ -4,6 +4,10 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed
+
+- A token whose `azp` or `client_id` is present but not a string is refused as naming the wrong client. Before, such a claim counted as absent, so a token with a numeric `azp` and the configured `client_id` was accepted (REQ-002-PRS-NF001).
+
 ## [0.5.0] - 2026-11-11
 
 ### Added
