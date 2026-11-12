@@ -324,10 +324,12 @@ def test_the_tool_list_carries_titles_annotations_and_strict_schemas(mcp: Sessio
 def test_enterich_tools_limits_what_is_offered(
     jwks: FakeJwks, signer: Signer, erp: FakeErpnext
 ) -> None:
-    with client(jwks, settings(tools="get_item"), erp) as c:
+    chosen = "get_item,list_customers,create_draft_sales_invoice"
+    with client(jwks, settings(tools=chosen), erp) as c:
         mcp = Session(c, token(signer))
-        assert [t["name"] for t in mcp.tools()] == ["get_item"]
-        assert mcp.call("list_items").error
+        assert sorted(t["name"] for t in mcp.tools()) == sorted(chosen.split(","))
+        result = mcp.call("list_items")
+        assert (result.error, result.text) == (True, "Unknown tool: list_items")
     assert erp.received == []
 
 
