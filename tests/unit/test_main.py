@@ -36,8 +36,9 @@ def test_start_logs_the_settings_and_runs_uvicorn(
 ) -> None:
     for name, value in ENV.items():
         monkeypatch.setenv(name, value)
+    monkeypatch.setenv("ENTERICH_HOST", "127.0.0.2")
     ran: dict[str, object] = {}
-    monkeypatch.setattr(__main__.uvicorn, "run", lambda app, **kw: ran.update(kw))  # pyright: ignore[reportUnknownLambdaType, reportUnknownArgumentType]
+    monkeypatch.setattr(__main__.uvicorn, "run", lambda app, **kw: ran.update(kw, app=app))  # pyright: ignore[reportUnknownLambdaType, reportUnknownArgumentType]
     __main__.main()
     line = json.loads(capsys.readouterr().out)
     assert line["event"] == "start"
@@ -52,7 +53,12 @@ def test_start_logs_the_settings_and_runs_uvicorn(
     assert line["leeway"] == 5
     assert line["operations"] == list(tools.names())
     assert API_SECRET not in json.dumps(line)
+    assert ran["app"] is not None
+    assert callable(ran["app"])
+    assert ran["host"] == "127.0.0.2"
     assert ran["port"] == 8000
+    assert ran["log_config"] is None
+    assert ran["access_log"] is False
     assert ran["proxy_headers"] is False
     assert ran["server_header"] is False
 
