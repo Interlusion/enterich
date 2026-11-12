@@ -269,6 +269,23 @@ def test_shutdown_closes_the_outgoing_clients(monkeypatch: pytest.MonkeyPatch) -
     assert len(closed) == 2  # the JWKS client and the ERPNext client
 
 
+def test_shutdown_leaves_a_handed_in_jwks_client_open(monkeypatch: pytest.MonkeyPatch) -> None:
+    closed: list[httpx2.AsyncClient] = []
+
+    class Recorded(httpx2.AsyncClient):
+        async def aclose(self) -> None:
+            closed.append(self)
+            await super().aclose()
+
+    monkeypatch.setattr(httpx2, "AsyncClient", Recorded)
+    handed_in = Recorded()
+    with TestClient(create_app(settings(), handed_in), base_url=BASE):
+        assert closed == []
+    assert len(closed) == 1  # the ERPNext client; the caller closes its own
+    assert handed_in not in closed
+    assert not handed_in.is_closed
+
+
 @dataclass
 class LocalJwks:
     """A JWKS on loopback over real HTTP, for the client create_app builds itself."""
