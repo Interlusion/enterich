@@ -210,6 +210,8 @@ class Verifier:
         def refuse(reason: str) -> _Refused:
             return _Refused(reason, subject, client)
 
+        if ("azp" in claims and azp is None) or ("client_id" in claims and client_id is None):
+            raise refuse("wrong client")  # present but not a string, so it names no client
         if azp is not None and client_id is not None and azp != client_id:
             raise refuse("azp and client_id differ")
         if client is None or client != s.client_id:
