@@ -396,14 +396,24 @@ def test_a_tax_summary_of_over_100_entries_returns_100(mcp: Session, erp: FakeEr
     assert result["truncated"] == ["tax_summary"]
 
 
-def test_a_tax_summary_is_in_the_invoices_currency(mcp: Session, erp: FakeErpnext) -> None:
+@pytest.mark.parametrize(
+    ("conversion_rate", "amounts"),
+    [
+        (0.9137, [(34.72, 182.74), (6.4, 91.36)]),
+        (2.0, [(76.0, 400.0), (14.0, 199.98)]),
+    ],
+)
+def test_a_tax_summary_is_in_the_invoices_currency(
+    mcp: Session, erp: FakeErpnext, conversion_rate: float, amounts: list[tuple[float, float]]
+) -> None:
     """REQ-001-PRS-F022: ERPNext stores the tax per item in the company's currency; the
-    amounts are the end-to-end site's for 200 and 99.99 USD at 0.9137."""
-    invoice = sales_invoice("ACC-SINV-2026-00502", currency="USD", conversion_rate=0.9137)
+    amounts at 0.9137 are the end-to-end site's for 200 and 99.99 USD, and any rate other
+    than 1 divides them."""
+    invoice = sales_invoice("ACC-SINV-2026-00502", currency="USD", conversion_rate=conversion_rate)
     item, tax = invoice["items"][0]["name"], invoice["taxes"][0]["name"]
     details = [
-        {"item_row": item, "tax_row": tax, "rate": 19.0, "amount": 34.72, "taxable_amount": 182.74},
-        {"item_row": item, "tax_row": tax, "rate": 7.0, "amount": 6.4, "taxable_amount": 91.36},
+        {"item_row": item, "tax_row": tax, "rate": rate, "amount": amount, "taxable_amount": base}
+        for rate, (amount, base) in zip([19.0, 7.0], amounts, strict=True)
     ]
     erp.add("Sales Invoice", {**invoice, "item_wise_tax_details": details})
     result = mcp.call("get_sales_invoice", {"name": "ACC-SINV-2026-00502"}).data
