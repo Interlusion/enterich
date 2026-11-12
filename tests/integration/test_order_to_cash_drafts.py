@@ -1016,6 +1016,17 @@ def test_rows_at_rate_0_are_named_up_to_20(mcp: Session, erp: FakeErpnext) -> No
     assert comment["content"].endswith(more)
 
 
+def test_20_rows_at_rate_0_are_named_without_a_count(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-001-PRS-F016: the count of further rows comes only when there are any."""
+    rows = [invoice_row(f"NP-{n}", 1, 0.0) for n in range(20)]
+    erp.docs["Sales Invoice"][DRAFT]["items"] = rows
+    result = update(mcp, remarks="Checked").data
+    assert len(result["warnings"]) == 20
+    assert "NP-19" in result["warnings"][-1]
+    [comment] = erp.comments
+    assert "more rows" not in comment["content"]
+
+
 # Due dates (REQ-001-PRS-F017)
 
 
