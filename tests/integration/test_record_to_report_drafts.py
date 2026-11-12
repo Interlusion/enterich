@@ -525,6 +525,22 @@ def test_an_update_warns_where_totals_were_rounded_apart(mcp: Session, erp: Fake
     assert comment["reference_name"] == DRAFT
 
 
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"accounts": [{"account": RENT, "debit": 650}, {"account": BANK, "credit": 650}]},
+        {"user_remark": "Rent November"},
+    ],
+)
+def test_an_update_with_equal_totals_warns_nothing(
+    mcp: Session, erp: FakeErpnext, arguments: dict[str, Any]
+) -> None:
+    result = update(mcp, **arguments)
+    assert not result.error, result.text
+    assert result.data["warnings"] == []
+    assert [c["content"].count("<br>") for c in erp.comments] == [0]
+
+
 def test_a_draft_without_rows_matches_nothing(mcp: Session, erp: FakeErpnext) -> None:
     empty = journal_entry("ACC-JV-2026-00012", docstatus=0, posting_date=TODAY, accounts=[])
     erp.add("Journal Entry", empty)
