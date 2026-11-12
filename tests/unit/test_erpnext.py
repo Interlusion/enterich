@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from decimal import Decimal
 
 import anyio
+import httpx2
 import pytest
 
 from enterich import erpnext
@@ -111,6 +112,18 @@ async def test_a_call_ends_after_the_call_timeout(
     fake.delay = 1.0
     with anyio.fail_after(0.9), pytest.raises(ErpnextError, match="didn't answer"):
         await Erpnext(settings(), fake.transport()).get_doc("Item", "SKU-1")
+
+
+async def test_the_call_timeout_is_the_only_time_limit(fake: FakeErpnext) -> None:
+    """httpx's default of 5 s would end a call that ERPNext answers within the 30 s."""
+    timeouts: list[object] = []
+
+    async def handle(request: httpx2.Request) -> httpx2.Response:
+        timeouts.append(request.extensions["timeout"])
+        return await fake.handle(request)
+
+    await Erpnext(settings(), httpx2.MockTransport(handle)).get_doc("Item", "SKU-1")
+    assert timeouts == [{"connect": None, "read": None, "write": None, "pool": None}]
 
 
 async def test_a_response_over_10_mib_is_refused(fake: FakeErpnext) -> None:
