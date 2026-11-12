@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 import time
+from collections.abc import AsyncIterator
 from typing import Any
 
 import anyio
@@ -13,8 +14,9 @@ import httpx2
 import pytest
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
-from enterich.auth import JwksCache, KeysUnavailable, Verifier, last_refusal
+from enterich.auth import MAX_JWKS_BYTES, JwksCache, KeysUnavailable, Verifier, last_refusal
 from enterich.config import Settings
+from tests.conftest import Logs
 from tests.fakes.jwks import FakeJwks, Signer, claims, ec_signer, rsa_signer, token
 from tests.fakes.settings import CLIENT_ID, JWKS_URL, RESOURCE_URL, SUBJECT, settings
 
@@ -311,6 +313,40 @@ async def test_a_jwks_without_usable_keys_counts_as_unavailable(
     jwks = FakeJwks([], extra_keys=keys)
     with pytest.raises(KeysUnavailable):
         await verifier(jwks).verify_token(token(signer))
+
+
+# The JWKS body is read in chunks up to a cap (REQ-002-URS-NF009, bounded work).
+class Chunks(httpx2.AsyncByteStream):
+    def __init__(self, body: bytes, size: int = 64 * 1024) -> None:
+        self._parts = [body[i : i + size] for i in range(0, len(body), size)]
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        for part in self._parts:
+            yield part
+
+
+def chunked_jwks(signer: Signer, length: int) -> JwksCache:
+    """A JWKS of `length` bytes, padded with an extra member, sent in 64 KiB chunks."""
+    head = json.dumps({"keys": [signer.jwk()], "pad": ""}).encode()
+    body = head[:-2] + b" " * (length - len(head)) + head[-2:]
+
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, stream=Chunks(body))
+
+    return JwksCache(JWKS_URL, httpx2.AsyncClient(transport=httpx2.MockTransport(handle)))
+
+
+async def test_a_jwks_of_1_mib_in_chunks_is_read_whole(signer: Signer) -> None:
+    v = Verifier(settings(), chunked_jwks(signer, MAX_JWKS_BYTES))
+    assert await v.verify_token(token(signer)) is not None
+
+
+async def test_a_jwks_over_1_mib_counts_as_unavailable(signer: Signer, logs: Logs) -> None:
+    v = Verifier(settings(), chunked_jwks(signer, MAX_JWKS_BYTES + 1))
+    with pytest.raises(KeysUnavailable):
+        await v.verify_token(token(signer))
+    [line] = logs.events("jwks")
+    assert line["outcome"] == "failed"
 
 
 async def test_an_empty_refresh_keeps_the_known_keys(jwks: FakeJwks, signer: Signer) -> None:
