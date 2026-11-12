@@ -177,6 +177,21 @@ def test_get_item_returns_the_assigned_companys_defaults_only(mcp: Session) -> N
     }
 
 
+def test_get_item_picks_the_assigned_companys_defaults_whatever_their_row(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    rows = list(reversed(item()["item_defaults"]))
+    erp.add("Item", item("FIRST", item_defaults=rows))
+    result = mcp.call("get_item", {"item_code": "FIRST"}).data
+    fields = ("income_account", "expense_account", "selling_cost_center", "buying_cost_center")
+    assert [result[k] for k in fields] == [
+        "4000 - Sales - EX",
+        "5000 - Cost - EX",
+        "Main - EX",
+        "Purchasing - EX",
+    ]
+
+
 def test_an_item_without_defaults_for_the_company_has_none(mcp: Session, erp: FakeErpnext) -> None:
     erp.add("Item", item("BARE", item_defaults=[]))
     result = mcp.call("get_item", {"item_code": "BARE"}).data
@@ -245,9 +260,9 @@ def test_an_unknown_or_unpermitted_name_names_the_input(
     )
     result = mcp.call("get_item", {"item_code": "SKU-1"})
     assert result.error
-    assert result.text.startswith("item_code: ")
-    assert "doesn't exist" in result.text
-    assert "isn't permitted" in result.text
+    assert result.text == (
+        "item_code: the item 'SKU-1' doesn't exist, or the agent user isn't permitted to read it."
+    )
 
 
 @pytest.mark.parametrize("body", [{}, {"exc_type": "PermissionError"}])
