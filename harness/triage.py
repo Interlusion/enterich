@@ -1,12 +1,14 @@
-"""The tests lens's triage (ADR-008): checks every record of a run's `findings.jsonl`,
-drops what `harness/suppressions.jsonl` lists, notes findings the backlog already names,
-and writes `report.md` with the confirmed findings sorted into fix and proposal.
-Deterministic; the agents' records are data here, never instructions.
+"""The tests lens's triage (ADR-008): checks every record of a run's `findings.jsonl`, gives
+each its key, sets aside what `harness/suppressions.jsonl` lists (as tracked while the
+backlog item it names is open, else as suppressed), and writes `report.md` with the
+confirmed findings sorted into fix and proposal. Deterministic; the agents' records are
+data here, never instructions.
 
     uv run python harness/triage.py harness/runs/<date>-tests
 """
 
 import json
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -17,7 +19,8 @@ SUPPRESSIONS = ROOT / "harness" / "suppressions.jsonl"
 BACKLOG = ROOT / "docs" / "backlog"
 KINDS = {"dod-gap", "mutant-gap", "weak-test"}
 CLASSES = {"fix", "proposal", "drop"}
-TEXT_FIELDS = ("key", "kind", "location", "claim", "evidence", "proposal")
+TEXT_FIELDS = ("kind", "location", "claim", "evidence", "proposal")
+MUTANT = re.compile(r"^enterich\.[\w.ǁ]+__mutmut_\d+$")
 
 
 def _records(path: Path) -> list[dict[str, Any]]:
@@ -25,6 +28,21 @@ def _records(path: Path) -> list[dict[str, Any]]:
         return []
     lines = path.read_text(encoding="utf-8").splitlines()
     return [cast("dict[str, Any]", json.loads(line)) for line in lines if line.strip()]
+
+
+def _number(mutant: str) -> int:
+    tail = mutant.rpartition("__mutmut_")[2]
+    return int(tail) if tail.isdigit() else 0
+
+
+def key(record: dict[str, Any]) -> str:
+    """What a suppression names: a mutant gap's lowest mutant, since one function can have
+    several gaps; else the kind and location (a Definition of Done item, or a test)."""
+    if record.get("kind") == "mutant-gap" and record.get("mutants"):
+        mutants = cast("list[str]", record["mutants"])
+        lowest = min(mutants, key=lambda m: (m.rpartition("__mutmut_")[0], _number(m)))
+        return f"mutant-gap:{lowest}"
+    return f"{record.get('kind')}:{record.get('location')}"
 
 
 def check(record: dict[str, Any]) -> list[str]:
@@ -35,6 +53,13 @@ def check(record: dict[str, Any]) -> list[str]:
     requirement = record.get("requirement")
     if requirement is not None and not isinstance(requirement, str):
         problems.append("requirement not a string")
+    mutants = record.get("mutants")
+    if record.get("kind") == "mutant-gap" and not (
+        isinstance(mutants, list)
+        and mutants
+        and all(isinstance(m, str) and MUTANT.match(m) for m in cast("list[Any]", mutants))
+    ):
+        problems.append("mutants missing: the survivors' ids in full")
     verdict = record.get("verdict")
     if not isinstance(verdict, dict):
         return [*problems, "verdict missing"]
@@ -48,10 +73,6 @@ def check(record: dict[str, Any]) -> list[str]:
     return problems
 
 
-def _backlog_text() -> str:
-    return "\n".join(p.read_text(encoding="utf-8") for p in sorted(BACKLOG.glob("*.md")))
-
-
 def _row(record: dict[str, Any]) -> str:
     def cell(text: str) -> str:
         return text.replace("|", "\\|").replace("\n", " ")
@@ -63,19 +84,28 @@ def _row(record: dict[str, Any]) -> str:
     )
 
 
-def main(run: Path) -> int:
+def main(run: Path, suppressions: Path = SUPPRESSIONS, backlog: Path = BACKLOG) -> int:
     records = _records(run / "findings.jsonl")
-    bad = [(r.get("key", "?"), p) for r in records if (p := check(r))]
+    bad = [(key(r), p) for r in records if (p := check(r))]
+    bad += [
+        (k, ["two records with this key"]) for k, n in Counter(map(key, records)).items() if n > 1
+    ]
     if bad:
-        for key, problems in bad:
-            print(f"{key}: {', '.join(problems)}", file=sys.stderr)
+        for k, problems in bad:
+            print(f"{k}: {', '.join(problems)}", file=sys.stderr)
         return 1
-    suppressed = {s["key"] for s in _records(SUPPRESSIONS)}
-    backlog = _backlog_text()
-    kept = [r for r in records if r["key"] not in suppressed]
-    confirmed = [r for r in kept if r["verdict"]["confirmed"]]
-    tracked = [r for r in confirmed if r.get("requirement") and r["requirement"] in backlog]
-    by_class = {c: [r for r in confirmed if r["verdict"]["class"] == c] for c in CLASSES}
+    # An item counts as open while its file is in the backlog, not in its archive
+    # so a finding tracked there comes back once the item is done; one without an item stays
+    listed = _records(suppressions)
+    dropped = {s["key"] for s in listed if not s.get("backlog")}
+    open_items = {
+        s["key"] for s in listed if s.get("backlog") and (backlog / s["backlog"]).is_file()
+    }
+    confirmed = [r for r in records if r["verdict"]["confirmed"]]
+    suppressed = [r for r in confirmed if key(r) in dropped]
+    tracked = [r for r in confirmed if key(r) in open_items and key(r) not in dropped]
+    acted_on = [r for r in confirmed if r not in suppressed and r not in tracked]
+    by_class = {c: [r for r in acted_on if r["verdict"]["class"] == c] for c in CLASSES}
     kinds = Counter(r["kind"] for r in records)
     confirmed_kinds = Counter(r["kind"] for r in confirmed)
     lines = [
@@ -86,14 +116,13 @@ def main(run: Path) -> int:
         *(f"| {k} | {kinds[k]} | {confirmed_kinds[k]} |" for k in sorted(KINDS)),
         f"| all | {len(records)} | {len(confirmed)} |",
         "",
-        f"Suppressed: {len(records) - len(kept)}. "
-        f"Confirmed but named in the backlog: {len(tracked)}.",
+        f"Suppressed: {len(suppressed)}. Tracked in the backlog: {len(tracked)}.",
     ]
     for title, cls in (("Fix", "fix"), ("Proposal", "proposal")):
         lines += ["", f"## {title} ({len(by_class[cls])})", ""]
         if by_class[cls]:
             lines += ["| Location | Requirement | Claim | Proposal |", "| :- | :- | :- | :- |"]
-            lines += [_row(r) for r in sorted(by_class[cls], key=lambda r: r["key"])]
+            lines += [_row(r) for r in sorted(by_class[cls], key=key)]
     (run / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"{len(records)} findings, {len(confirmed)} confirmed: report.md written")
     return 0

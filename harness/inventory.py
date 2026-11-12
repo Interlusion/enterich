@@ -15,6 +15,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SPECS = ROOT / "docs" / "specs"
 TESTS = ROOT / "tests"
+# The harness's own tests cite requirement IDs as data, not as what they check
+LEFT_OUT = {TESTS / "repo" / "test_harness.py"}
 # Requirement IDs in full, as the specs index writes them
 ID = re.compile(r"REQ-\d{3}-(?:URS|PRS)-N?F\d{3}")
 HEADING = re.compile(r"^#### (REQ-\d{3}-(?:URS|PRS)-N?F\d{3}): (.+)$")
@@ -73,7 +75,7 @@ def _section_ids(lines: list[str], before: int) -> list[str]:
 
 def tests() -> list[Test]:
     found: list[Test] = []
-    for path in sorted(TESTS.rglob("test_*.py")):
+    for path in sorted(set(TESTS.rglob("test_*.py")) - LEFT_OUT):
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source)
         lines = source.splitlines()

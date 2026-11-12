@@ -33,11 +33,16 @@ const FINDINGS = {
             description: 'dod-gap: "<spec>#<REQ id> item <n>"; mutant-gap: "<path>:<function>"; weak-test: "<path>::<test>"',
           },
           requirement: { type: ['string', 'null'], description: 'The REQ id in full, or null' },
+          mutants: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'mutant-gap: the survivors\' ids in full, as in survivors.jsonl; else []',
+          },
           claim: { type: 'string', description: 'One sentence: what is not checked' },
           evidence: { type: 'string', description: 'Tests read, mutant ids, lines' },
           proposal: { type: 'string', description: 'The test (or removal) that would close it' },
         },
-        required: ['kind', 'location', 'requirement', 'claim', 'evidence', 'proposal'],
+        required: ['kind', 'location', 'requirement', 'mutants', 'claim', 'evidence', 'proposal'],
       },
     },
   },
@@ -62,7 +67,7 @@ For each Definition of Done item, read the tests that should check it (start fro
 - "dod-gap": an item no test checks, or checks only in part (say which part is missing). An item whose wording says it is verified otherwise than by a test is not a gap.
 - "weak-test": a test citing this spec's requirements that would pass with the behaviour broken (asserts too little, or only a status), or that repeats another test exactly.
 
-Report only real gaps, the most consequential first, at most 20. ${READ_ONLY}`
+One finding per item or test: name every missing part in it. Report only real gaps, the most consequential first, at most 20. ${READ_ONLY}`
 
 const mutantPrompt = modules => `You survey mutation survivors for the tests lens of Enterich's improvement pipeline (docs/arc42/adr/ADR-008-improvement-pipeline.md).
 
@@ -73,7 +78,7 @@ Judge each survivor, reading the code and the tests around it:
 - equivalent: the mutant behaves the same as the original for every input that can reach it;
 - gap: behaviour the specs (docs/specs/) or the code's own contract need, that no test notices.
 
-Report only gaps, as "mutant-gap" findings. Group survivors that one missing test would kill into one finding; name their ids in "evidence". Name the requirement when a spec states the behaviour. The most consequential first, at most 20. ${READ_ONLY}`
+Report only gaps, as "mutant-gap" findings. Group survivors that one missing test would kill into one finding; list their ids in full in "mutants". Name the requirement when a spec states the behaviour. The most consequential first, at most 20. ${READ_ONLY}`
 
 const verifyPrompt = f => `You verify one finding of the tests lens of Enterich's improvement pipeline (docs/arc42/adr/ADR-008-improvement-pipeline.md). Another agent made it; try to refute it.
 
@@ -88,10 +93,32 @@ If confirmed, "class" is:
 - drop: real but not worth a change (say why).
 If refuted, "class" is drop. ${READ_ONLY}`
 
+// harness/triage.py's key(): what a suppression names. Its tests are the rule's reference.
+const mutantName = m => m.split('__mutmut_')[0]
+const mutantNumber = m => Number(m.split('__mutmut_').pop()) || 0
+const byMutant = (a, b) => mutantName(a) < mutantName(b) ? -1 : mutantName(a) > mutantName(b) ? 1
+  : mutantNumber(a) - mutantNumber(b)
+const key = f => f.kind === 'mutant-gap' && f.mutants.length
+  ? `mutant-gap:${[...f.mutants].sort(byMutant)[0]}`
+  : `${f.kind}:${f.location}`
+
+// Findings of one survey with one key become one, so triage gets one record per key
+const merged = findings => Object.values(findings.reduce((byKey, f) => {
+  const k = key(f), seen = byKey[k]
+  byKey[k] = !seen ? { ...f } : {
+    ...seen,
+    mutants: [...new Set([...seen.mutants, ...f.mutants])],
+    claim: `${seen.claim} Also: ${f.claim}`,
+    evidence: `${seen.evidence} ${f.evidence}`,
+    proposal: `${seen.proposal} ${f.proposal}`,
+  }
+  return byKey
+}, {}))
+
 const verify = (findings, origin) =>
   parallel(findings.map((f, i) => () =>
     agent(verifyPrompt(f), { label: `verify:${origin}:${i + 1}`, phase: 'Verify', schema: VERDICT })
-      .then(v => v && { ...f, key: `${f.kind}:${f.location}`, origin, verdict: v })))
+      .then(v => v && { ...f, origin, verdict: v })))
 
 const items = [
   ...args.specs.map(spec => ({ label: `spec:${spec}`, prompt: specPrompt(spec) })),
@@ -102,12 +129,12 @@ const results = await pipeline(
   items,
   item => agent(item.prompt, { label: item.label, phase: 'Survey', schema: FINDINGS }),
   (survey, item) => {
-    const found = survey ? survey.findings : []
+    const found = merged(survey ? survey.findings : [])
     const dropped = found.slice(CAP)
     log(`${item.label}: ${found.length} findings` +
       (dropped.length ? `, ${dropped.length} beyond the cap not verified` : ''))
     return verify(found.slice(0, CAP), item.label)
-      .then(rs => [...rs, ...dropped.map(f => ({ ...f, key: `${f.kind}:${f.location}`, origin: item.label, verdict: null }))])
+      .then(rs => [...rs, ...dropped.map(f => ({ ...f, origin: item.label, verdict: null }))])
   },
 )
 
