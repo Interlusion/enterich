@@ -630,6 +630,9 @@ def test_a_create_leaves_its_origin_on_the_draft(
 ) -> None:
     result = create(mcp).data
     [line] = logs.events("operation")
+    assert line["operation"] == "create_draft_sales_invoice"
+    assert line["sid"] == "00000000-0000-0000-0000-0000000000aa"
+    assert line["outcome"] == {"document": result["name"]}
     assert re.fullmatch(r"[0-9a-f]{12}", line["call"])
     assert line["request_id"] == str(mcp.request_id)
     [comment] = erp.comments
@@ -691,9 +694,13 @@ def test_the_line_counts_the_erpnext_calls_and_their_time(
 
 def test_a_refused_write_leaves_no_comment(mcp: Session, erp: FakeErpnext, logs: Logs) -> None:
     assert create(mcp, customer="CUST-9999").error
-    assert update(mcp, modified="2026-10-28 10:00:00.000000", remarks="x").error
+    refused = update(mcp, modified="2026-10-28 10:00:00.000000", remarks="x")
+    assert refused.error
     assert erp.comments == []
     assert all(re.fullmatch(r"[0-9a-f]{12}", line["call"]) for line in logs.events("operation"))
+    _, line = logs.events("operation")
+    assert line["operation"] == "update_draft_sales_invoice"
+    assert line["outcome"] == {"refusal": refused.text}
 
 
 def test_a_failing_comment_without_warnings_still_says_so(mcp: Session, erp: FakeErpnext) -> None:
