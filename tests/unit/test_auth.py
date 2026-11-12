@@ -315,6 +315,19 @@ async def test_a_jwks_without_usable_keys_counts_as_unavailable(
         await verifier(jwks).verify_token(token(signer))
 
 
+@pytest.mark.parametrize("body", [[], None, "x", 1])
+async def test_a_jwks_that_is_not_a_json_object_counts_as_unavailable(
+    signer: Signer, body: object
+) -> None:
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, content=json.dumps(body).encode())
+
+    client = httpx2.AsyncClient(transport=httpx2.MockTransport(handle))
+    v = Verifier(settings(), JwksCache(JWKS_URL, client))
+    with pytest.raises(KeysUnavailable):
+        await v.verify_token(token(signer))
+
+
 # The JWKS body is read in chunks up to a cap (REQ-002-URS-NF009, bounded work).
 class Chunks(httpx2.AsyncByteStream):
     def __init__(self, body: bytes, size: int = 64 * 1024) -> None:
