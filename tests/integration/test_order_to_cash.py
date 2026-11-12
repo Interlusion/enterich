@@ -108,6 +108,8 @@ def test_list_customers_returns_records_with_outside_text_apart(mcp: Session) ->
 def test_disabled_customers_only_when_asked_for(mcp: Session) -> None:
     every = mcp.call("list_customers", {"include_disabled": True}).data["records"]
     assert [r["disabled"] for r in every if r["name"] == "CUST-OLD"] == [True]
+    # REQ-001-PRS-F014: yes/no fields are booleans, not ERPNext's 0 and 1.
+    assert {type(r["disabled"]) for r in every} == {bool}
 
 
 # get_customer
