@@ -151,6 +151,11 @@ def test_healthz_allows_only_get_and_head(method: str) -> None:
     assert response.headers["allow"] == "GET, HEAD"
 
 
+def test_healthz_answers_head_as_it_answers_get() -> None:
+    # REQ-002-PRS-NF012: HEAD is in the Allow header above, so it gets the 200 that GET gets.
+    assert wrapped().head("/healthz").status_code == 200
+
+
 @pytest.mark.parametrize(
     ("method", "path", "status"),
     [
