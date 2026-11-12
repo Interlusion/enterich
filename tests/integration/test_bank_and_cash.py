@@ -139,6 +139,9 @@ def test_list_bank_accounts_sends_exactly_the_catalogued_call(
 
 def test_list_bank_accounts_returns_only_the_companys_own(mcp: Session) -> None:
     result = mcp.call("list_bank_accounts").data
+    # 1 == True in Python: check the JSON types, not only the values (REQ-001-PRS-F014)
+    assert result["records"][0]["is_default"] is True
+    assert result["records"][0]["disabled"] is False
     assert result["records"] == [
         {
             "name": MAIN,
@@ -161,6 +164,8 @@ def test_disabled_bank_accounts_only_when_asked_for(mcp: Session, erp: FakeErpne
         ["is_company_account", "=", 1],
     ]
     assert [r["name"] for r in result["records"]] == [MAIN, "Old - Example Bank"]
+    assert result["records"][1]["is_default"] is False
+    assert result["records"][1]["disabled"] is True
 
 
 # list_bank_transactions, get_bank_transaction (REQ-007-PRS-F002)
@@ -183,6 +188,8 @@ def test_list_bank_transactions_sends_exactly_the_catalogued_call(
         "bank_account": MAIN,
         "from_date": "2026-10-01",
         "to_date": "2026-10-31",
+        "limit": 5,
+        "offset": 5,
     }
     if state is not None:
         arguments["state"] = state
@@ -198,6 +205,7 @@ def test_list_bank_transactions_sends_exactly_the_catalogued_call(
         ["date", "<=", "2026-10-31"],
     ]
     assert call.param("order_by") == "date desc, name desc"
+    assert (call.param("limit_start"), call.param("limit_page_length")) == ("5", "6")
 
 
 @pytest.mark.parametrize(
@@ -349,6 +357,8 @@ def test_list_payment_entries_sends_exactly_the_catalogued_call(
             "state": state,
             "from_date": "2026-10-01",
             "to_date": "2026-10-31",
+            "limit": 5,
+            "offset": 5,
         },
     )
     [call] = erp.received
@@ -364,6 +374,7 @@ def test_list_payment_entries_sends_exactly_the_catalogued_call(
         ["posting_date", "<=", "2026-10-31"],
     ]
     assert call.param("order_by") == "posting_date desc, name desc"
+    assert (call.param("limit_start"), call.param("limit_page_length")) == ("5", "6")
 
 
 def test_list_payment_entries_without_inputs_filters_by_company_only(
@@ -449,3 +460,30 @@ def test_another_companys_payment_entry_answers_as_unknown(mcp: Session) -> None
     assert other.error
     assert other.text.startswith("name: ")
     assert other.text.replace("00002", "") == unknown.text.replace("09999", "")
+
+
+# All three lists (REQ-001-PRS-F014)
+
+
+@pytest.mark.parametrize(
+    "tool", ["list_bank_accounts", "list_bank_transactions", "list_payment_entries"]
+)
+def test_each_list_returns_the_offset_it_was_asked_for(mcp: Session, tool: str) -> None:
+    result = mcp.call(tool, {"offset": 5}).data
+    assert (result["offset"], result["records"], result["has_more"]) == (5, [], False)
+
+
+@pytest.mark.parametrize(
+    ("tool", "arguments"),
+    [
+        ("list_bank_accounts", {"include_disabled": True}),
+        ("list_bank_transactions", {"state": "all"}),
+        ("list_payment_entries", {}),
+    ],
+)
+def test_each_list_reports_more_than_its_limit(
+    mcp: Session, erp: FakeErpnext, tool: str, arguments: dict[str, Any]
+) -> None:
+    erp.add("Payment Entry", payment_entry("ACC-PAY-2026-00003"))
+    result = mcp.call(tool, {**arguments, "limit": 1}).data
+    assert (result["count"], len(result["records"]), result["has_more"]) == (1, 1, True)

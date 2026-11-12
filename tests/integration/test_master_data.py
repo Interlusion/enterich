@@ -245,7 +245,7 @@ def test_an_unknown_or_unpermitted_name_names_the_input(
     )
     result = mcp.call("get_item", {"item_code": "SKU-1"})
     assert result.error
-    assert "item_code" in result.text
+    assert result.text.startswith("item_code: ")
     assert "doesn't exist" in result.text
     assert "isn't permitted" in result.text
 

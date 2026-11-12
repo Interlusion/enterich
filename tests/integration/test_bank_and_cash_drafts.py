@@ -401,6 +401,21 @@ def test_an_allocation_above_the_outstanding_amount_is_refused(
     assert erp.writes() == []
 
 
+def test_a_residual_below_one_takes_a_payment(mcp: Session, erp: FakeErpnext) -> None:
+    erp.add("Sales Invoice", sales_invoice("ACC-SINV-2026-00009", outstanding_amount=0.5))
+    residual = [{"reference_name": "ACC-SINV-2026-00009", "allocated_amount": 0.5}]
+    result = create(mcp, paid_amount=0.5, references=residual)
+    assert not result.error, result.text
+    [post] = erp.writes(PATH)
+    assert post.body["references"] == [
+        {
+            "reference_doctype": "Sales Invoice",
+            "reference_name": "ACC-SINV-2026-00009",
+            "allocated_amount": 0.5,
+        }
+    ]
+
+
 def test_allocations_above_the_paid_amount_are_refused(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, paid_amount=100, references=PAID)
     assert result.error
@@ -466,12 +481,15 @@ def test_allow_duplicate_warns(mcp: Session, erp: FakeErpnext) -> None:
 # Warnings (REQ-007-PRS-F007)
 
 
-def test_a_part_not_allocated_warns(mcp: Session, erp: FakeErpnext) -> None:
-    references = [{"reference_name": INVOICE, "allocated_amount": 20}]
+@pytest.mark.parametrize(("allocated", "unallocated"), [(20, 10), (29.5, 0.5)])
+def test_a_part_not_allocated_warns(
+    mcp: Session, erp: FakeErpnext, allocated: float, unallocated: float
+) -> None:
+    references = [{"reference_name": INVOICE, "allocated_amount": allocated}]
     result = create(mcp, paid_amount=30, references=references).data
-    assert result["unallocated_amount"] == 10
+    assert result["unallocated_amount"] == unallocated
     [warning] = result["warnings"]
-    assert "10" in warning
+    assert warning.startswith(f"{unallocated} of the paid amount")
     assert "advance" in warning
     [comment] = erp.comments
     assert comment["reference_doctype"] == "Payment Entry"
@@ -483,12 +501,18 @@ def test_a_payment_without_references_doesnt_warn(mcp: Session) -> None:
     assert result["warnings"] == []
 
 
-def test_two_currencies_warn(mcp: Session, erp: FakeErpnext) -> None:
+@pytest.mark.parametrize(
+    "party",
+    [
+        {"party_type": "Customer", "party": "CUST-0001"},  # the bank is paid_to
+        {"party_type": "Supplier", "party": "SUPP-0001"},  # the bank is paid_from
+    ],
+)
+def test_two_currencies_warn(mcp: Session, erp: FakeErpnext, party: dict[str, str]) -> None:
     erp.add("Account", account(BANK, account_currency="USD"))
-    result = create(mcp).data
+    result = create(mcp, **party).data
     [warning] = result["warnings"]
-    assert "USD" in warning
-    assert "EUR" in warning
+    assert "The bank account is in USD, the party's account in EUR" in warning
     assert "received_amount" in warning
     assert "exchange rates" in warning
     assert "sent" not in warning
@@ -711,6 +735,16 @@ def test_an_update_warns_of_a_part_not_allocated(mcp: Session) -> None:
     result = update(mcp, paid_amount=100).data  # 80 allocated
     [warning] = result["warnings"]
     assert "20" in warning
+
+
+def test_an_update_of_a_large_draft_cuts_its_references(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-001-PRS-NF003: an update's result cuts its child tables as a get does."""
+    [row] = erp.docs["Payment Entry"][DRAFT]["references"]
+    erp.docs["Payment Entry"][DRAFT]["references"] = [row] * 101
+    result = update(mcp, reference_no="TX-4801").data
+    assert len(result["references"]) == 100
+    assert result["truncated"] == ["references"]
+    assert len(erp.docs["Payment Entry"][DRAFT]["references"]) == 101
 
 
 # Drafts per hour (REQ-001-PRS-F019)
