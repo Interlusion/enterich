@@ -163,6 +163,14 @@ def test_a_pages_texts_are_cut_to_500() -> None:
     assert result["truncated"] == ["records.description", "records.remarks"]
 
 
+def test_a_text_of_exactly_500_is_not_cut() -> None:
+    """REQ-001-PRS-NF003: `truncated` names only what was cut."""
+    records: list[dict[str, Any]] = [{"name": "A", "remarks": "r" * 500, "outside_text": {}}]
+    result = page(records, offset=0, limit=10)
+    assert result["records"][0]["remarks"] == "r" * 500
+    assert result["truncated"] == []
+
+
 def test_texts_in_nested_rows_and_objects_are_cut_with_their_path() -> None:
     records: list[dict[str, Any]] = [
         {"lines": [{"text": "x" * 600}], "summary": {"note": "y" * 600}, "outside_text": {}}
