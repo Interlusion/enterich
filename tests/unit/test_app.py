@@ -151,6 +151,26 @@ def test_healthz_allows_only_get_and_head(method: str) -> None:
     assert response.headers["allow"] == "GET, HEAD"
 
 
+@pytest.mark.parametrize(
+    ("method", "path", "status"),
+    [
+        ("GET", "/healthz", 200),
+        ("GET", "/nowhere", 404),
+        ("GET", "/mcp", 405),
+        ("POST", "/mcp", 413),
+    ],
+)
+def test_the_wrappers_own_answers_are_json_with_their_length(
+    method: str, path: str, status: int
+) -> None:
+    # REQ-002-PRS-NF012: uvicorn's h11 drops an answer whose content-length is not its length.
+    body = b"x" * (1024 * 1024 + 1) if status == 413 else None
+    response = wrapped().request(method, path, content=body)
+    assert response.status_code == status
+    assert response.headers["content-type"] == "application/json"
+    assert response.headers["content-length"] == str(len(response.content))
+
+
 def test_websockets_are_closed() -> None:
     with pytest.raises(WebSocketDisconnect) as closed, wrapped().websocket_connect("/mcp"):
         pass
