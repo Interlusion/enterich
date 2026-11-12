@@ -1,8 +1,8 @@
 """The tests lens's triage (ADR-008): checks every record of a run's `findings.jsonl`, gives
 each its key, sets aside what `harness/suppressions.jsonl` lists (as tracked while the
 backlog item it names is open, else as suppressed), and writes `report.md` with the
-confirmed findings sorted into fix and proposal. Deterministic; the agents' records are
-data here, never instructions.
+confirmed findings sorted into fix and proposal, and `fixes.jsonl` for the fix stage.
+Deterministic; the agents' records are data here, never instructions.
 
     uv run python harness/triage.py harness/runs/<date>-tests
 """
@@ -43,6 +43,22 @@ def key(record: dict[str, Any]) -> str:
         lowest = min(mutants, key=lambda m: (m.rpartition("__mutmut_")[0], _number(m)))
         return f"mutant-gap:{lowest}"
     return f"{record.get('kind')}:{record.get('location')}"
+
+
+def slug(record: dict[str, Any]) -> str:
+    """The fix branch's name after `auto/tests-`, from the key: `shapes-page-9`,
+    `req-001-prs-f014-item-3`, `test-shapes-test-a-page-is-cut`."""
+    kind, _, rest = key(record).partition(":")
+    if kind == "mutant-gap":
+        name, _, number = rest.removeprefix("enterich.").rpartition("__mutmut_")
+        words = [w.removeprefix("x_").replace("ǁ", " ") for w in name.split(".")]
+        text = f"{' '.join(words)} {number}"
+    elif kind == "dod-gap":
+        text = rest.partition("#")[2]
+    else:
+        path, _, test = rest.partition("::")
+        text = f"{Path(path).stem} {test}"
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60].rstrip("-")
 
 
 def check(record: dict[str, Any]) -> list[str]:
@@ -124,7 +140,22 @@ def main(run: Path, suppressions: Path = SUPPRESSIONS, backlog: Path = BACKLOG) 
             lines += ["| Location | Requirement | Claim | Proposal |", "| :- | :- | :- | :- |"]
             lines += [_row(r) for r in sorted(by_class[cls], key=key)]
     (run / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"{len(records)} findings, {len(confirmed)} confirmed: report.md written")
+    # The fix stage's input: each fix with its branch's slug and its mutants' diffs
+    diffs = {s["id"]: s["diff"] for s in _records(run / "survivors.jsonl")}
+    with (run / "fixes.jsonl").open("w", encoding="utf-8") as out:
+        for r in sorted(by_class["fix"], key=key):
+            mutants = cast("list[str]", r.get("mutants") or [])
+            handover = {
+                "key": key(r),
+                "slug": slug(r),
+                **r,
+                "diffs": {m: diffs[m] for m in mutants if m in diffs},
+            }
+            out.write(json.dumps(handover, ensure_ascii=False) + "\n")
+    print(
+        f"{len(records)} findings, {len(confirmed)} confirmed, {len(by_class['fix'])} to fix: "
+        "report.md and fixes.jsonl written"
+    )
     return 0
 
 

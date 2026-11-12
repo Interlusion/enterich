@@ -11,7 +11,10 @@ A run lives in `runs/<date>-tests/`.
 3. **Survey and verify:** the Workflow `improve-tests` (`.claude/workflows/improve-tests.js`), run from Claude Code with the run directory as its argument. Its agents read the run's files and return findings, each with a verdict from another agent; the session writes them to `findings.jsonl`.
 4. **Triage:** `uv run python harness/triage.py harness/runs/<date>-tests` checks every record, sets aside what `suppressions.jsonl` lists, sorts the confirmed findings into fix, proposal and dropped, and writes `report.md`.
 
-The fix stage (one agent per confirmed fix, each on its own `auto/` branch) follows once the first run's report has been reviewed.
+Triage also writes `fixes.jsonl`, the fix stage's input: each fix with its key, its branch's slug and its mutants' diffs.
+
+5. **Fix:** the Workflow `improve-tests-fix` (`.claude/workflows/improve-tests-fix.js`), with the run directory, the base branch, the commit holding the run and the keys and slugs of `fixes.jsonl` as its arguments; each agent reads its record from there. One agent per fix, in a worktree of its own, writes the test on `auto/tests-<slug>`, shows it red against the mutant or a break, and commits it (`test:`, then a `fix:` only if the code was wrong). Another agent redoes the red check and reviews the branch. Nothing is pushed.
+6. **Gate:** `E2E_ERPNEXT_URL=… uv run python harness/gate.py harness/runs/<date>-tests auto/tests-… [--push]` refuses a branch that isn't `auto/`, doesn't start with a `test:` or changes what ADR-008 forbids, runs every check in a worktree of the branch, the end-to-end tests included (the site: `scripts/erpnext-site.sh up`), and writes `gates.jsonl`. With `--push`, it pushes the branches that passed. The operator opens and merges their pull requests.
 
 ## Suppressions
 
