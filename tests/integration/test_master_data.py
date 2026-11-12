@@ -260,9 +260,9 @@ def test_an_unknown_or_unpermitted_name_names_the_input(
     )
     result = mcp.call("get_item", {"item_code": "SKU-1"})
     assert result.error
-    assert result.text.startswith("item_code: ")
-    assert "doesn't exist" in result.text
-    assert "isn't permitted" in result.text
+    assert result.text == (
+        "item_code: the item 'SKU-1' doesn't exist, or the agent user isn't permitted to read it."
+    )
 
 
 def test_a_long_erpnext_message_reaches_the_agent_cut_to_300(
