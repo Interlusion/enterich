@@ -401,6 +401,21 @@ def test_an_allocation_above_the_outstanding_amount_is_refused(
     assert erp.writes() == []
 
 
+def test_a_residual_below_one_takes_a_payment(mcp: Session, erp: FakeErpnext) -> None:
+    erp.add("Sales Invoice", sales_invoice("ACC-SINV-2026-00009", outstanding_amount=0.5))
+    residual = [{"reference_name": "ACC-SINV-2026-00009", "allocated_amount": 0.5}]
+    result = create(mcp, paid_amount=0.5, references=residual)
+    assert not result.error, result.text
+    [post] = erp.writes(PATH)
+    assert post.body["references"] == [
+        {
+            "reference_doctype": "Sales Invoice",
+            "reference_name": "ACC-SINV-2026-00009",
+            "allocated_amount": 0.5,
+        }
+    ]
+
+
 def test_allocations_above_the_paid_amount_are_refused(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, paid_amount=100, references=PAID)
     assert result.error
