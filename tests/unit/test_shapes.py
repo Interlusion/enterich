@@ -211,6 +211,14 @@ def test_a_result_stays_under_100000_characters() -> None:
     assert to_text({"a": "x" * (100_000 - frame)}) is None
 
 
+def test_a_result_keeps_non_ascii_text_as_it_is() -> None:
+    """REQ-001-PRS-NF003: "ü" is one character of the 100,000, not the six of `\\u00fc`."""
+    assert to_text({"customer_name": "Müller €"}) == '{"customer_name": "Müller €"}'
+    frame = len('{"a": ""}')
+    under = to_text({"a": "ü" * (99_999 - frame)})
+    assert len(under or "") == 99_999
+
+
 days = TypeAdapter(Day)
 
 
