@@ -151,6 +151,35 @@ async def test_a_response_over_10_mib_is_refused(fake: FakeErpnext) -> None:
         await Erpnext(settings(), fake.transport()).get_doc("Item", "SKU-1")
 
 
+class Chunked(httpx2.AsyncByteStream):
+    """An answer arriving in 64 KiB pieces, as a real socket delivers a large one."""
+
+    def __init__(self, body: bytes) -> None:
+        self.body = body
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        for start in range(0, len(self.body), 64 * 1024):
+            yield self.body[start : start + 64 * 1024]
+
+
+def chunked(body: bytes) -> httpx2.MockTransport:
+    return httpx2.MockTransport(lambda _: httpx2.Response(200, stream=Chunked(body)))
+
+
+async def test_a_response_of_exactly_10_mib_in_many_chunks_is_read_whole() -> None:
+    head, tail = b'{"message": {"name": "SKU-1", "description": "', b'"}}'
+    padding = b"x" * (erpnext.MAX_RESPONSE_BYTES - len(head) - len(tail))
+    client = Erpnext(settings(), chunked(head + padding + tail))
+    doc = await client.get_doc("Item", "SKU-1")
+    assert doc == {"name": "SKU-1", "description": padding.decode()}
+
+
+async def test_a_response_over_10_mib_in_many_chunks_is_refused() -> None:
+    body = b'{"data": "' + b"x" * (20 * 1024 * 1024) + b'"}'
+    with pytest.raises(ErpnextError, match="10 MiB"):
+        await Erpnext(settings(), chunked(body)).get_doc("Item", "SKU-1")
+
+
 @pytest.mark.parametrize(
     ("status", "exc_type", "message"),
     [
