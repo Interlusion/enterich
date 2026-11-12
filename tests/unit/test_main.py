@@ -1,10 +1,11 @@
 """Start-up: REQ-002-PRS-NF005 (refusal) and the start line of REQ-002-PRS-NF008."""
 
 import json
+from importlib.metadata import version
 
 import pytest
 
-from enterich import __main__
+from enterich import __main__, tools
 from tests.fakes.settings import API_SECRET, ENV
 
 
@@ -40,8 +41,14 @@ def test_start_logs_the_settings_and_runs_uvicorn(
     __main__.main()
     line = json.loads(capsys.readouterr().out)
     assert line["event"] == "start"
+    assert line["version"] == version("enterich")
+    assert line["resource_url"] == ENV["ENTERICH_RESOURCE_URL"]
+    assert line["issuer"] == ENV["ENTERICH_ISSUER"]
+    assert line["client"] == ENV["ENTERICH_CLIENT_ID"]
     assert line["subject"] == ENV["ENTERICH_SUBJECT"]
+    assert line["company"] == ENV["ENTERICH_COMPANY"]
     assert line["leeway"] == 5
+    assert line["operations"] == list(tools.names())
     assert API_SECRET not in json.dumps(line)
     assert ran["port"] == 8000
     assert ran["proxy_headers"] is False
