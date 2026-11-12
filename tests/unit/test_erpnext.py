@@ -367,6 +367,18 @@ async def test_the_client_counts_calls_and_their_time(fake: FakeErpnext) -> None
     assert meter.seconds >= 0.1
 
 
+async def test_reads_send_no_body_and_no_content_type(fake: FakeErpnext) -> None:
+    client = Erpnext(settings(), fake.transport())
+    await client.get_doc("Item", "SKU-1")
+    await client.get_list(
+        "Item", fields=["item_code"], order_by="name asc", start=0, page_length=21
+    )
+    assert [received.method for received in fake.received] == ["GET", "GET"]
+    for received in fake.received:
+        assert "content-type" not in received.headers
+        assert received.headers.get("content-length", "0") == "0"
+
+
 async def test_writes_send_json_with_decimals_as_numbers(fake: FakeErpnext) -> None:
     fake.add("Customer", customer("CUST-0001"))
     client = Erpnext(settings(), fake.transport())
