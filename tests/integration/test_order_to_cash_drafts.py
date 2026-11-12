@@ -352,6 +352,18 @@ def test_a_create_differing_in_its_match_goes_through_without_warning(
     assert len(erp.writes(PATH)) == 2
 
 
+def test_a_row_given_twice_counts_twice(mcp: Session, erp: FakeErpnext) -> None:
+    row = {"item_code": "SKU-1", "qty": 1}
+    first = create(mcp, items=[row, row]).data
+    once = create(mcp, items=[row]).data
+    assert once["warnings"] == []
+    again = create(mcp, items=[row, row])
+    assert again.error
+    assert first["name"] in again.text
+    assert once["name"] not in again.text
+    assert len(erp.writes(PATH)) == 2
+
+
 def test_a_draft_with_an_added_free_item_still_matches(mcp: Session, erp: FakeErpnext) -> None:
     erp.free_items["SKU-1"] = "GIFT"
     first = create(mcp).data
