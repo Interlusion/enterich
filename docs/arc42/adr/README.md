@@ -11,5 +11,6 @@ Decisions about Enterich. The architecture they shape is in the [arc42 overview]
 | [ADR-005](ADR-005-toolchain-and-dependencies.md) | Python with uv: lock with hashes, Dependabot, pinned base image and Actions | Accepted |
 | [ADR-006](ADR-006-licence-and-name.md) | Apache-2.0, and a name without ERPNext or Frappe | Accepted |
 | [ADR-007](ADR-007-specs-by-accounting-area.md) | Requirement specs by accounting area, with one core spec | Accepted |
+| [ADR-008](ADR-008-improvement-pipeline.md) | An improvement pipeline of agents between deterministic stages, committing only on `auto/` branches | Proposed |
 
 New ADRs take the highest number + 1 and start as Proposed. An ADR is Accepted when the maintainer accepts it, and is superseded by a new ADR rather than rewritten. Agent-drafted ADRs say so under Author.
