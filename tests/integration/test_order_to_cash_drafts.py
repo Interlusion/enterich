@@ -976,6 +976,9 @@ def test_an_update_warns_where_a_pricing_rule_replaced_a_rate(
     [warning] = result["warnings"]
     assert "row 2" in warning.lower()
     assert "SKU-2" in warning
+    # Row 2 is matched to the second row given, not the first (REQ-001-PRS-F016)
+    assert "19" in warning
+    assert "15" in warning
     [comment] = erp.comments
     assert comment["reference_name"] == DRAFT
 
