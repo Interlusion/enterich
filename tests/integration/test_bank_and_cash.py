@@ -139,6 +139,9 @@ def test_list_bank_accounts_sends_exactly_the_catalogued_call(
 
 def test_list_bank_accounts_returns_only_the_companys_own(mcp: Session) -> None:
     result = mcp.call("list_bank_accounts").data
+    # 1 == True in Python: check the JSON types, not only the values (REQ-001-PRS-F014)
+    assert result["records"][0]["is_default"] is True
+    assert result["records"][0]["disabled"] is False
     assert result["records"] == [
         {
             "name": MAIN,
@@ -161,6 +164,8 @@ def test_disabled_bank_accounts_only_when_asked_for(mcp: Session, erp: FakeErpne
         ["is_company_account", "=", 1],
     ]
     assert [r["name"] for r in result["records"]] == [MAIN, "Old - Example Bank"]
+    assert result["records"][1]["is_default"] is False
+    assert result["records"][1]["disabled"] is True
 
 
 # list_bank_transactions, get_bank_transaction (REQ-007-PRS-F002)
