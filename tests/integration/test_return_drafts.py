@@ -209,6 +209,21 @@ def test_a_create_sends_erpnexts_return_with_the_given_items(
     assert (mapping.method, mapping.params) == ("GET", {"source_name": INVOICE})
 
 
+def test_a_create_with_items_leaves_out_the_other_items(mcp: Session, erp: FakeErpnext) -> None:
+    invoice(
+        erp, "Sales Invoice", "ACC-SINV-2026-00008", [("v1", "SKU-1", 2.0), ("v2", "SKU-2", 1.0)]
+    )
+    mapped = erp.mapped_return("Sales Invoice", "ACC-SINV-2026-00008")
+    result = mcp.call(
+        "create_draft_sales_return",
+        {"return_against": "ACC-SINV-2026-00008", "items": [{"item_code": "SKU-1", "qty": 1}]},
+    )
+    assert not result.error, result.text
+    [post] = erp.writes(SALES)
+    # SKU-2 on v2 has 1 left to return, and isn't given
+    assert post.body["items"] == lines(mapped, (0, 1))
+
+
 def test_a_create_without_items_returns_all_that_is_left(mcp: Session, erp: FakeErpnext) -> None:
     erp.docs["Sales Invoice"].pop(SALES_DRAFT)
     mapped = erp.mapped_return("Sales Invoice", INVOICE)
