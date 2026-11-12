@@ -99,6 +99,27 @@ async def test_the_agent_gets_enterichs_text_without_a_prefix(
     assert operation["outcome"] == {"refusal": text}
 
 
+async def test_a_refusal_of_300_is_kept_whole_and_one_of_301_is_cut_to_300(
+    monkeypatch: pytest.MonkeyPatch, logs: Logs
+) -> None:
+    """REQ-001-PRS-F008: only a text over 300 characters is cut, to exactly 300."""
+
+    async def fits(inputs: Nothing, context: Context) -> dict[str, Any]:
+        raise tools.Refusal("x" * 300)
+
+    async def over(inputs: Nothing, context: Context) -> dict[str, Any]:
+        raise tools.Refusal("y" * 301)
+
+    _, whole = await call(monkeypatch, fits)
+    _, cut = await call(monkeypatch, over)
+    assert whole == "x" * 300
+    assert cut == "y" * 299 + "…"
+    assert [line["outcome"] for line in logs.events("operation")] == [
+        {"refusal": whole},
+        {"refusal": cut},
+    ]
+
+
 async def test_a_read_counts_rows_whatever_the_result_holds(
     monkeypatch: pytest.MonkeyPatch, logs: Logs
 ) -> None:
@@ -108,6 +129,22 @@ async def test_a_read_counts_rows_whatever_the_result_holds(
     error, _ = await call(monkeypatch, read)
     assert not error
     assert logs.events("operation")[0]["outcome"] == {"rows": 1}
+
+
+async def test_the_operation_line_is_a_warning_only_for_a_refusal(
+    monkeypatch: pytest.MonkeyPatch, logs: Logs
+) -> None:
+    async def read(inputs: Nothing, context: Context) -> dict[str, Any]:
+        return {"records": []}
+
+    async def refuse(inputs: Nothing, context: Context) -> dict[str, Any]:
+        raise tools.Refusal("No.")
+
+    assert not (await call(monkeypatch, read))[0]
+    assert (await call(monkeypatch, refuse))[0]
+    served, refused = logs.events("operation")
+    assert (served["outcome"], served["level"]) == ({"rows": 0}, "info")
+    assert (refused["outcome"], refused["level"]) == ({"refusal": "No."}, "warning")
 
 
 async def test_a_create_names_the_document(monkeypatch: pytest.MonkeyPatch, logs: Logs) -> None:
@@ -145,13 +182,18 @@ async def test_long_keys_and_lists_are_cut_in_the_line(
     async def read(inputs: Nothing, context: Context) -> dict[str, Any]:
         return {"records": []}
 
-    arguments = {"k" * 10_000: list(range(10_000)), "nested": {str(i): i for i in range(10_000)}}
+    arguments = {
+        "k" * 10_000: list(range(10_000)),
+        "nested": {str(i): i for i in range(10_000)},
+        "texts": ["t" * 10_000, "u"],
+    }
     error, text = await call(monkeypatch, read, arguments=arguments)
     assert error
     assert len(text) <= 300
     [operation] = logs.events("operation")
     logged = operation["arguments"]
-    assert [len(key) for key in logged] == [200, 6]
-    assert len(logged["k" * 200]) == 100
+    assert [len(key) for key in logged] == [200, 6, 5]
+    assert logged["k" * 200] == list(range(100))
+    assert logged["texts"] == ["t" * 200, "u"]
     assert len(logged["nested"]) == 100
     assert len(operation["outcome"]["refusal"]) <= 300

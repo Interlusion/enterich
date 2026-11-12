@@ -470,6 +470,14 @@ def test_another_companys_invoice_answers_as_unknown(mcp: Session) -> None:
     assert "Other AG" not in other.text
 
 
+def test_a_get_links_the_name_erpnext_answers_with(mcp: Session, erp: FakeErpnext) -> None:
+    # ERPNext finds names case-insensitively; the link carries the stored name.
+    invoices = erp.docs["Sales Invoice"]
+    invoices["acc-sinv-2026-00001"] = invoices["ACC-SINV-2026-00001"]
+    result = mcp.call("get_sales_invoice", {"name": "acc-sinv-2026-00001"}).data
+    assert result["url"] == "https://erp.example.com/desk/sales-invoice/ACC-SINV-2026-00001"
+
+
 # list_sales_tax_templates
 
 

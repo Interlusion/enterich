@@ -1,6 +1,6 @@
 """Shared input types and result shaping: REQ-001-PRS-F010 (names),
 REQ-001-PRS-F014 (common inputs), REQ-001-PRS-NF001 (outside text),
-REQ-001-PRS-NF003 (child tables)."""
+REQ-001-PRS-NF003 (child tables, result size)."""
 
 from decimal import Decimal
 from typing import Any
@@ -21,6 +21,7 @@ from enterich.shapes import (
     like_pattern,
     page,
     split_outside,
+    to_text,
 )
 
 names = TypeAdapter(Name)
@@ -163,6 +164,14 @@ def test_a_pages_texts_are_cut_to_500() -> None:
     assert result["truncated"] == ["records.description", "records.remarks"]
 
 
+def test_a_text_of_exactly_500_is_not_cut() -> None:
+    """REQ-001-PRS-NF003: `truncated` names only what was cut."""
+    records: list[dict[str, Any]] = [{"name": "A", "remarks": "r" * 500, "outside_text": {}}]
+    result = page(records, offset=0, limit=10)
+    assert result["records"][0]["remarks"] == "r" * 500
+    assert result["truncated"] == []
+
+
 def test_texts_in_nested_rows_and_objects_are_cut_with_their_path() -> None:
     records: list[dict[str, Any]] = [
         {"lines": [{"text": "x" * 600}], "summary": {"note": "y" * 600}, "outside_text": {}}
@@ -192,6 +201,22 @@ def test_a_page_has_more_only_beyond_its_limit() -> None:
     assert (exactly["count"], exactly["has_more"]) == (2, False)
     beyond = page(records, offset=0, limit=2)
     assert (beyond["count"], beyond["has_more"]) == (2, True)
+
+
+def test_a_result_stays_under_100000_characters() -> None:
+    """REQ-001-PRS-NF003: a result of exactly 100,000 characters is already too large."""
+    frame = len('{"a": ""}')
+    under = to_text({"a": "x" * (99_999 - frame)})
+    assert len(under or "") == 99_999
+    assert to_text({"a": "x" * (100_000 - frame)}) is None
+
+
+def test_a_result_keeps_non_ascii_text_as_it_is() -> None:
+    """REQ-001-PRS-NF003: "ü" is one character of the 100,000, not the six of `\\u00fc`."""
+    assert to_text({"customer_name": "Müller €"}) == '{"customer_name": "Müller €"}'
+    frame = len('{"a": ""}')
+    under = to_text({"a": "ü" * (99_999 - frame)})
+    assert len(under or "") == 99_999
 
 
 days = TypeAdapter(Day)
