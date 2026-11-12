@@ -694,6 +694,8 @@ def test_references_above_the_drafts_amount_are_refused(mcp: Session, erp: FakeE
     result = update(mcp, references=PAID)  # 119 against the draft's 80
     assert result.error
     assert result.text.startswith("references: ")
+    assert "119" in result.text
+    assert "80" in result.text
     assert erp.writes() == []
 
 
