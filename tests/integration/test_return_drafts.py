@@ -479,6 +479,26 @@ def test_a_draft_debit_note_against_the_invoice_is_a_duplicate(
     assert result.error
     assert result.text.startswith("allow_duplicate: ")
     assert PURCHASE_DRAFT in result.text
+    assert erp.writes() == []
+    [check] = [r for r in erp.lists(PURCHASES) if ["is_return", "=", 1] in r.param("filters")]
+    assert check.param("filters") == [
+        ["company", "=", COMPANY],
+        ["docstatus", "=", 0],
+        ["is_return", "=", 1],
+        ["return_against", "=", BILL],
+    ]
+
+
+@pytest.mark.parametrize(("docstatus", "status"), [(1, "Return"), (2, "Cancelled")])
+def test_submitted_and_cancelled_debit_notes_arent_duplicates(
+    mcp: Session, erp: FakeErpnext, docstatus: int, status: str
+) -> None:
+    """REQ-005-PRS-F009: only a draft return against the invoice counts."""
+    erp.docs["Purchase Invoice"][PURCHASE_DRAFT].update(docstatus=docstatus, status=status)
+    result = create(mcp, "create_draft_purchase_return", items=[{"item_code": "SKU-1", "qty": 1}])
+    assert not result.error, result.text
+    assert result.data["warnings"] == []
+    assert len(erp.writes(PURCHASES)) == 1
 
 
 # update_draft_sales_return, update_draft_purchase_return
