@@ -455,6 +455,8 @@ def test_list_sales_tax_templates_sends_exactly_the_catalogued_call(
     assert call.param("fields") == TEMPLATE_FIELDS
     assert call.param("filters") == [["company", "=", COMPANY], ["disabled", "=", 0]]
     assert call.param("order_by") == "name asc"
+    assert (call.param("limit_start"), call.param("limit_page_length")) == ("0", "21")
+    assert (result["count"], result["offset"], result["has_more"]) == (1, 0, False)
     assert result["records"] == [
         {
             "name": "VAT 19% - EX",
@@ -471,6 +473,18 @@ def test_disabled_templates_only_when_asked_for(mcp: Session, erp: FakeErpnext) 
     records = mcp.call("list_sales_tax_templates", {"include_disabled": True}).data["records"]
     assert [r["name"] for r in records] == ["Old VAT - EX", "VAT 19% - EX"]
     assert erp.received[0].param("filters") == [["company", "=", COMPANY]]
+
+
+def test_template_paging_reports_more(mcp: Session, erp: FakeErpnext) -> None:
+    """REQ-001-PRS-F014: a list asks ERPNext for one record more than `limit` to tell
+    whether more follow."""
+    erp.add("Sales Taxes and Charges Template", tax_template("VAT 7% - EX"))
+    args = {"include_disabled": True, "limit": 1, "offset": 1}
+    result = mcp.call("list_sales_tax_templates", args).data
+    [call] = erp.received
+    assert (call.param("limit_start"), call.param("limit_page_length")) == ("1", "2")
+    assert [r["name"] for r in result["records"]] == ["VAT 19% - EX"]
+    assert (result["count"], result["offset"], result["has_more"]) == (1, 1, True)
 
 
 # report_accounts_receivable
