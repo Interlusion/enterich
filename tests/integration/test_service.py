@@ -3,6 +3,10 @@ REQ-002-PRS-NF003, REQ-002-PRS-NF008, REQ-002-PRS-NF009, REQ-002-PRS-NF010,
 REQ-002-PRS-NF011, REQ-002-PRS-NF012."""
 
 import json
+import threading
+from collections.abc import Iterator
+from dataclasses import dataclass, field
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.metadata import version as installed
 from typing import Any
 
@@ -241,6 +245,90 @@ def test_shutdown_closes_the_outgoing_clients(monkeypatch: pytest.MonkeyPatch) -
     with TestClient(create_app(settings()), base_url=BASE):
         assert closed == []
     assert len(closed) == 2  # the JWKS client and the ERPNext client
+
+
+@dataclass
+class LocalJwks:
+    """A JWKS on loopback over real HTTP, for the client create_app builds itself."""
+
+    url: str
+    redirect: bool = False  # answer with a redirect to /moved, which serves the keys
+    paths: list[str] = field(default_factory=list[str])
+
+
+@pytest.fixture
+def local_jwks(jwks: FakeJwks) -> Iterator[LocalJwks]:
+    keys = json.dumps({"keys": [s.jwk() for s in jwks.signers]}).encode()
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            served.paths.append(self.path)
+            if served.redirect and self.path == "/certs":
+                self.send_response(302)
+                self.send_header("location", "/moved")
+                self.send_header("content-length", "0")
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("content-type", "application/json")
+            self.send_header("content-length", str(len(keys)))
+            self.end_headers()
+            self.wfile.write(keys)
+
+        def log_message(self, format: str, *args: Any) -> None:
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    served = LocalJwks(f"http://127.0.0.1:{server.server_address[1]}/certs")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield served
+    server.shutdown()
+    server.server_close()
+
+
+def test_the_jwks_client_follows_no_redirect(
+    local_jwks: LocalJwks, signer: Signer, logs: Logs
+) -> None:
+    """REQ-002-PRS-NF001: keys come from the configured JWKS URL and no other source."""
+    local_jwks.redirect = True
+    with TestClient(create_app(settings(jwks_url=local_jwks.url)), base_url=BASE) as c:
+        response = initialize(c, token(signer), "2025-11-25")
+    assert response.status_code == 503
+    assert local_jwks.paths == ["/certs"]
+
+
+def test_the_jwks_client_takes_no_proxy_from_the_environment(
+    local_jwks: LocalJwks, signer: Signer, logs: Logs, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy"):
+        monkeypatch.setenv(name, "http://127.0.0.1:9")  # nothing listens there
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+    with TestClient(create_app(settings(jwks_url=local_jwks.url)), base_url=BASE) as c:
+        response = initialize(c, token(signer), "2025-11-25")
+    assert response.status_code == 200
+    assert local_jwks.paths == ["/certs"]
+
+
+def test_a_jwks_fetch_has_a_time_limit(
+    local_jwks: LocalJwks, signer: Signer, logs: Logs, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    limits: list[dict[str, float | None]] = []
+    send = httpx2.AsyncClient.send
+
+    async def recorded(
+        self: httpx2.AsyncClient, request: httpx2.Request, **kwargs: Any
+    ) -> httpx2.Response:
+        limits.append(request.extensions["timeout"])
+        return await send(self, request, **kwargs)
+
+    monkeypatch.setattr(httpx2.AsyncClient, "send", recorded)
+    with TestClient(create_app(settings(jwks_url=local_jwks.url)), base_url=BASE) as c:
+        response = initialize(c, token(signer), "2025-11-25")
+    assert response.status_code == 200
+    assert len(limits) == 1
+    assert None not in limits[0].values()
 
 
 def test_healthz_needs_nothing(jwks: FakeJwks, logs: Logs) -> None:
