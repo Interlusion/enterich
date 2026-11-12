@@ -724,6 +724,19 @@ def test_the_comment_stays_within_the_operation_time(
     assert "comment" in missing
 
 
+def test_a_create_whose_calls_together_exceed_the_operation_time_is_a_tool_error(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-002-PRS-NF011: the limit covers the operation, not each call
+    monkeypatch.setattr(tools, "OPERATION_TIMEOUT", 1.0)
+    erp.slow[PATH] = 0.6
+    result = create(mcp)
+    assert result.error
+    assert result.text == "The operation took longer than 1 seconds."
+    assert [(r.method, r.path) for r in erp.received] == [("GET", PATH), ("POST", PATH)]
+    assert erp.comments == []
+
+
 @pytest.mark.parametrize("name", ["enterich_request", "other"])
 def test_an_argument_outside_the_schema_is_refused_whatever_its_name(
     mcp: Session, erp: FakeErpnext, logs: Logs, name: str
