@@ -26,9 +26,9 @@ def offered(answer: Any) -> list[str]:
     return sorted(tool["name"] for tool in answer["result"]["tools"])
 
 
-def initialize(c: TestClient, t: str, version: str) -> Any:
+def initialize(c: TestClient, t: str, version: str, path: str = "/mcp") -> Any:
     return c.post(
-        "/mcp",
+        path,
         headers=bearer(t),
         json={
             "jsonrpc": "2.0",
@@ -43,7 +43,7 @@ def initialize(c: TestClient, t: str, version: str) -> Any:
     )
 
 
-def list_tools(c: TestClient, t: str, version: str) -> Any:
+def list_tools(c: TestClient, t: str, version: str, path: str = "/mcp") -> Any:
     params: dict[str, Any] = {}
     headers = {**bearer(t), "mcp-protocol-version": version}
     if version == "2026-07-28":
@@ -54,7 +54,7 @@ def list_tools(c: TestClient, t: str, version: str) -> Any:
             "io.modelcontextprotocol/clientCapabilities": {},
         }
     return c.post(
-        "/mcp",
+        path,
         headers=headers,
         json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": params},
     )
@@ -131,6 +131,23 @@ def test_other_paths_are_404(jwks: FakeJwks, signer: Signer, logs: Logs, path: s
     with client(jwks) as c:
         response = c.post(path, headers=bearer(token(signer)), json={}, follow_redirects=False)
     assert response.status_code == 404
+
+
+def test_mcp_is_served_at_the_path_of_the_resource_url(
+    jwks: FakeJwks, signer: Signer, logs: Logs
+) -> None:
+    resource = "https://mcp.example.com/erp/agent"
+    t = token(signer, aud=[resource])
+    with client(jwks, settings(resource_url=resource)) as c:
+        assert initialize(c, t, "2025-11-25", "/erp/agent").status_code == 200
+        tools = list_tools(c, t, "2025-11-25", "/erp/agent")
+        assert tools.status_code == 200
+        assert offered(tools.json()) == list(names())
+        metadata = c.get("/.well-known/oauth-protected-resource/erp/agent")
+        assert metadata.status_code == 200
+        assert metadata.json()["resource"] == resource
+        assert c.post("/mcp", headers=bearer(t), json={}).status_code == 404
+        assert c.get(METADATA).status_code == 404
 
 
 def test_missing_token_gets_401_with_the_metadata_pointer(jwks: FakeJwks, logs: Logs) -> None:
