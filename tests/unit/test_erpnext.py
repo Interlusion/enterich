@@ -250,6 +250,20 @@ async def test_a_refusal_is_at_most_300_characters(fake: FakeErpnext) -> None:
     assert len(text) <= 300
 
 
+async def test_a_refusal_of_300_is_kept_whole_and_one_of_301_is_cut_to_300(
+    fake: FakeErpnext,
+) -> None:
+    """REQ-001-PRS-F008: only a text over 300 characters is cut, to exactly 300."""
+    prefix = "ERPNext refused the request (417 ValidationError). ERPNext's message: "
+    fits = "x" * (300 - len(prefix))
+    whole = await failure(fake, 417, error(417, "ValidationError", fits))
+    cut = await failure(fake, 417, error(417, "ValidationError", fits + "y"))
+    assert whole == prefix + fits
+    assert len(whole) == 300
+    assert cut == prefix + fits[:-1] + "…"
+    assert len(cut) == 300
+
+
 @pytest.mark.parametrize(
     "answer", [{}, {"message": None}, {"message": ["x"]}, [], "agent@example.com", 5]
 )
