@@ -18,11 +18,13 @@ from tests.fakes.erpnext import (
 )
 from tests.fakes.settings import DRAFTS_PER_HOUR
 from tests.integration.clock import TODAY
+from tests.integration.duplicates import Duplicate
 from tests.integration.mcp import Result, Session
 
 PATH = "/api/resource/Journal Entry"
 DRAFT = "ACC-JV-2026-00010"
 MODIFIED = "2026-10-28 11:00:00.000000"
+BY_ROWS = Duplicate("draft", "posting date and rows")
 RENT = "6310 - Rent - EX"
 BANK = "1200 - Bank - EX"
 DEBTORS = "1400 - Debtors - EX"
@@ -270,8 +272,7 @@ def test_a_create_with_the_drafts_rows_is_refused_naming_it(mcp: Session, erp: F
     rows = [{"account": BANK, "credit": 500}, {"account": RENT, "debit": 500}]
     result = create(mcp, accounts=rows)
     assert result.error
-    assert result.text.startswith("allow_duplicate:")
-    assert DRAFT in result.text
+    assert result.text == BY_ROWS.refusal(DRAFT)
     assert erp.writes() == []
 
 
@@ -314,16 +315,14 @@ def test_a_repeated_create_matches_the_amounts_erpnext_rounded(
     assert erp.docs["Journal Entry"][first["name"]]["total_debit"] == 100.0
     again = create(mcp, accounts=rows)
     assert again.error
-    assert again.text.startswith("allow_duplicate:")
-    assert first["name"] in again.text
+    assert again.text == BY_ROWS.refusal(first["name"])
     assert len(erp.writes(PATH)) == 1
 
 
 def test_allow_duplicate_creates_and_says_so(mcp: Session, erp: FakeErpnext) -> None:
     rows = [{"account": RENT, "debit": 500}, {"account": BANK, "credit": 500}]
     result = create(mcp, accounts=rows, allow_duplicate=True).data
-    [warning] = result["warnings"]
-    assert DRAFT in warning
+    assert result["warnings"] == [BY_ROWS.warning(DRAFT)]
     [comment] = erp.comments
     assert comment["reference_doctype"] == "Journal Entry"
 
