@@ -1,0 +1,13 @@
+{
+  "fixes": 5,
+  "states": {
+    "accepted": 4,
+    "rejected": 1
+  },
+  "missing": [],
+  "unaccepted": {
+    "auto/tests-ratchet-limit-not-at-boundary": [
+      "4caaad82b516aa2037df29910ef16e9316d618c8"
+    ]
+  }
+}

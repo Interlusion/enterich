@@ -1,44 +1,20 @@
 [
   {
-    "branch": "auto/tests-integration-service",
+    "branch": "auto/tests-unit-erpnext",
     "files": [
-      "tests/integration/test_service.py"
+      "tests/unit/test_erpnext.py"
     ],
     "ratchets": [],
     "fixes": [
       {
-        "key": "mutant-gap:enterich.app.x__log_rejection__mutmut_19",
-        "slug": "app-log-rejection-19",
-        "ratchet": null
-      },
-      {
-        "key": "mutant-gap:enterich.app.x_create_app__mutmut_49",
-        "slug": "app-create-app-49",
-        "ratchet": null
-      }
-    ]
-  },
-  {
-    "branch": "auto/tests-ratchet-limit-not-at-boundary",
-    "files": [
-      "tests/unit/test_erpnext.py"
-    ],
-    "ratchets": [
-      {
-        "key": "ratchet:limit-not-at-boundary",
-        "slug": "ratchet-limit-not-at-boundary"
-      }
-    ],
-    "fixes": [
-      {
         "key": "mutant-gap:enterich.erpnext.x__check_fields__mutmut_17",
         "slug": "erpnext-check-fields-17",
-        "ratchet": "ratchet:limit-not-at-boundary"
+        "ratchet": null
       },
       {
         "key": "mutant-gap:enterich.erpnext.x\u01c1Erpnext\u01c1_refusal__mutmut_25",
         "slug": "erpnext-x-erpnext-refusal-25",
-        "ratchet": "ratchet:limit-not-at-boundary"
+        "ratchet": null
       }
     ]
   }
