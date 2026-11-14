@@ -164,8 +164,8 @@ def test_missing_token_gets_401_with_the_metadata_pointer(jwks: FakeJwks, logs: 
     challenge = response.headers["www-authenticate"]
     assert challenge.startswith("Bearer ")
     assert f'resource_metadata="{BASE}{METADATA}"' in challenge
-    assert [(r["status"], r["reason"]) for r in logs.events("rejection")] == [
-        (401, "no bearer token")
+    assert [(r["level"], r["status"], r["reason"]) for r in logs.events("rejection")] == [
+        ("warning", 401, "no bearer token")
     ]
 
 
@@ -200,8 +200,11 @@ def test_a_missing_scope_gets_403(jwks: FakeJwks, signer: Signer, logs: Logs) ->
     assert response.status_code == 403
     assert 'error="insufficient_scope"' in response.headers["www-authenticate"]
     assert [
-        (r["status"], r["reason"], r["sub"], r["client"]) for r in logs.events("rejection")
-    ] == [(403, "missing scope", "00000000-0000-0000-0000-000000000001", "enterich-agent")]
+        (r["level"], r["status"], r["reason"], r["sub"], r["client"])
+        for r in logs.events("rejection")
+    ] == [
+        ("warning", 403, "missing scope", "00000000-0000-0000-0000-000000000001", "enterich-agent")
+    ]
 
 
 def test_a_refused_token_gets_401_and_one_short_line_each(
@@ -223,6 +226,7 @@ def test_a_refused_token_gets_401_and_one_short_line_each(
     assert len(lines) == 50
     assert all(len(line) <= 300 for line in lines)
     first = logs.events("rejection")[0]
+    assert first["level"] == "warning"
     assert first["reason"] == "wrong subject"
     assert first["sub"] == "11111111-1111-1111-1111-111111111111"
     assert first["client"] == "enterich-agent"
@@ -415,8 +419,8 @@ def test_unreachable_jwks_gets_503_not_401(jwks: FakeJwks, signer: Signer, logs:
         response = c.post("/mcp", headers=bearer(token(signer)), json={})
     assert response.status_code == 503
     assert response.headers["retry-after"] == "30"
-    assert [(r["status"], r["reason"]) for r in logs.events("rejection")] == [
-        (503, "no signing keys")
+    assert [(r["level"], r["status"], r["reason"]) for r in logs.events("rejection")] == [
+        ("warning", 503, "no signing keys")
     ]
     assert logs.events("jwks")[0]["outcome"] == "failed"
 
