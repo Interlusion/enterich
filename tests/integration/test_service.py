@@ -8,6 +8,7 @@ import hmac
 import json
 import threading
 import time
+import warnings
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -17,6 +18,7 @@ from typing import Any
 import httpx2
 import pytest
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from mcp import MCPDeprecationWarning
 from starlette.testclient import TestClient
 
 from enterich.app import create_app
@@ -285,6 +287,15 @@ def test_a_2_mib_body_gets_413_before_the_token_check(
         response = c.post("/mcp", headers=bearer(token(signer)), content=b"x" * (2 * 1024 * 1024))
     assert response.status_code == 413
     assert jwks.fetches == 0
+
+
+def test_the_start_draws_no_deprecation_warning_from_the_sdk(jwks: FakeJwks) -> None:
+    """ADR-003: Enterich sets `AuthSettings.validate_token_resource` itself, as its verifier
+    checks `aud`. Left to the SDK's changing default, every start would warn on stderr."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", MCPDeprecationWarning)
+        with client(jwks):
+            pass  # the start alone: the app assembled, its lifespan begun and ended
 
 
 def test_shutdown_closes_the_outgoing_clients(monkeypatch: pytest.MonkeyPatch) -> None:
