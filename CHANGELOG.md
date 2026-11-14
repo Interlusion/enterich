@@ -4,6 +4,10 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+### Security
+
+- opentelemetry-api, which the MCP SDK depends on, is 1.45.2: before, a crafted `traceparent` header took quadratic time to parse (GHSA-mf5v-w3w3-f6cg).
+
 ### Fixed
 
 - A token whose `azp` or `client_id` is present but not a string is refused as naming the wrong client. Before, such a claim counted as absent, so a token with a numeric `azp` and the configured `client_id` was accepted (REQ-002-PRS-NF001).
