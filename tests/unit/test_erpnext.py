@@ -250,6 +250,20 @@ async def test_a_refusal_is_at_most_300_characters(fake: FakeErpnext) -> None:
     assert len(text) <= 300
 
 
+async def test_a_refusal_of_300_is_kept_whole_and_one_of_301_is_cut_to_300(
+    fake: FakeErpnext,
+) -> None:
+    """REQ-001-PRS-F008: only a text over 300 characters is cut, to exactly 300."""
+    prefix = "ERPNext refused the request (417 ValidationError). ERPNext's message: "
+    fits = "x" * (300 - len(prefix))
+    whole = await failure(fake, 417, error(417, "ValidationError", fits))
+    cut = await failure(fake, 417, error(417, "ValidationError", fits + "y"))
+    assert whole == prefix + fits
+    assert len(whole) == 300
+    assert cut == prefix + fits[:-1] + "…"
+    assert len(cut) == 300
+
+
 @pytest.mark.parametrize(
     "answer", [{}, {"message": None}, {"message": ["x"]}, [], "agent@example.com", 5]
 )
@@ -338,6 +352,27 @@ async def test_a_list_without_a_field_asked_for_is_refused(fake: FakeErpnext) ->
         "ERPNext's Item list lacks fields Enterich asked for (item_code, stock_uom, "
         "is_stock_item and 1 more): the agent user needs read on Item, at the fields' "
         "permission level too (configuration guide)."
+    )
+
+
+async def test_a_list_without_three_fields_asked_for_names_all_three_and_counts_none(
+    fake: FakeErpnext,
+) -> None:
+    # REQ-001-PRS-F018: the refusal names up to three fields and counts only those beyond
+    fake.fail("/api/resource/Item", 200, {"data": [{"name": "SKU-1"}]})
+    client = Erpnext(settings(), fake.transport())
+    with pytest.raises(ErpnextError) as caught:
+        await client.get_list(
+            "Item",
+            fields=["name", "item_code", "item_group", "stock_uom"],
+            order_by="name asc",
+            start=0,
+            page_length=1,
+        )
+    assert str(caught.value) == (
+        "ERPNext's Item list lacks fields Enterich asked for (item_code, item_group, "
+        "stock_uom): the agent user needs read on Item, at the fields' permission level too "
+        "(configuration guide)."
     )
 
 
