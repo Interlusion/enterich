@@ -20,6 +20,7 @@ from tests.fakes.erpnext import (
 )
 from tests.fakes.settings import DRAFTS_PER_HOUR
 from tests.integration.clock import TODAY
+from tests.integration.duplicates import Duplicate
 from tests.integration.mcp import Result, Session
 
 SALES = "/api/resource/Sales Invoice"
@@ -29,6 +30,8 @@ BILL = "ACC-PINV-2026-00001"  # SKU-1 on row p1 (2)
 SALES_DRAFT = "ACC-SINV-2026-00020"  # the agent's draft return against INVOICE
 PURCHASE_DRAFT = "ACC-PINV-2026-00020"  # the agent's draft return against BILL
 MODIFIED = "2026-10-28 11:00:00.000000"
+BY_INVOICE = Duplicate("draft return", "invoice (return_against)")
+BY_BILL = Duplicate("purchase invoice", "supplier and bill_no")
 
 
 def row(name: str, code: str, qty: float, rate: float, doctype: str) -> dict[str, Any]:
@@ -349,11 +352,7 @@ def test_inputs_outside_the_schema_are_refused(
 def test_a_draft_return_against_the_invoice_is_a_duplicate(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, items=[{"item_code": "SKU-1", "qty": 1}])
     assert result.error
-    assert result.text == (
-        "allow_duplicate: a draft return with the same invoice (return_against) exists "
-        f"({SALES_DRAFT}). Check it first; to create another anyway, repeat with "
-        "allow_duplicate true."
-    )
+    assert result.text == BY_INVOICE.refusal(SALES_DRAFT)
     assert erp.writes() == []
     [check] = [r for r in erp.lists(SALES) if ["is_return", "=", 1] in r.param("filters")]
     assert check.param("fields") == ["name"]
@@ -376,10 +375,7 @@ def test_submitted_and_cancelled_returns_arent_duplicates(mcp: Session, erp: Fak
 def test_allow_duplicate_creates_and_warns(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, items=[{"item_code": "SKU-1", "qty": 1}], allow_duplicate=True)
     [warning] = result.data["warnings"]
-    assert warning == (
-        f"Possible duplicate of {SALES_DRAFT}: a draft return with the same invoice "
-        "(return_against)."
-    )
+    assert warning == BY_INVOICE.warning(SALES_DRAFT)
     assert len(erp.comments) == 1
 
 
@@ -520,11 +516,7 @@ def test_a_draft_debit_note_against_the_invoice_is_a_duplicate(
 ) -> None:
     result = create(mcp, "create_draft_purchase_return")
     assert result.error
-    assert result.text == (
-        "allow_duplicate: a draft return with the same invoice (return_against) exists "
-        f"({PURCHASE_DRAFT}). Check it first; to create another anyway, repeat with "
-        "allow_duplicate true."
-    )
+    assert result.text == BY_INVOICE.refusal(PURCHASE_DRAFT)
     assert erp.writes() == []
     [check] = [r for r in erp.lists(PURCHASES) if ["is_return", "=", 1] in r.param("filters")]
     assert check.param("filters") == [
@@ -1051,11 +1043,7 @@ def test_a_debit_note_with_a_known_number_is_a_duplicate(mcp: Session, erp: Fake
         bill_no="CN-77",
     )
     assert result.error
-    assert result.text == (
-        "allow_duplicate: a purchase invoice with the same supplier and bill_no exists "
-        "(ACC-PINV-2026-00009). Check it first; to create another anyway, repeat with "
-        "allow_duplicate true."
-    )
+    assert result.text == BY_BILL.refusal("ACC-PINV-2026-00009")
     assert erp.writes() == []
     [check] = [r for r in erp.lists(PURCHASES) if ["bill_no", "=", "CN-77"] in r.param("filters")]
     assert check.param("filters") == [
@@ -1080,10 +1068,7 @@ def test_a_debit_note_with_a_known_number_is_created_when_allowed(
     )
     assert not result.error, result.text
     [warning] = result.data["warnings"]
-    assert warning == (
-        "Possible duplicate of ACC-PINV-2026-00009: a purchase invoice with the same supplier "
-        "and bill_no."
-    )
+    assert warning == BY_BILL.warning("ACC-PINV-2026-00009")
 
 
 def test_a_debit_note_update_with_a_known_number_warns(mcp: Session, erp: FakeErpnext) -> None:
@@ -1091,10 +1076,7 @@ def test_a_debit_note_update_with_a_known_number_warns(mcp: Session, erp: FakeEr
     result = update(mcp, "update_draft_purchase_return", bill_no="CN-77")
     assert not result.error, result.text
     [warning] = result.data["warnings"]
-    assert warning == (
-        "Possible duplicate of ACC-PINV-2026-00009: a purchase invoice with the same supplier "
-        "and bill_no."
-    )
+    assert warning == BY_BILL.warning("ACC-PINV-2026-00009")
 
 
 def test_a_debit_notes_own_number_doesnt_warn(mcp: Session, erp: FakeErpnext) -> None:

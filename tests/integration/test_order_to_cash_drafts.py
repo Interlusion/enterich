@@ -27,11 +27,13 @@ from tests.fakes.erpnext import (
 )
 from tests.fakes.settings import DRAFTS_PER_HOUR
 from tests.integration.clock import HOUR_AGO, TODAY
+from tests.integration.duplicates import Duplicate
 from tests.integration.mcp import Result, Session
 
 PATH = "/api/resource/Sales Invoice"
 DRAFT = "ACC-SINV-2026-00010"
 MODIFIED = "2026-10-28 11:00:00.000000"
+BY_ITEMS = Duplicate("draft", "customer, posting date and items")
 VAT_ROWS = [
     {
         "charge_type": "On Net Total",
@@ -342,11 +344,7 @@ def test_a_refusal_names_up_to_five_drafts_and_counts_the_rest(
     made = sorted(create(mcp, allow_duplicate=True).data["name"] for _ in range(count))
     again = create(mcp)
     assert again.error
-    assert again.text == (
-        "allow_duplicate: a draft with the same customer, posting date and items exists "
-        f"({', '.join(made[:5])}{more}). Check it first; to create another anyway, repeat "
-        "with allow_duplicate true."
-    )
+    assert again.text == BY_ITEMS.refusal(f"{', '.join(made[:5])}{more}")
     assert len(erp.writes(PATH)) == count
 
 
@@ -409,10 +407,7 @@ def test_allow_duplicate_creates_and_leaves_the_warning_on_the_draft(
     first = create(mcp).data
     second = create(mcp, allow_duplicate=True).data
     [warning] = second["warnings"]
-    assert warning == (
-        f"Possible duplicate of {first['name']}: a draft with the same customer, posting date "
-        "and items."
-    )
+    assert warning == BY_ITEMS.warning(first["name"])
     first_comment, comment = erp.comments
     assert first_comment["reference_name"] == first["name"]
     assert comment == {
