@@ -1,0 +1,12 @@
+{"sha": "c870b18", "subject": "test: an over-allocation refusal names the invoice's outstanding amount", "verdict": "wanted", "comment": "", "at": "2026-11-12T23:30:10.002Z"}
+{"sha": "c2764fc", "subject": "test: a failure is an error line with the cleaned traceback", "verdict": "wanted", "comment": "", "at": "2026-11-12T23:32:00.845Z"}
+{"sha": "33f2bc0", "subject": "test: a debit note's update refuses a cancelled, moved or cleared invoice", "verdict": "wanted", "comment": "", "at": "2026-11-13T09:45:59.566Z"}
+{"sha": "82693a2", "subject": "test: a resource URL the metadata can't publish unchanged stops Enterich", "verdict": "wanted", "comment": "", "at": "2026-11-13T09:47:00.431Z"}
+{"sha": "9cb00e2", "subject": "test: rejection lines stay short with non-ASCII subject and client", "verdict": "wanted", "comment": "", "at": "2026-11-13T09:48:53.368Z"}
+{"sha": "d467afc", "subject": "test: a start without warnings logs its start line at info level", "verdict": "wanted", "comment": "", "at": "2026-11-13T09:49:35.840Z"}
+{"sha": "5766f21", "subject": "test: show that no token case leaks a token segment to the log or a response", "verdict": "wanted", "comment": "", "at": "2026-11-13T09:50:53.628Z"}
+{"sha": "263cc89", "subject": "test: show a refusal whose _server_messages isn't a list keeps status and type", "verdict": "wanted", "comment": "", "at": "2026-11-13T09:51:37.140Z"}
+{"sha": "51e88f4", "subject": "test: a reverse-charge debit note's tax summary is negative on its Deduct row too", "verdict": "wanted", "comment": "", "at": "2026-11-13T09:52:33.626Z"}
+{"sha": "c072e20", "subject": "test: a JWKS is read whole across chunks, up to 1 MiB", "verdict": "wanted", "comment": "", "at": "2026-11-13T09:53:23.189Z"}
+{"sha": "dfac8ae", "subject": "test: list_bank_accounts returns is_default and disabled as booleans", "verdict": "wanted", "comment": "", "at": "2026-11-13T09:54:04.926Z"}
+{"sha": "544fbe0", "subject": "test: show that each operation has one Rights row in its area spec", "verdict": "wanted", "comment": "", "at": "2026-11-13T09:54:46.386Z"}
