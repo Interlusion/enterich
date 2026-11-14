@@ -8,6 +8,7 @@ import hmac
 import json
 import threading
 import time
+import warnings
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -17,6 +18,7 @@ from typing import Any
 import httpx2
 import pytest
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from mcp import MCPDeprecationWarning
 from starlette.testclient import TestClient
 
 from enterich.app import create_app
@@ -164,8 +166,8 @@ def test_missing_token_gets_401_with_the_metadata_pointer(jwks: FakeJwks, logs: 
     challenge = response.headers["www-authenticate"]
     assert challenge.startswith("Bearer ")
     assert f'resource_metadata="{BASE}{METADATA}"' in challenge
-    assert [(r["status"], r["reason"]) for r in logs.events("rejection")] == [
-        (401, "no bearer token")
+    assert [(r["level"], r["status"], r["reason"]) for r in logs.events("rejection")] == [
+        ("warning", 401, "no bearer token")
     ]
 
 
@@ -200,8 +202,11 @@ def test_a_missing_scope_gets_403(jwks: FakeJwks, signer: Signer, logs: Logs) ->
     assert response.status_code == 403
     assert 'error="insufficient_scope"' in response.headers["www-authenticate"]
     assert [
-        (r["status"], r["reason"], r["sub"], r["client"]) for r in logs.events("rejection")
-    ] == [(403, "missing scope", "00000000-0000-0000-0000-000000000001", "enterich-agent")]
+        (r["level"], r["status"], r["reason"], r["sub"], r["client"])
+        for r in logs.events("rejection")
+    ] == [
+        ("warning", 403, "missing scope", "00000000-0000-0000-0000-000000000001", "enterich-agent")
+    ]
 
 
 def test_a_refused_token_gets_401_and_one_short_line_each(
@@ -223,6 +228,7 @@ def test_a_refused_token_gets_401_and_one_short_line_each(
     assert len(lines) == 50
     assert all(len(line) <= 300 for line in lines)
     first = logs.events("rejection")[0]
+    assert first["level"] == "warning"
     assert first["reason"] == "wrong subject"
     assert first["sub"] == "11111111-1111-1111-1111-111111111111"
     assert first["client"] == "enterich-agent"
@@ -281,6 +287,15 @@ def test_a_2_mib_body_gets_413_before_the_token_check(
         response = c.post("/mcp", headers=bearer(token(signer)), content=b"x" * (2 * 1024 * 1024))
     assert response.status_code == 413
     assert jwks.fetches == 0
+
+
+def test_the_start_draws_no_deprecation_warning_from_the_sdk(jwks: FakeJwks) -> None:
+    """ADR-003: Enterich sets `AuthSettings.validate_token_resource` itself, as its verifier
+    checks `aud`. Left to the SDK's changing default, every start would warn on stderr."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", MCPDeprecationWarning)
+        with client(jwks):
+            pass  # the start alone: the app assembled, its lifespan begun and ended
 
 
 def test_shutdown_closes_the_outgoing_clients(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -415,8 +430,8 @@ def test_unreachable_jwks_gets_503_not_401(jwks: FakeJwks, signer: Signer, logs:
         response = c.post("/mcp", headers=bearer(token(signer)), json={})
     assert response.status_code == 503
     assert response.headers["retry-after"] == "30"
-    assert [(r["status"], r["reason"]) for r in logs.events("rejection")] == [
-        (503, "no signing keys")
+    assert [(r["level"], r["status"], r["reason"]) for r in logs.events("rejection")] == [
+        ("warning", 503, "no signing keys")
     ]
     assert logs.events("jwks")[0]["outcome"] == "failed"
 
