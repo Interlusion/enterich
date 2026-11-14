@@ -1091,7 +1091,10 @@ def test_a_debit_note_update_with_a_known_number_warns(mcp: Session, erp: FakeEr
     result = update(mcp, "update_draft_purchase_return", bill_no="CN-77")
     assert not result.error, result.text
     [warning] = result.data["warnings"]
-    assert "ACC-PINV-2026-00009" in warning
+    assert warning == (
+        "Possible duplicate of ACC-PINV-2026-00009: a purchase invoice with the same supplier "
+        "and bill_no."
+    )
 
 
 def test_a_debit_notes_own_number_doesnt_warn(mcp: Session, erp: FakeErpnext) -> None:
