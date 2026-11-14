@@ -327,8 +327,10 @@ def test_a_recorded_supplier_invoice_is_refused_naming_it(
 ) -> None:
     result = create(mcp, bill_no=bill_no)
     assert result.error
-    assert result.text.startswith("allow_duplicate:")
-    assert found in result.text
+    assert result.text == (
+        f"allow_duplicate: a purchase invoice with the same supplier and bill_no exists ({found}). "
+        "Check it first; to create another anyway, repeat with allow_duplicate true."
+    )
     assert erp.writes() == []
 
 
@@ -350,8 +352,10 @@ def test_other_bills_go_through_without_warning(
 
 def test_allow_duplicate_records_the_bill_again_and_says_so(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, bill_no="R-4711", allow_duplicate=True).data
-    [warning] = result["warnings"]
-    assert "ACC-PINV-2026-00001" in warning
+    assert result["warnings"] == [
+        "Possible duplicate of ACC-PINV-2026-00001: a purchase invoice with the same supplier "
+        "and bill_no."
+    ]
     assert len(erp.comments) == 1
 
 
@@ -377,7 +381,10 @@ def test_a_create_sent_again_is_refused_naming_the_first_draft(
 def test_without_a_bill_the_items_match(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, items=DRAFT_ITEMS)
     assert result.error
-    assert DRAFT in result.text
+    assert result.text == (
+        "allow_duplicate: a draft with the same supplier, posting date and items exists "
+        f"({DRAFT}). Check it first; to create another anyway, repeat with allow_duplicate true."
+    )
     [check] = erp.lists(PATH)
     assert check.param("fields") == ["name", "items.item_code", "items.qty", "items.is_free_item"]
     assert check.param("filters") == [
@@ -718,8 +725,9 @@ def test_a_create_differing_from_the_draft_goes_through(
 
 def test_allow_duplicate_on_the_item_match_warns(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, items=DRAFT_ITEMS, allow_duplicate=True).data
-    [warning] = result["warnings"]
-    assert DRAFT in warning
+    assert result["warnings"] == [
+        f"Possible duplicate of {DRAFT}: a draft with the same supplier, posting date and items."
+    ]
     assert len(erp.comments) == 1
 
 
