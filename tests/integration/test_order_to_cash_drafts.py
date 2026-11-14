@@ -409,7 +409,10 @@ def test_allow_duplicate_creates_and_leaves_the_warning_on_the_draft(
     first = create(mcp).data
     second = create(mcp, allow_duplicate=True).data
     [warning] = second["warnings"]
-    assert first["name"] in warning
+    assert warning == (
+        f"Possible duplicate of {first['name']}: a draft with the same customer, posting date "
+        "and items."
+    )
     first_comment, comment = erp.comments
     assert first_comment["reference_name"] == first["name"]
     assert comment == {

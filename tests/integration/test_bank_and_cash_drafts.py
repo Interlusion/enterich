@@ -433,14 +433,29 @@ def test_a_payment_without_references_checks_no_invoice(mcp: Session, erp: FakeE
     assert erp.lists("/api/resource/Sales Invoice") == []
 
 
-# The duplicate match (REQ-007-PRS-F006, REQ-001-PRS-F005)
+# The duplicate match (REQ-007-PRS-F006, REQ-001-PRS-F005): the refusal and the warning
+# name the payment entry found and what matched, in full.
+
+
+def refused_as_duplicate(found: str) -> str:
+    return (
+        "allow_duplicate: a payment entry with the same party and bank reference (reference_no) "
+        f"exists ({found}). Check it first; to create another anyway, repeat with "
+        "allow_duplicate true."
+    )
+
+
+def warned_as_duplicate(found: str) -> str:
+    return (
+        f"Possible duplicate of {found}: a payment entry with the same party and bank "
+        "reference (reference_no)."
+    )
 
 
 def test_a_recorded_bank_reference_is_refused(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, reference_no="TX-4711")
     assert result.error
-    assert result.text.startswith("allow_duplicate: ")
-    assert "ACC-PAY-2026-00001" in result.text
+    assert result.text == refused_as_duplicate("ACC-PAY-2026-00001")
     assert erp.writes() == []
     [check] = erp.lists(PATH)
     assert check.param("filters") == [
@@ -455,7 +470,7 @@ def test_a_recorded_bank_reference_is_refused(mcp: Session, erp: FakeErpnext) ->
 def test_a_drafts_bank_reference_is_refused(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, reference_no="TX-4800")
     assert result.error
-    assert DRAFT in result.text
+    assert result.text == refused_as_duplicate(DRAFT)
 
 
 def test_a_create_sent_again_is_refused_naming_the_first_draft(
@@ -464,8 +479,7 @@ def test_a_create_sent_again_is_refused_naming_the_first_draft(
     first = create(mcp).data
     again = create(mcp)
     assert again.error
-    assert again.text.startswith("allow_duplicate: ")
-    assert first["name"] in again.text
+    assert again.text == refused_as_duplicate(first["name"])
     assert len(erp.writes(PATH)) == 1
 
 
@@ -486,8 +500,7 @@ def test_a_reference_not_recorded_for_the_party_goes_through(
 
 def test_allow_duplicate_warns(mcp: Session, erp: FakeErpnext) -> None:
     result = create(mcp, reference_no="TX-4711", allow_duplicate=True).data
-    [warning] = result["warnings"]
-    assert "ACC-PAY-2026-00001" in warning
+    assert result["warnings"] == [warned_as_duplicate("ACC-PAY-2026-00001")]
     assert len(erp.comments) == 1
 
 
@@ -770,8 +783,7 @@ def test_a_stale_update_changes_nothing(mcp: Session, erp: FakeErpnext) -> None:
 
 def test_an_update_to_a_recorded_bank_reference_warns(mcp: Session, erp: FakeErpnext) -> None:
     result = update(mcp, reference_no="TX-4711").data
-    [warning] = result["warnings"]
-    assert "ACC-PAY-2026-00001" in warning
+    assert result["warnings"] == [warned_as_duplicate("ACC-PAY-2026-00001")]
     [check] = erp.lists(PATH)
     assert check.param("filters") == [
         ["company", "=", COMPANY],
