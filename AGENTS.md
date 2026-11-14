@@ -33,4 +33,4 @@ Start at `docs/README.md`. The specs in `docs/specs/` are the contract: a new op
 - Conventional Commits: `feat`, `fix`, `docs`, `ci`, `chore`, `refactor`, `test`.
 - Keep scripts and agents off `api.github.com` (60 requests/h unauthenticated): use `git ls-remote`, `raw.githubusercontent.com`, `releases.atom`. The workflows' two authenticated exceptions are in the development guide.
 - Markdown: one line per paragraph, no hard wrapping. `mdformat` formats it (config in `.mdformat.toml`).
-- Commit or push only when the operator asks.
+- Commit or push only when the operator asks. The improvement pipeline commits and pushes on its own, on `auto/` branches only, and never changes the specs, ADRs or this file ([ADR-008](docs/arc42/adr/ADR-008-improvement-pipeline.md)).
