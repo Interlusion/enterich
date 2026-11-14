@@ -341,6 +341,27 @@ async def test_a_list_without_a_field_asked_for_is_refused(fake: FakeErpnext) ->
     )
 
 
+async def test_a_list_without_three_fields_asked_for_names_all_three_and_counts_none(
+    fake: FakeErpnext,
+) -> None:
+    # REQ-001-PRS-F018: the refusal names up to three fields and counts only those beyond
+    fake.fail("/api/resource/Item", 200, {"data": [{"name": "SKU-1"}]})
+    client = Erpnext(settings(), fake.transport())
+    with pytest.raises(ErpnextError) as caught:
+        await client.get_list(
+            "Item",
+            fields=["name", "item_code", "item_group", "stock_uom"],
+            order_by="name asc",
+            start=0,
+            page_length=1,
+        )
+    assert str(caught.value) == (
+        "ERPNext's Item list lacks fields Enterich asked for (item_code, item_group, "
+        "stock_uom): the agent user needs read on Item, at the fields' permission level too "
+        "(configuration guide)."
+    )
+
+
 async def test_a_list_without_a_field_above_the_users_permission_level_is_refused(
     fake: FakeErpnext,
 ) -> None:
