@@ -1,0 +1,79 @@
+{
+  "mutants": 7110,
+  "by_status": {
+    "survived": 515,
+    "killed": 6593,
+    "timeout": 2
+  },
+  "survivors_filtered": {
+    "message": 183,
+    "cast": 59
+  },
+  "by_module": {
+    "enterich.__main__": {
+      "killed": 71,
+      "survived": 1
+    },
+    "enterich.app": {
+      "killed": 383,
+      "survived": 58,
+      "timeout": 2
+    },
+    "enterich.auth": {
+      "killed": 333,
+      "survived": 29
+    },
+    "enterich.config": {
+      "survived": 24,
+      "killed": 518
+    },
+    "enterich.erpnext": {
+      "killed": 461,
+      "survived": 75
+    },
+    "enterich.log": {
+      "killed": 115,
+      "survived": 11
+    },
+    "enterich.shapes": {
+      "killed": 219,
+      "survived": 38
+    },
+    "enterich.tools": {
+      "killed": 454,
+      "survived": 40
+    },
+    "enterich.tools.bank_and_cash": {
+      "killed": 735,
+      "survived": 57
+    },
+    "enterich.tools.drafts": {
+      "killed": 463,
+      "survived": 21
+    },
+    "enterich.tools.invoicing": {
+      "killed": 487,
+      "survived": 7
+    },
+    "enterich.tools.master_data": {
+      "killed": 146,
+      "survived": 5
+    },
+    "enterich.tools.order_to_cash": {
+      "killed": 351,
+      "survived": 16
+    },
+    "enterich.tools.procure_to_pay": {
+      "killed": 536,
+      "survived": 50
+    },
+    "enterich.tools.record_to_report": {
+      "killed": 901,
+      "survived": 35
+    },
+    "enterich.tools.returns": {
+      "killed": 420,
+      "survived": 48
+    }
+  }
+}
