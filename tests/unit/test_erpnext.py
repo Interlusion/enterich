@@ -430,11 +430,26 @@ async def test_empty_fields_and_child_fields_without_rows_pass(fake: FakeErpnext
     assert rows == [{"name": "ACC-SINV-2026-00001", "return_against": None, "item_code": None}]
 
 
-async def test_refusal_texts_never_carry_the_credentials(fake: FakeErpnext) -> None:
-    body = error(401, "AuthenticationError", f"token {API_KEY}:{API_SECRET} is invalid")
-    text = await failure(fake, 401, body)
-    assert API_KEY not in text
-    assert API_SECRET not in text
+PREFIX_401 = "ERPNext refused the request (401 AuthenticationError). ERPNext's message: "
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        f"token {API_KEY}:{API_SECRET} is invalid",
+        f"unknown key {API_KEY}",
+        f"wrong secret {API_SECRET}",
+        # the secret straddles the 300-character cut
+        "x" * (290 - len(PREFIX_401)) + API_SECRET,
+    ],
+    ids=["pair", "key-alone", "secret-alone", "across-the-cut"],
+)
+async def test_refusal_texts_never_carry_the_credentials(fake: FakeErpnext, message: str) -> None:
+    """REQ-002-PRS-NF010: each credential is removed on its own, before the cut."""
+    text = await failure(fake, 401, error(401, "AuthenticationError", message))
+    assert text.startswith(PREFIX_401)
+    for credential in (API_KEY, API_SECRET):
+        assert credential[:8] not in text
 
 
 async def test_the_client_counts_calls_and_their_time(fake: FakeErpnext) -> None:
