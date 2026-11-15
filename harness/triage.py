@@ -1,13 +1,17 @@
-"""The tests lens's triage (ADR-008): checks every record of a run's `findings.jsonl`, gives
-each its key, sets aside what `harness/suppressions.jsonl` lists (as tracked while the
-backlog item it names is open, else as suppressed), and writes `report.md` with the
+"""Triage (ADR-008), for the tests lens and the security lens: checks every record of a
+run's `findings.jsonl`, gives each its key, sets aside what `harness/suppressions.jsonl`
+lists (as tracked while the backlog item it names is open, else as suppressed), and writes
+`report.md` with the
 confirmed findings sorted into fix and proposal, and `fixes.jsonl` for the fix stage.
 A pattern of `harness/patterns.jsonl` that the verdicts name in three or more findings
 across at least two files becomes a ratchet in `ratchets.jsonl`: one generic test for the
 class, before its findings.
+A run's lens is in its directory's name (`<date>-security`), and its findings are of that
+lens's kinds. A security finding names its promise (`harness/promises.jsonl`), and a breach
+is confirmed only with how it was reproduced.
 Deterministic; the agents' records are data here, never instructions.
 
-    uv run python harness/triage.py harness/runs/<date>-tests
+    uv run python harness/triage.py harness/runs/<date>-<lens>
 """
 
 import json
@@ -33,7 +37,14 @@ TEST_FILE = re.compile(r"^tests/[\w/]+\.py$")
 # ratchet. Two neighbouring findings are closed by two tests
 RATCHET_FROM = 3
 RATCHET_FILES = 2
-KINDS = {"dod-gap", "mutant-gap", "weak-test"}
+PROMISES = ROOT / "harness" / "promises.jsonl"
+# Each lens's kinds of finding. A breach: a promise can be broken, as reproduced; unproven:
+# it holds as far as read, but no test would notice it breaking
+LENSES = {
+    "tests": {"dod-gap", "mutant-gap", "weak-test"},
+    "security": {"breach", "unproven"},
+}
+KINDS = {kind for kinds in LENSES.values() for kind in kinds}
 CLASSES = {"fix", "proposal", "drop"}
 TEXT_FIELDS = ("kind", "location", "claim", "evidence", "proposal")
 MUTANT = re.compile(r"^enterich\.[\w.ǁ]+__mutmut_\d+$")
@@ -54,6 +65,12 @@ def vocabulary(path: Path = PATTERNS) -> dict[str, str]:
     return known
 
 
+def lens(run: Path) -> str:
+    """A run's lens, from its directory's name: `<date>-<lens>` or `<date>-<lens>-<n>`; the
+    tests lens, the first, if it names none."""
+    return next((part for part in run.name.split("-") if part in LENSES), "tests")
+
+
 def _number(mutant: str) -> int:
     tail = mutant.rpartition("__mutmut_")[2]
     return int(tail) if tail.isdigit() else 0
@@ -61,7 +78,11 @@ def _number(mutant: str) -> int:
 
 def key(record: dict[str, Any]) -> str:
     """What a suppression names: a mutant gap's lowest mutant, since one function can have
-    several gaps; else the kind and location (a Definition of Done item, or a test)."""
+    several gaps; a security finding's kind, promise and location, since one function can
+    break several promises; else the kind and location (a Definition of Done item, or a
+    test)."""
+    if record.get("kind") in LENSES["security"]:
+        return f"{record.get('kind')}:{record.get('promise')}:{record.get('location')}"
     if record.get("kind") == "mutant-gap" and record.get("mutants"):
         mutants = cast("list[str]", record["mutants"])
         lowest = min(mutants, key=lambda m: (m.rpartition("__mutmut_")[0], _number(m)))
@@ -71,8 +92,13 @@ def key(record: dict[str, Any]) -> str:
 
 def slug(record: dict[str, Any]) -> str:
     """The fix branch's name after `auto/tests-`, from the key: `shapes-page-9`,
-    `req-001-prs-f014-item-3`, `test-shapes-test-a-page-is-cut`."""
+    `req-001-prs-f014-item-3`, `test-shapes-test-a-page-is-cut`; a security finding's from
+    its promise and place: `one-company-drafts-editable`."""
     kind, _, rest = key(record).partition(":")
+    if kind in LENSES["security"]:
+        path, _, name = str(record.get("location")).partition(":")
+        text = f"{record.get('promise')} {Path(path).stem} {name}"
+        return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60].rstrip("-")
     if kind == "mutant-gap":
         name, _, number = rest.removeprefix("enterich.").rpartition("__mutmut_")
         words = [w.removeprefix("x_").replace("ǁ", " ") for w in name.split(".")]
@@ -85,12 +111,22 @@ def slug(record: dict[str, Any]) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60].rstrip("-")
 
 
-def check(record: dict[str, Any], known: Collection[str] = ()) -> list[str]:
+def check(
+    record: dict[str, Any],
+    known: Collection[str] = (),
+    promises: Collection[str] = (),
+    kinds: Collection[str] = KINDS,
+) -> list[str]:
     """What is wrong with a record; empty when it can be triaged. A verdict's pattern is
-    one of the vocabulary's (`known`), or none."""
+    one of the vocabulary's (`known`), or none; a security finding's promise is one of
+    the lens's (`promises`), and no other finding names one."""
     problems = [f"{f} missing" for f in TEXT_FIELDS if not isinstance(record.get(f), str)]
-    if record.get("kind") not in KINDS:
+    if record.get("kind") not in kinds:
         problems.append(f"kind {record.get('kind')!r}")
+    security = record.get("kind") in LENSES["security"]
+    promise = record.get("promise")
+    if (promise not in promises) if security else (promise is not None):
+        problems.append(f"promise {promise!r}")
     requirement = record.get("requirement")
     if requirement is not None and not isinstance(requirement, str):
         problems.append("requirement not a string")
@@ -111,6 +147,13 @@ def check(record: dict[str, Any], known: Collection[str] = ()) -> list[str]:
         problems.append(f"verdict.class {verdict.get('class')!r}")
     if not isinstance(verdict.get("reason"), str):
         problems.append("verdict.reason missing")
+    shown = verdict.get("reproduction")
+    if (
+        record.get("kind") == "breach"
+        and verdict.get("confirmed") is True
+        and not (isinstance(shown, str) and shown.strip())
+    ):
+        problems.append("verdict.reproduction missing: a breach is confirmed as reproduced")
     pattern = verdict.get("pattern")
     if pattern is not None and not (isinstance(pattern, str) and pattern in known):
         problems.append(f"verdict.pattern {pattern!r}")
@@ -142,10 +185,13 @@ def main(
     suppressions: Path = SUPPRESSIONS,
     backlog: Path = BACKLOG,
     patterns: Path = PATTERNS,
+    promises: Path = PROMISES,
 ) -> int:
     known = vocabulary(patterns)
+    of_lens = LENSES[lens(run)]
+    promised = {str(p.get("promise")) for p in _records(promises)}
     records = _records(run / "findings.jsonl")
-    bad = [(key(r), p) for r in records if (p := check(r, known))]
+    bad = [(key(r), p) for r in records if (p := check(r, known, promised, of_lens))]
     bad += [
         (k, ["two records with this key"]) for k, n in Counter(map(key, records)).items() if n > 1
     ]
@@ -179,11 +225,11 @@ def main(
     kinds = Counter(r["kind"] for r in records)
     confirmed_kinds = Counter(r["kind"] for r in confirmed)
     lines = [
-        f"# Tests lens: {run.name}",
+        f"# {lens(run).capitalize()} lens: {run.name}",
         "",
         "| Kind | Found | Confirmed |",
         "| :- | -: | -: |",
-        *(f"| {k} | {kinds[k]} | {confirmed_kinds[k]} |" for k in sorted(KINDS)),
+        *(f"| {k} | {kinds[k]} | {confirmed_kinds[k]} |" for k in sorted(of_lens)),
         f"| all | {len(records)} | {len(confirmed)} |",
         "",
         f"Suppressed: {len(suppressed)}. Tracked in the backlog: {len(tracked)}.",
