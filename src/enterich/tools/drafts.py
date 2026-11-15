@@ -110,7 +110,11 @@ async def insert(context: Context, doctype: str, doc: dict[str, Any]) -> dict[st
     """A new draft of the assigned company, once the limit of drafts per hour allows it
     (REQ-001-PRS-F019): call it after the duplicate check."""
     limit = context.settings.max_drafts_per_hour
-    if limit is not None:
+    body = {**doc, "company": context.settings.company, "docstatus": 0}
+    if limit is None:
+        return await context.erpnext.insert(doctype, body)
+    # Held from the count to the insert, so creates sent at once count each other's drafts
+    async with context.creating[doctype]:
         made = await context.erpnext.get_list(
             doctype,
             fields=("name",),
@@ -129,9 +133,7 @@ async def insert(context: Context, doctype: str, doc: dict[str, Any]) -> dict[st
                 "the operator allows (ENTERICH_MAX_DRAFTS_PER_HOUR); nothing was created. Try "
                 "again later, or ask a person to review the drafts or to raise the limit."
             )
-    return await context.erpnext.insert(
-        doctype, {**doc, "company": context.settings.company, "docstatus": 0}
-    )
+        return await context.erpnext.insert(doctype, body)
 
 
 async def editable(
