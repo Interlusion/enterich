@@ -191,6 +191,18 @@ def test_http_urls_are_allowed_for_loopback_hosts() -> None:
     assert s.resource_url == "http://127.0.0.1:8000/mcp"
 
 
+NOT_LOOPBACK = ["10.0.0.5", "0.0.0.0", "[::]", "localhost.example.com"]
+
+
+@pytest.mark.parametrize("host", NOT_LOOPBACK)
+@pytest.mark.parametrize(
+    ("name", "path"),
+    [("ISSUER", "/realms/x"), ("JWKS_URL", "/certs"), ("RESOURCE_URL", "/mcp")],
+)
+def test_http_urls_to_any_other_host_stop_enterich(name: str, path: str, host: str) -> None:
+    assert problems(**{name: f"http://{host}{path}"}) == [f"ENTERICH_{name}: {HTTPS_ONLY}"]
+
+
 def test_messages_never_contain_secrets() -> None:
     found = problems(ERPNEXT_API_KEY=" ", TIMEZONE="x")
     found_text = " ".join(found)
@@ -202,8 +214,9 @@ def test_messages_never_contain_secrets() -> None:
     assert API_SECRET not in str(s.model_dump())
 
 
-def test_http_erpnext_url_to_another_host_warns() -> None:
-    s = load({**ENV, "ENTERICH_ERPNEXT_URL": "http://erp.internal:8080"}, ())
+@pytest.mark.parametrize("host", ["erp.internal", *NOT_LOOPBACK])
+def test_http_erpnext_url_to_another_host_warns(host: str) -> None:
+    s = load({**ENV, "ENTERICH_ERPNEXT_URL": f"http://{host}:8080"}, ())
     assert s.warnings == ("ENTERICH_ERPNEXT_URL uses http: the API key travels unencrypted",)
 
 
