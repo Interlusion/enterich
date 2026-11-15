@@ -1,3 +1,5 @@
 # Local links and their #anchors only (https://lychee.cli.rs/usage/config/).
 offline = true
 include_fragments = "full"
+# A run's records quote agents' findings, test inputs among them, such as an invalid URL
+exclude_path = ["harness/runs"]
