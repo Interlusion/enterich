@@ -1,0 +1,46 @@
+{
+  "fixes": 15,
+  "states": {
+    "accepted": 10,
+    "rejected": 1,
+    "refuted": 3
+  },
+  "missing": [
+    "breach:secrets-never-in-git:harness/gate.py:main"
+  ],
+  "unaccepted": {
+    "auto/security-e2e-seed": [
+      "abab86c7a0ff67ef8006b81bb5494caeaa32f5df"
+    ]
+  },
+  "accepted": {
+    "auto/security-e2e-ceiling": [
+      "c421fa6eb8d82562e30ad26c8c32ee99037d29a1"
+    ],
+    "auto/security-integration-conftest": [
+      "c88853fada3711f104a6eceda87a58ca0347108b"
+    ],
+    "auto/security-integration-order-to-cash-drafts": [
+      "1e72cce4be06a5448df4809e1680e1ec347e96fc",
+      "765fe9c7461589fcc3086ec800d4559cc6d38c6a",
+      "3606d623a78b2f5b1f81149c97e907c43ac28e42"
+    ],
+    "auto/security-integration-return-drafts": [
+      "27490ded7cdc5acdde9f7601118dc4829d5f3338",
+      "f1b09eeeecfb95f83b778c34cb8665cfed9eb197"
+    ],
+    "auto/security-repo-workflows": [
+      "457d327e27efe8240cafbd1406d212c0cf3ebf0d"
+    ],
+    "auto/security-unit-config": [
+      "5925928246635dd690ea9d94782ef648c57aab84"
+    ],
+    "auto/security-unit-erpnext": [
+      "7e9dd5b68ff34d9e6b089e8444421a8ae00b18a4",
+      "3b221b53cdcdd2290816365fdb190340fd106b9f"
+    ],
+    "auto/security-unit-log": [
+      "7cc6268fdfa1bcc4a014e09bf289fffa591cda81"
+    ]
+  }
+}
