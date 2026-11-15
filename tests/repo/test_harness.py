@@ -1994,3 +1994,128 @@ def test_the_security_inventory_of_the_repository_is_written(
         "update",
         "add_comment",
     ]
+
+
+# The security lens's findings in triage and the plan
+
+BREACH: dict[str, Any] = {
+    "kind": "breach",
+    "promise": "one-company",
+    "location": "src/enterich/tools/drafts.py:editable",
+    "requirement": "REQ-001-PRS-F007",
+    "mutants": [],
+    "claim": "An update reaches a draft of another company",
+    "evidence": "drafts.py:92 reads the company after the write",
+    "proposal": "Check the company before the write",
+    "origin": "promise:one-company",
+    "verdict": {
+        "confirmed": True,
+        "class": "fix",
+        "pattern": None,
+        "test_files": ["tests/integration/test_service.py"],
+        "reproduction": "A throwaway test against the fake: the update of OTHER-1 was sent",
+        "reason": "reproduced",
+    },
+}
+UNPROVEN: dict[str, Any] = {
+    **BREACH,
+    "kind": "unproven",
+    "claim": "No test would notice an update without the company check",
+    "verdict": {**BREACH["verdict"], "reproduction": None},
+}
+
+
+@pytest.mark.parametrize(
+    ("name", "lens"),
+    [
+        ("2026-11-14-tests", "tests"),
+        ("2026-11-14-tests-2", "tests"),
+        ("2026-11-15-security", "security"),
+        ("2026-11-15-security-2", "security"),
+        # The first lens, if the name says none
+        ("run", "tests"),
+    ],
+)
+def test_a_runs_lens_is_in_its_directorys_name(name: str, lens: str) -> None:
+    assert triage.lens(Path("harness/runs") / name) == lens
+
+
+def test_a_security_findings_key_names_its_promise() -> None:
+    """One function can break two promises: two findings, two suppressions."""
+    assert triage.key(BREACH) == "breach:one-company:src/enterich/tools/drafts.py:editable"
+    assert triage.key(UNPROVEN) == "unproven:one-company:src/enterich/tools/drafts.py:editable"
+    assert triage.slug(BREACH) == "one-company-drafts-editable"
+
+
+def test_a_complete_security_record_can_be_triaged() -> None:
+    assert triage.check(BREACH, promises={"one-company"}) == []
+    assert triage.check(UNPROVEN, promises={"one-company"}) == []
+
+
+@pytest.mark.parametrize(
+    ("record", "problem"),
+    [
+        ({**BREACH, "promise": None}, "promise None"),
+        ({**BREACH, "promise": "be-nice"}, "promise 'be-nice'"),
+        # A breach is confirmed only as reproduced
+        ({**BREACH, "verdict": {**BREACH["verdict"], "reproduction": None}}, "reproduction"),
+        ({**BREACH, "verdict": {**BREACH["verdict"], "reproduction": " "}}, "reproduction"),
+        # A tests finding names no promise
+        ({**FINDING, "promise": "one-company"}, "promise 'one-company'"),
+    ],
+)
+def test_a_security_record_with_a_wrong_field_is_refused(
+    record: dict[str, Any], problem: str
+) -> None:
+    assert any(problem in p for p in triage.check(record, promises={"one-company"}))
+
+
+def test_a_refuted_breach_needs_no_reproduction() -> None:
+    verdict = {**BREACH["verdict"], "confirmed": False, "class": "drop", "reproduction": None}
+    assert triage.check({**BREACH, "verdict": verdict}, promises={"one-company"}) == []
+
+
+def _security_run(tmp_path: Path) -> Path:
+    run = tmp_path / "2026-11-15-security"
+    run.mkdir()
+    return run
+
+
+def test_triage_reports_a_security_run_by_its_own_kinds(tmp_path: Path) -> None:
+    run = _security_run(tmp_path)
+    promises = _write(tmp_path / "promises.jsonl", [{"promise": "one-company"}])
+    _write(run / "findings.jsonl", [BREACH, UNPROVEN])
+    empty = _write(tmp_path / "empty.jsonl", [])
+    done = triage.main(
+        run, suppressions=empty, backlog=tmp_path / "backlog", patterns=empty, promises=promises
+    )
+    assert done == 0
+    report = (run / "report.md").read_text()
+    assert report.startswith("# Security lens: 2026-11-15-security\n")
+    assert "| breach | 1 | 1 |" in report
+    assert "| unproven | 1 | 1 |" in report
+    assert "mutant-gap" not in report
+    # No survivors.jsonl in a security run: a fix has no diffs
+    assert [(f["key"], f["diffs"]) for f in _lines(run / "fixes.jsonl")] == [
+        (triage.key(BREACH), {}),
+        (triage.key(UNPROVEN), {}),
+    ]
+
+
+def test_a_finding_of_another_lens_is_refused_in_a_run(tmp_path: Path) -> None:
+    run = _security_run(tmp_path)
+    promises = _write(tmp_path / "promises.jsonl", [{"promise": "one-company"}])
+    _write(run / "findings.jsonl", [FINDING])
+    empty = _write(tmp_path / "empty.jsonl", [])
+    done = triage.main(
+        run, suppressions=empty, backlog=tmp_path / "backlog", patterns=empty, promises=promises
+    )
+    assert done == 1
+
+
+def test_a_security_runs_branches_are_named_after_its_lens() -> None:
+    fix = {**BREACH, "key": triage.key(BREACH), "slug": triage.slug(BREACH), "ratchet": None}
+    [group] = plan.groups([fix], [], lens="security")
+    assert group["branch"] == "auto/security-integration-service"
+    [group] = plan.groups([fix], [])
+    assert group["branch"] == "auto/tests-integration-service"
