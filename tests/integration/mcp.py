@@ -19,6 +19,7 @@ BASE = "https://erp.example.com"
 METADATA = "/.well-known/oauth-protected-resource/mcp"
 ACCEPT = {"accept": "application/json, text/event-stream"}
 VERSION = "2025-11-25"
+CALLED: set[str] = set()  # every tool name a Session has called in this test run
 
 
 def client(
@@ -77,6 +78,7 @@ class Session:
         self, name: str, arguments: dict[str, Any] | None = None, request_id: str | None = None
     ) -> Result:
         """Call a tool, under the next request ID or under `request_id`."""
+        CALLED.add(name)
         answer = self._rpc("tools/call", {"name": name, "arguments": arguments or {}}, request_id)
         if "error" in answer:
             return Result(True, answer["error"]["message"])
