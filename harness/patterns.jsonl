@@ -1,0 +1,3 @@
+{"pattern": "yes-no-not-bool", "means": "A yes/no field is compared with ==, so an unconverted 0 or 1 passes for false or true"}
+{"pattern": "dropped-argument", "means": "A flag, field list or argument sent to ERPNext can be dropped without a test noticing"}
+{"pattern": "text-by-part", "means": "A refusal's or a warning's text is checked by a part of it, such as its start or a name it holds, not by what it says"}

@@ -1,0 +1,35 @@
+[
+  {
+    "branch": "auto/tests-integration-procure-to-pay-drafts",
+    "files": [
+      "tests/integration/test_procure_to_pay_drafts.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "mutant-gap:enterich.tools.procure_to_pay.x_create_draft_purchase_invoice__mutmut_85",
+        "slug": "tools-procure-to-pay-create-draft-purchase-invoice-85",
+        "ratchet": null
+      }
+    ]
+  },
+  {
+    "branch": "auto/tests-integration-return-drafts",
+    "files": [
+      "tests/integration/test_return_drafts.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "mutant-gap:enterich.tools.procure_to_pay.x_create_draft_purchase_return__mutmut_25",
+        "slug": "tools-procure-to-pay-create-draft-purchase-return-25",
+        "ratchet": null
+      },
+      {
+        "key": "mutant-gap:enterich.tools.procure_to_pay.x_update_draft_purchase_invoice__mutmut_75",
+        "slug": "tools-procure-to-pay-update-draft-purchase-invoice-75",
+        "ratchet": null
+      }
+    ]
+  }
+]

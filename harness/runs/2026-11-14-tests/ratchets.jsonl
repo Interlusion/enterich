@@ -1,0 +1,1 @@
+{"key": "ratchet:limit-not-at-boundary", "slug": "ratchet-limit-not-at-boundary", "pattern": "limit-not-at-boundary", "means": "A limit is tested well past its boundary, never at it and one beyond", "findings": ["mutant-gap:enterich.erpnext.x__check_fields__mutmut_17", "mutant-gap:enterich.erpnext.xǁErpnextǁ_refusal__mutmut_25"]}

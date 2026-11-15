@@ -1,0 +1,21 @@
+[
+  {
+    "branch": "auto/tests-unit-erpnext",
+    "files": [
+      "tests/unit/test_erpnext.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "mutant-gap:enterich.erpnext.x__check_fields__mutmut_17",
+        "slug": "erpnext-check-fields-17",
+        "ratchet": null
+      },
+      {
+        "key": "mutant-gap:enterich.erpnext.x\u01c1Erpnext\u01c1_refusal__mutmut_25",
+        "slug": "erpnext-x-erpnext-refusal-25",
+        "ratchet": null
+      }
+    ]
+  }
+]
