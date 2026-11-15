@@ -1703,6 +1703,26 @@ def test_the_sweep_leaves_a_call_of_python_or_a_library_alone() -> None:
     assert sweep.swept(survivors, [LIKE], [], OWN | {"x_create_draft_sales_invoice"}) == []
 
 
+def test_the_sweep_finds_what_the_fourth_runs_survey_missed() -> None:
+    """The survey found the duplicate texts checked by a part in two modules; the same
+    mutants survived in three more, and at the helper's default."""
+    run = inventory.ROOT / "harness" / "runs" / "2026-11-14-tests-2"
+    swept = sweep.swept(
+        _lines(run / "survivors.jsonl"),
+        _lines(run / "findings.jsonl"),
+        _lines(run / "unverified.jsonl"),
+        sweep.own_names(),
+        sweep.module_names(),
+    )
+    assert {s["location"]: len(s["mutants"]) for s in swept} == {
+        "src/enterich/tools/bank_and_cash.py:create_draft_payment_entry": 8,
+        "src/enterich/tools/bank_and_cash.py:update_draft_payment_entry": 4,
+        "src/enterich/tools/drafts.py:duplicate_warning": 2,
+        "src/enterich/tools/order_to_cash.py:create_draft_sales_invoice": 1,
+        "src/enterich/tools/record_to_report.py:create_draft_journal_entry": 2,
+    }
+
+
 def test_the_sweep_writes_its_candidates_for_the_verifiers(tmp_path: Path) -> None:
     changed = f"-{REFUSE}\n+{REFUSE.replace('PAYMENT_MATCH', 'None')}"
     other = "enterich.tools.bank_and_cash.x_create_draft_payment_entry__mutmut_30"
