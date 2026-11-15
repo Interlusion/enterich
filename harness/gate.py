@@ -5,7 +5,8 @@ run's `outcomes.json`, which `harness/outcomes.py` writes), changes no test file
 for another branch (the run's `groups.json`, which `harness/plan.py` writes), no code or
 changelog a branch that passed before it in the same call changes, only what the tests lens
 may change and nothing the pipeline may not (a file moved away counts at its old place),
-and passes every check, the end-to-end tests included: none skipped, expected to fail or
+and passes every check, a secret scan of its commits and their messages and the
+end-to-end tests included: none skipped, expected to fail or
 left out, and every test `main` had where the branch left it still runs and passes, in as
 many cases (only the operator removes, moves or weakens a test). Each branch is
 checked in a worktree of its own; the results go to the run's `gates.jsonl`. With `--push`, a
@@ -89,6 +90,11 @@ CHECKS = {
     # E2E_ERPNEXT_URL set: the end-to-end tests run with the others; -rp names each that passed
     "tests": ["uv", "run", "pytest", "-q", "-p", "no:cacheprovider", "-rp"],
 }
+# gitleaks as CI runs it, from the image it pins, on the branch's patch: the pipeline
+# pushes to a public repository, and CI scans only pull requests and pushes to main
+SCANNER_IMAGE_DIR = ".github/gitleaks"
+SCANNER_IMAGE = "enterich-gate-gitleaks"
+SCANNER = ["docker", "run", "--rm", "-i", SCANNER_IMAGE, "stdin", "--redact", "--no-banner"]
 COLLECT = ["uv", "run", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider"]
 TEST = re.compile(r"^[\w./-]+\.py::\S")
 PASSED = "PASSED "
@@ -292,6 +298,35 @@ def patch_ids(commits: Sequence[str], repo: Path = ROOT) -> dict[str, str]:
     return found
 
 
+def patch(repo: Path, fork: str, commit: str) -> str:
+    """What a push of the commit makes public beyond `main`: every commit since the fork,
+    its message and its diff, a secret removed again included."""
+    return _git("log", "-p", "--no-color", "--no-ext-diff", f"{fork}..{commit}", repo=repo)
+
+
+def leaks(repo: Path, fork: str, commit: str, scanner: Sequence[str] = SCANNER) -> bool:
+    """Whether the scanner finds a secret in the branch's patch; it says what, redacted."""
+    done = subprocess.run(  # noqa: S603 - fixed arguments, no shell
+        scanner, input=patch(repo, fork, commit), capture_output=True, text=True, check=False
+    )
+    if done.returncode != 0:
+        print(
+            f"{commit}: the secret scan failed\n{(done.stdout + done.stderr)[-3000:]}",
+            file=sys.stderr,
+        )
+    return done.returncode != 0
+
+
+def _scanner() -> None:
+    """The scanner's image, built from the Dockerfile CI builds it from."""
+    subprocess.run(  # noqa: S603 - fixed arguments, no shell
+        ["docker", "build", "-q", "-t", SCANNER_IMAGE, SCANNER_IMAGE_DIR],  # noqa: S607
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+    )
+
+
 @contextmanager
 def _tree(commit: str) -> Generator[Path]:
     """A worktree of the commit with its packages, removed afterwards."""
@@ -314,10 +349,10 @@ def _tests_at(commit: str) -> Counter[str]:
     return tests_collected(done.stdout)
 
 
-def _checks(branch: str, commit: str, before: Mapping[str, int]) -> dict[str, bool]:
+def _checks(branch: str, commit: str, before: Mapping[str, int], fork: str) -> dict[str, bool]:
     """Every check at the commit; `before` is what the tests are compared with, the tests
-    `main` had where the branch left it."""
-    results: dict[str, bool] = {}
+    `main` had where the branch left it at `fork`."""
+    results: dict[str, bool] = {"secrets": not leaks(ROOT, fork, commit)}
     with _tree(commit) as tree:
         for name, command in CHECKS.items():
             done = subprocess.run(command, cwd=tree, capture_output=True, text=True, check=False)  # noqa: S603
@@ -380,6 +415,7 @@ def main(run: Path, branches: list[str], base: str, push: bool) -> int:
         return 2
     groups = cast("list[dict[str, Any]]", json.loads(plan.read_text()))
     fetch(ROOT, base)
+    _scanner()
     summary = cast("dict[str, Any]", json.loads(outcomes.read_text()))
     if "accepted" not in summary:
         print(
@@ -420,7 +456,12 @@ def main(run: Path, branches: list[str], base: str, push: bool) -> int:
             )
             # The rules are checked every time; the checks once per commit when pushing
             earlier = passed_earlier(records, branch, commit) if push else None
-            checks = {} if found else earlier or _checks(branch, commit, before(commit))
+            checks = (
+                {}
+                if found
+                else earlier
+                or _checks(branch, commit, before(commit), _git("merge-base", base, commit).strip())
+            )
             passed = not found and all(checks.values())
             if passed:
                 passed_paths[branch] = state.paths
