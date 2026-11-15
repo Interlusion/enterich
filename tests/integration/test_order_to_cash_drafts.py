@@ -7,6 +7,7 @@ tax summary (REQ-001-PRS-F022)."""
 
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import pytest
@@ -1201,6 +1202,20 @@ def test_the_limit_counts_the_drafts_enterich_creates(limited: Session, erp: Fak
         assert not create(limited, items=[{"item_code": "SKU-1", "qty": qty}]).error
     result = create(limited, items=[{"item_code": "SKU-1", "qty": 99}])
     assert result.text == LIMITED
+
+
+def test_creates_sent_at_once_dont_get_past_the_limit(limited: Session, erp: FakeErpnext) -> None:
+    # REQ-001-PRS-F019: a client may send its tool calls in parallel
+    erp.slow[PATH] = 0.05
+    quantities = range(1, DRAFTS_PER_HOUR + 3)
+
+    def create_of(qty: int) -> Result:
+        return create(limited, items=[{"item_code": "SKU-1", "qty": qty}])
+
+    with ThreadPoolExecutor(len(quantities)) as pool:
+        results = list(pool.map(create_of, quantities))
+    assert len(erp.writes(PATH)) == DRAFTS_PER_HOUR
+    assert sorted(r.text for r in results if r.error) == [LIMITED] * 2
 
 
 def test_a_repeated_create_is_refused_as_a_duplicate_first(
