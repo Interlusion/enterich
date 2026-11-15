@@ -713,11 +713,14 @@ def test_a_failing_comment_without_warnings_still_says_so(mcp: Session, erp: Fak
 def test_the_comment_stays_within_the_operation_time(
     mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # REQ-001-PRS-F015, REQ-002-PRS-NF011: the comment gets what is left of the operation's
+    # time, not a time of its own; the check and the insert take about 0.7 s of 1 s
     monkeypatch.setattr(tools, "OPERATION_TIMEOUT", 1.0)
+    erp.slow[PATH] = 0.35
     erp.slow[COMMENT_METHOD] = 3.0
     started = time.monotonic()
     result = create(mcp).data
-    assert time.monotonic() - started < 2.0
+    assert time.monotonic() - started < 1.2
     assert result["name"] in erp.docs["Sales Invoice"]
     [missing] = result["warnings"]
     assert "comment" in missing
