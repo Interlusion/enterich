@@ -93,3 +93,12 @@ def test_a_failure_is_an_error_line_with_the_cleaned_traceback() -> None:
     assert line["level"] == "error"
     expected = "".join(traceback.format_exception(caught.value)).replace("s3cret", "***")
     assert line["traceback"] == expected
+
+
+def test_a_failure_message_is_cleaned_before_it_is_cut() -> None:
+    # A secret across the cut would otherwise leave its start in clear.
+    stream = capture()
+    text = "x" * (log.MAX_MESSAGE - 5) + "s3cretvalue"
+    log.failure(RuntimeError(text), secrets=("s3cretvalue",))
+    line = json.loads(stream.getvalue())
+    assert line["message"] == "x" * (log.MAX_MESSAGE - 5) + "***"
