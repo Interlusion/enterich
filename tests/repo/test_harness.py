@@ -13,7 +13,18 @@ from typing import Any
 
 import pytest
 
-from harness import cleanup, gate, inventory, mutation, outcomes, plan, record, sweep, triage
+from harness import (
+    cleanup,
+    gate,
+    inventory,
+    mutation,
+    outcomes,
+    plan,
+    record,
+    surface,
+    sweep,
+    triage,
+)
 
 
 def test_the_inventory_reads_a_requirements_definition_of_done() -> None:
@@ -1757,3 +1768,229 @@ def test_a_sweeps_verdicts_are_added_to_the_runs_findings(tmp_path: Path) -> Non
     assert record.main(tmp_path, _result(tmp_path, again)) == 0
     assert _lines(tmp_path / "findings.jsonl") == [FINDING, swept, judged]
     assert _lines(tmp_path / "unverified.jsonl") == [DOD_GAP]
+
+
+# The security lens's inventory (harness/surface.py)
+
+POLICY = """# Security policy
+
+## Scope
+
+In scope is anything that breaks a promise, for example:
+
+- **The token check:** a request that gets through without a valid access token.
+- **The tool limits:**
+  - reaching another company's data;
+  - calling a tool the configuration doesn't offer.
+
+Out of scope:
+
+- ERPNext and Frappe themselves.
+"""
+
+
+def _vocabulary(tmp_path: Path, *promises: dict[str, Any]) -> list[dict[str, Any]]:
+    (tmp_path / "SECURITY.md").write_text(POLICY, encoding="utf-8")
+    return list(promises)
+
+
+TOKEN = {"promise": "token-check", "source": "SECURITY.md", "text": "**The token check:**"}
+COMPANY = {"promise": "one-company", "source": "SECURITY.md", "text": "another company's data"}
+OFFERED = {"promise": "tools-offered", "source": "SECURITY.md", "text": "calling a tool"}
+
+
+def test_the_policys_scope_is_its_bullets_without_those_that_only_head_others() -> None:
+    assert surface.scope(POLICY) == [
+        "**The token check:** a request that gets through without a valid access token.",
+        "reaching another company's data;",
+        "calling a tool the configuration doesn't offer.",
+    ]
+
+
+def test_a_vocabulary_that_follows_the_policy_is_kept(tmp_path: Path) -> None:
+    assert surface.unkept(_vocabulary(tmp_path, TOKEN, COMPANY, OFFERED), tmp_path) == []
+
+
+def test_a_line_of_the_policys_scope_without_a_promise_stops_the_inventory(
+    tmp_path: Path,
+) -> None:
+    problems = surface.unkept(_vocabulary(tmp_path, TOKEN, COMPANY), tmp_path)
+    assert problems == [
+        "SECURITY.md: 0 promises for the line: calling a tool the configuration doesn't offer."
+    ]
+
+
+def test_a_line_of_the_policys_scope_with_two_promises_stops_the_inventory(
+    tmp_path: Path,
+) -> None:
+    twice = {"promise": "tools", "source": "SECURITY.md", "text": "the configuration"}
+    problems = surface.unkept(_vocabulary(tmp_path, TOKEN, COMPANY, OFFERED, twice), tmp_path)
+    assert problems == [
+        "SECURITY.md: 2 promises for the line: calling a tool the configuration doesn't offer."
+    ]
+
+
+def test_a_promise_whose_source_no_longer_holds_its_text_stops_the_inventory(
+    tmp_path: Path,
+) -> None:
+    gone = {"promise": "fixed-schema", "source": "AGENTS.md", "text": "**Tools have a fixed"}
+    nowhere = {**TOKEN, "promise": "token-again", "start": ["src/enterich/gone.py"]}
+    problems = surface.unkept(
+        _vocabulary(tmp_path, TOKEN, COMPANY, OFFERED, gone, nowhere), tmp_path
+    )
+    assert problems == [
+        "fixed-schema: AGENTS.md doesn't hold its text",
+        "token-again: src/enterich/gone.py doesn't exist",
+        "SECURITY.md: 2 promises for the line: **The token check:** a request that gets through "
+        "without a v",
+    ]
+
+
+def test_two_promises_of_one_name_stop_the_inventory(tmp_path: Path) -> None:
+    problems = surface.unkept(_vocabulary(tmp_path, TOKEN, COMPANY, OFFERED, OFFERED), tmp_path)
+    assert problems[0] == "tools-offered: two promises of this name"
+
+
+def test_the_repositorys_vocabulary_follows_its_policy_and_its_specs() -> None:
+    promises = surface._records(surface.PROMISES)  # pyright: ignore[reportPrivateUsage]
+    assert surface.unkept(promises) == []
+    known = {r.id for r in inventory.requirements()}
+    assert {rid for p in promises for rid in p["requirements"]} <= known
+
+
+def test_a_text_input_without_a_bound_is_found_by_its_path() -> None:
+    schema = {
+        "$defs": {
+            "Row": {
+                "properties": {
+                    "account": {"type": "string", "maxLength": 140},
+                    "debit": {"anyOf": [{"type": "number"}, {"type": "string"}, {"type": "null"}]},
+                    "kind": {"type": "string", "enum": ["a", "b"]},
+                }
+            }
+        },
+        "properties": {
+            "accounts": {"type": "array", "items": {"$ref": "#/$defs/Row"}},
+            "posting_date": {"anyOf": [{"type": "string", "format": "date"}, {"type": "null"}]},
+            "remarks": {"type": "string"},
+            "name": {"type": "string", "pattern": "^x$"},
+        },
+    }
+    assert surface.unbounded(schema) == ["accounts[].debit", "remarks"]
+
+
+def _project(tmp_path: Path) -> Path:
+    src = tmp_path / "src" / "enterich"
+    (src / "tools").mkdir(parents=True)
+    (src / "erpnext.py").write_text(
+        "class Erpnext:\n"
+        "    async def insert(self, doctype, doc):\n"
+        "        return await self._call('POST', _resource(doctype), {}, doc)\n"
+        "    async def _call(self, method, path, params, body=None): ...\n",
+        encoding="utf-8",
+    )
+    (src / "tools" / "drafts.py").write_text(
+        "async def insert(context, doc):\n"
+        "    line = {}\n"
+        "    line.update(doc)\n"
+        "    url = context.erpnext.geturl()\n"
+        "    saved = await context.erpnext.insert('Journal Entry', line)\n"
+        "    log.event('operation', sub=context.sub, **fields)\n"
+        "    log.failure(exc, secrets, operation='x')\n"
+        "    other.event('not the log')\n"
+        "    return saved  # noqa: S104 - an example\n",
+        encoding="utf-8",
+    )
+    (src / "config.py").write_text(
+        "class Settings(BaseModel):\n"
+        "    issuer: str\n"
+        "    erpnext_api_key: SecretStr\n"
+        "    max_drafts_per_hour: int | None = None\n"
+        "    def secrets(self): ...\n"
+        "class Other:\n"
+        "    left_out: str\n",
+        encoding="utf-8",
+    )
+    return tmp_path
+
+
+def test_every_request_to_erpnext_is_listed_with_its_method_and_path(tmp_path: Path) -> None:
+    assert surface.requests(_project(tmp_path)) == [
+        {
+            "at": "src/enterich/erpnext.py:3",
+            "in": "insert",
+            "method": "'POST'",
+            "path": "_resource(doctype)",
+        }
+    ]
+
+
+def test_only_calls_of_the_erpnext_clients_methods_are_client_calls(tmp_path: Path) -> None:
+    # Neither a dict's update nor another attribute of the client
+    assert surface.client_calls(_project(tmp_path)) == [
+        {
+            "at": "src/enterich/tools/drafts.py:5",
+            "in": "insert",
+            "call": "insert",
+            "first": "'Journal Entry'",
+        }
+    ]
+
+
+def test_every_log_call_is_listed_with_its_event_and_fields(tmp_path: Path) -> None:
+    assert surface.log_calls(_project(tmp_path)) == [
+        {
+            "at": "src/enterich/tools/drafts.py:6",
+            "in": "insert",
+            "call": "event",
+            "event": "operation",
+            "fields": ["sub", "**"],
+        },
+        {
+            "at": "src/enterich/tools/drafts.py:7",
+            "in": "insert",
+            "call": "failure",
+            "event": None,
+            "fields": ["operation"],
+        },
+    ]
+
+
+def test_the_settings_are_the_fields_of_the_configurations_class(tmp_path: Path) -> None:
+    assert surface.settings(_project(tmp_path)) == [
+        {"setting": "issuer", "type": "str"},
+        {"setting": "erpnext_api_key", "type": "SecretStr"},
+        {"setting": "max_drafts_per_hour", "type": "int | None"},
+    ]
+
+
+def test_a_silenced_security_rule_is_listed_as_written(tmp_path: Path) -> None:
+    assert surface.silenced(_project(tmp_path)) == [
+        {
+            "at": "src/enterich/tools/drafts.py:9",
+            "line": "return saved  # noqa: S104 - an example",
+        }
+    ]
+
+
+def test_the_security_inventory_of_the_repository_is_written(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert surface.main(tmp_path) == 0
+    counts = json.loads(capsys.readouterr().out)
+    promises = [json.loads(line) for line in (tmp_path / "promises.jsonl").read_text().splitlines()]
+    found = json.loads((tmp_path / "surface.json").read_text())
+    assert counts["promises"] == len(promises) > 0
+    # Each promise carries its requirements in full: the token check's, with its tests
+    check = next(p for p in promises if p["promise"] == "token-check")
+    by_id = {r["id"]: r for r in check["requirements"]}
+    assert by_id["REQ-002-PRS-NF001"]["dod"]
+    assert by_id["REQ-002-PRS-NF001"]["tests"]
+    # Every tool of the snapshot, the three writes among the requests
+    assert counts["tools"] == len(json.loads((inventory.ROOT / surface.TOOLS).read_text()))
+    assert {r["method"] for r in found["requests"]} == {"'GET'", "'POST'", "'PUT'"}
+    assert [r["in"] for r in found["requests"] if r["method"] != "'GET'"] == [
+        "insert",
+        "update",
+        "add_comment",
+    ]
