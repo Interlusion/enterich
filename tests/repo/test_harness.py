@@ -2119,3 +2119,52 @@ def test_a_security_runs_branches_are_named_after_its_lens() -> None:
     assert group["branch"] == "auto/security-integration-service"
     [group] = plan.groups([fix], [])
     assert group["branch"] == "auto/tests-integration-service"
+
+
+# The gate's secret scan: the pipeline pushes to a public repository on its own, and CI's
+# gitleaks runs only on pull requests and pushes to main
+
+# A scanner as the gate calls gitleaks: the patch on standard input, a finding as exit 1
+FAKE_SCANNER = [sys.executable, "-c", "import sys; sys.exit('LEAKED' in sys.stdin.read())"]
+
+
+def test_the_gate_scans_a_branchs_commits_and_their_messages(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "switch", "-q", "-c", "auto/x")
+    (repo / "a.txt").write_text("key = 'LEAKED'\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "test: a")
+    fork = _git(repo, "merge-base", "main", "HEAD")
+    assert "LEAKED" in gate.patch(repo, fork, _git(repo, "rev-parse", "HEAD"))
+    assert gate.leaks(repo, fork, "HEAD", FAKE_SCANNER) is True
+    # A secret removed again in a later commit is still in the history pushed
+    (repo / "a.txt").write_text("key = ''\n")
+    _git(repo, "commit", "-qam", "test: b")
+    assert gate.leaks(repo, fork, "HEAD", FAKE_SCANNER) is True
+
+
+def test_a_secret_in_a_commit_message_is_found_too(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "switch", "-q", "-c", "auto/x")
+    (repo / "a.txt").write_text("a\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "test: a\n\nThe key was LEAKED")
+    fork = _git(repo, "merge-base", "main", "HEAD")
+    assert gate.leaks(repo, fork, "HEAD", FAKE_SCANNER) is True
+
+
+def test_a_branch_without_a_secret_passes_the_scan(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "switch", "-q", "-c", "auto/x")
+    (repo / "a.txt").write_text("a\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "test: a")
+    fork = _git(repo, "merge-base", "main", "HEAD")
+    assert gate.leaks(repo, fork, "HEAD", FAKE_SCANNER) is False
+
+
+def test_the_gate_scans_with_the_gitleaks_ci_runs() -> None:
+    """One pinned image for both: Dependabot keeps it current."""
+    assert gate.SCANNER_IMAGE_DIR == ".github/gitleaks"
+    assert (gate.ROOT / gate.SCANNER_IMAGE_DIR / "Dockerfile").is_file()
+    assert gate.SCANNER[-3:] == ["stdin", "--redact", "--no-banner"]
