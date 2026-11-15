@@ -11,6 +11,7 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 ### Fixed
 
 - Creates sent at once no longer get past `ENTERICH_MAX_DRAFTS_PER_HOUR`: within one Enterich process, a create holds a lock per DocType from its count to its insert. Before, parallel creates all passed the count before any of them inserted (REQ-001-PRS-F019).
+- A return draft never carries `amended_from`, even where ERPNext's mapping of the invoice copies it (as a Property Setter or an app could make it do). Before, Enterich sent the mapping's `amended_from` on, so only ERPNext's stock `no_copy` kept a create from amending a cancelled invoice (REQ-001-PRS-F006).
 - A token whose `azp` or `client_id` is present but not a string is refused as naming the wrong client. Before, such a claim counted as absent, so a token with a numeric `azp` and the configured `client_id` was accepted (REQ-002-PRS-NF001).
 
 ## [0.5.0] - 2026-11-11

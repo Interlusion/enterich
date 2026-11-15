@@ -108,9 +108,11 @@ def duplicate_warning(names: Sequence[str], match: str, kind: str = "draft") -> 
 
 async def insert(context: Context, doctype: str, doc: dict[str, Any]) -> dict[str, Any]:
     """A new draft of the assigned company, once the limit of drafts per hour allows it
-    (REQ-001-PRS-F019): call it after the duplicate check."""
+    (REQ-001-PRS-F019): call it after the duplicate check. Never one that amends another,
+    even where ERPNext's mapping carries `amended_from` (REQ-001-PRS-F006)."""
     limit = context.settings.max_drafts_per_hour
-    body = {**doc, "company": context.settings.company, "docstatus": 0}
+    new = {k: v for k, v in doc.items() if k != "amended_from"}
+    body = {**new, "company": context.settings.company, "docstatus": 0}
     if limit is None:
         return await context.erpnext.insert(doctype, body)
     # Held from the count to the insert, so creates sent at once count each other's drafts
