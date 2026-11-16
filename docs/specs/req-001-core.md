@@ -334,7 +334,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-F011: Operations chosen
 
-**Description**: When its configuration lists operations, Enterich SHALL offer and run only those; when it lists none, all operations of the area specs. Enterich SHALL refuse to start when the list names an unknown operation.
+**Description**: When its configuration lists operations, Enterich SHALL offer and run only those; when the list isn't set, all operations of the area specs. Enterich SHALL refuse to start when the list names an unknown operation, or is set and names none.
 
 **Related URS**: REQ-001-URS-F008
 
@@ -342,6 +342,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 - With a list of three operations, `tools/list` shows exactly those, and calling another gives an unknown-tool error.
 - A misspelt operation name stops Enterich at start with a message naming it.
+- A list set but blank, or only commas, stops Enterich at start with a message.
 - Verification: test.
 - Evidence: Enterich's test suite.
 
