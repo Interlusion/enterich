@@ -113,6 +113,7 @@ ASYMMETRIC = (
     "ES256, ES384, ES512, EdDSA, PS256, PS384, PS512, RS256, RS384, RS512"
 )
 IANA = "must be an IANA time zone name, e.g. Europe/Berlin"
+NO_OPERATION = "must name at least one operation; unset, all are offered"
 
 
 @pytest.mark.parametrize(
@@ -147,6 +148,8 @@ IANA = "must be an IANA time zone name, e.g. Europe/Berlin"
         ("TOKEN_ALGORITHMS", "RS256,none", ASYMMETRIC),
         ("TIMEZONE", "Europe/Nowhere", IANA),
         ("TOOLS", "list_items,drop_database", "unknown operations: drop_database"),
+        ("TOOLS", "", NO_OPERATION),
+        ("TOOLS", " , ", NO_OPERATION),
         ("PORT", "0", "must be from 1 to 65535"),
         ("PORT", "65536", "must be from 1 to 65535"),
         ("LOG_LEVEL", "TRACE", "must be one of DEBUG, INFO, WARNING, ERROR"),
