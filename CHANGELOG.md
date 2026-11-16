@@ -15,6 +15,10 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 - A return draft never carries `amended_from`, even where ERPNext's mapping of the invoice copies it (as a Property Setter or an app could make it do). Before, Enterich sent the mapping's `amended_from` on, so only ERPNext's stock `no_copy` kept a create from amending a cancelled invoice (REQ-001-PRS-F006).
 - A token whose `azp` or `client_id` is present but not a string is refused as naming the wrong client. Before, such a claim counted as absent, so a token with a numeric `azp` and the configured `client_id` was accepted (REQ-002-PRS-NF001).
 
+### Configuration
+
+- A blank `ENTERICH_TOOLS` (empty, or only commas) stops Enterich at start. Before, it started with no tool offered; unset, all operations are offered as before (REQ-001-PRS-F011).
+
 ## [0.5.0] - 2026-11-11
 
 ### Added

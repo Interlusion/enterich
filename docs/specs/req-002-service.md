@@ -85,7 +85,7 @@ Out of scope: issuing tokens or signing users in, including second factors; seve
 
 #### REQ-002-URS-NF011: Rights known exactly
 
-**Description**: The deployer SHALL be able to see exactly which ERPNext rights Enterich's operations need, and which settings the authorization server must provide.
+**Description**: The deployer SHALL be able to see exactly which ERPNext rights Enterich's operations need, which ERPNext site settings they work under, and which settings the authorization server must provide.
 
 **Related User Stories**: REQ-001-P5-2 | **Rationale**: Rights granted "to be safe" widen what a manipulated agent can do; rights missing make operations fail at the site.
 
@@ -280,7 +280,7 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 
 #### REQ-002-PRS-NF013: Rights listed and proven
 
-**Description**: Every operation SHALL work with exactly the ERPNext rights its area spec lists for it, and the settings Enterich needs from the authorization server SHALL be those its token check requires (REQ-002-PRS-NF001).
+**Description**: Every operation SHALL work with exactly the ERPNext rights its area spec lists for it, and under the ERPNext site settings the configuration guide asks for; the settings Enterich needs from the authorization server SHALL be those its token check requires (REQ-002-PRS-NF001).
 
 **Related URS**: REQ-002-URS-NF011
 
@@ -289,8 +289,23 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 - Every operation of the area specs has its rights listed in its area spec's Rights section.
 - Where a row lists write only if creator (REQ-001 Terms), the agent user's key changes and discards only the drafts it created; ERPNext refuses it a draft a person created.
 - Run as an agent user holding exactly the rights an operation's row lists, besides the rights ERPNext gives every desk user through the roles All and Desk User, the operation works. With one listed right removed, the operations that need it are refused. Enterich's refusal of a list that lacks fields counts (REQ-001-PRS-F018): with another row's select or those roles, ERPNext answers `list_items` without read on Item, and `list_customers` without read on Customer, with fewer fields. Only `get_customer` and `get_supplier` without read on Address answer instead, without addresses (All's rule for a user's own addresses).
+- Every field the configuration guide's site settings name exists on the pinned ERPNext; the end-to-end site is set as the guide says, the agent user with its User Permission on the company, and the operations work there. A switch that closes an endpoint closes it to the agent user's key.
 - Verification: inspection and test.
-- Evidence: the area specs' Rights sections; the end-to-end test against a real ERPNext v16 site.
+- Evidence: the area specs' Rights sections; the configuration guide; the end-to-end test against a real ERPNext v16 site.
+
+#### REQ-002-PRS-NF014: Nothing of a deployment in the repository
+
+**Description**: The repository SHALL name no host or email address of a deployment. Each host in a URL SHALL be a reserved example or test name, an address that isn't public, or a public site on the repository's list of public hosts; each email address SHALL be at a reserved example domain. Each pushed commit SHALL pass a secret scan.
+
+**Related URS**: REQ-002-URS-NF008
+
+**Definition of Done**:
+
+- A check over every tracked file finds each host in a URL and each email address, and fails on one that isn't allowed, naming file, line and host; a company's host in a URL and an email address at its domain, planted in a file, each fail it.
+- A new public host passes only with an entry on the list.
+- CI scans each pushed commit for secrets, and the improvement pipeline's gate scans each branch before it pushes.
+- Verification: test and inspection.
+- Evidence: Enterich's test suite; the CI workflow.
 
 ## Acceptance Criteria Summary
 
