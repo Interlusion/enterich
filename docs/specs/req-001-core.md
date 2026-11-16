@@ -453,7 +453,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-F019: Drafts per hour
 
-**Description**: When the configuration sets a limit of drafts per hour, a create operation SHALL count the documents of its DocType in the assigned company that the agent user created in the last 60 minutes, whatever their state now, and SHALL refuse the create without a write when they reach the limit, saying that the operator sets it. Without the limit, no create is counted.
+**Description**: When the configuration sets a limit of drafts per hour, a create operation SHALL count the documents of its DocType in the assigned company that the agent user created in the last 60 minutes, whatever their state now, and SHALL refuse the create without a write when they reach the limit, saying that the operator sets it. Creates that run at the same time in one Enterich process SHALL count each other. Enterich instances don't see each other's creates in progress: with several on one ERPNext site, creates that run at the same time in different instances can together pass the limit, by at most one create per instance besides the first. Without the limit, no create is counted.
 
 **Related URS**: REQ-001-URS-F010, REQ-001-URS-NF001
 
@@ -462,6 +462,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - With the limit 2 and two sales invoices the agent user created in the last hour, a third create is refused, naming the limit and its variable, and nothing is inserted; with one of the two created more than 60 minutes ago, it goes through.
 - A document another user created, or one of another company, doesn't count; each DocType is counted on its own, so two sales invoices don't hold back a purchase invoice.
 - The count comes after the duplicate check: a create repeated after a lost answer is still refused as a duplicate, naming the first draft.
+- With the limit 2, creates sent at once to one Enterich process insert two drafts; the others are refused.
 - Without the limit, a create makes no count.
 - Verification: test.
 - Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
