@@ -6,6 +6,7 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ### Security
 
+- **Configuration guide:** Frappe's built-in MCP endpoint is turned off with Enable MCP in System Settings (`enable_mcp`). The guide named the site config key `disable_mcp_server`, which Frappe 16.54 ignores, so a site set up by the guide kept the endpoint and its generic tools open to the agent user's API key.
 - opentelemetry-api, which the MCP SDK depends on, is 1.45.2: before, a crafted `traceparent` header took quadratic time to parse (GHSA-mf5v-w3w3-f6cg).
 
 ### Fixed
