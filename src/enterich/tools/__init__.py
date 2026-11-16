@@ -10,9 +10,10 @@ import html
 import logging
 import secrets
 import time
+from collections import defaultdict
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from collections.abc import Set as AbstractSet
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import islice
 from typing import Any, Literal, cast
 
@@ -57,6 +58,11 @@ class Refusal(Exception):  # noqa: N818 - a refusal, not a fault of Enterich's
 class Context:
     settings: Settings
     erpnext: Erpnext
+    # A lock per DocType, held by a create from its count of drafts per hour to its insert
+    # (REQ-001-PRS-F019)
+    creating: defaultdict[str, anyio.Lock] = field(
+        default_factory=lambda: defaultdict[str, anyio.Lock](anyio.Lock)
+    )
 
 
 @dataclass(frozen=True)
