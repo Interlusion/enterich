@@ -551,6 +551,31 @@ def test_a_debit_note_sent_again_is_refused_naming_the_first_draft(
     assert len(erp.writes(PURCHASES)) == 1
 
 
+# ERPNext's mapping makes a new draft only (REQ-001-PRS-F006)
+
+
+@pytest.mark.parametrize("doctype", SIDES)
+def test_a_mapping_that_amends_or_submits_is_sent_as_a_new_draft(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch, doctype: str
+) -> None:
+    sales = doctype == "Sales Invoice"
+    erp.docs[doctype].pop(SALES_DRAFT if sales else PURCHASE_DRAFT)
+    # A Property Setter or an app's mapping could copy these, which stock ERPNext leaves out
+    erp.docs[doctype][INVOICE if sales else BILL]["amended_from"] = numbered(doctype, 4)
+    mapping = erp.mapped_return
+
+    def submitted(doctype: str, name: str) -> dict[str, Any]:
+        return {**mapping(doctype, name), "docstatus": 1}
+
+    monkeypatch.setattr(erp, "mapped_return", submitted)
+    result = create(mcp, tool(doctype), items=[{"item_code": "SKU-1", "qty": 1}])
+    assert not result.error, result.text
+    [post] = erp.writes(SALES if sales else PURCHASES)
+    assert post.body["docstatus"] == 0
+    assert "amended_from" not in post.body
+    assert erp.doors == []
+
+
 # update_draft_sales_return, update_draft_purchase_return
 
 
