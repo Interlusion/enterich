@@ -1,7 +1,7 @@
 export const meta = {
   name: 'improve-tests-fix',
   description: 'Fix stage of the tests lens and the security lens (ADR-008): one auto/ branch per group of the plan, its ratchets\' generic tests first, then one agent per confirmed fix in turn, test first; another agent reviews each',
-  whenToUse: 'After harness/triage.py has sorted a run, harness/plan.py has grouped its fixes and the run is committed; args: {run, base, source, trailers, groups: the run\'s groups.json, reserve}; then harness/record.py writes the result\'s outcomes to the run\'s outcomes.jsonl, harness/outcomes.py checks them, and harness/gate.py checks and pushes',
+  whenToUse: 'After harness/triage.py has sorted a run, harness/plan.py has grouped its fixes and the run is committed; args: {run, base, source, trailers, groups: the run\'s groups.json, reserve}; then harness/record.py writes the result\'s outcomes to the run\'s outcomes.jsonl, harness/outcomes.py checks them, and harness/gate.py checks and pushes. Once a branch held back is rebased after another\'s merge: args: {run, base, source, rebased: [{outcome: its record in outcomes.jsonl, commits: the rebased commits}]}, only the reviews',
   phases: [
     { title: 'Fix', detail: 'per survey branch, one agent per finding in turn, each in its own worktree: the test, shown red, committed' },
     { title: 'Review', detail: 'another agent redoes the red check and judges each fix' },
@@ -18,6 +18,9 @@ export const meta = {
 // from fixes.jsonl at the source commit, so no record is copied by hand. A group's agents
 // run in turn on its branch, each working detached and moving the branch to its commits,
 // so no worktree holds the branch; the groups run side by side.
+// With args.rebased instead of groups, [{outcome, commits}]: fixes accepted before whose
+// branch the session rebased after another branch's merge, each with its outcome record
+// and its rebased commits ("<full sha> <subject>"). Only the reviews run, on those commits.
 const RUN = args.run
 // The lens is in the run directory's name, as harness/triage.py reads it: a security run's
 // findings are breaches and unproven promises, not mutants and Definition of Done items
@@ -33,7 +36,8 @@ const RESERVE = args.reserve || 50000
 const left = () => typeof budget !== 'undefined' && budget.total ? budget.remaining() : Infinity
 // The trailers name the model and the session, so they come with the run, never from here
 const TRAILERS = args.trailers
-if (!TRAILERS) throw new Error('args.trailers: the commit trailers of the session that runs this')
+const REBASED = args.rebased || null
+if (!TRAILERS && !REBASED) throw new Error('args.trailers: the commit trailers of the session that runs this')
 // What the tests lens changes, as harness/gate.py checks it (ALLOWED, FORBIDDEN and
 // FORBIDDEN_NAMES there; a test holds this line to that list)
 const MAY_CHANGE = 'tests/, src/enterich/ and CHANGELOG.md'
@@ -175,6 +179,30 @@ const runGroup = async g => {
       }))
   }
   return { branch: g.branch, fixes: [...done, ...(await Promise.all(reviews))] }
+}
+
+// A rebase that resolved a conflict changed a commit's diff, so the gate no longer takes it
+// for the commits a review accepted: another review judges the rebased commits. Its outcome
+// keeps the earlier commits and review under "rebased", and harness/record.py lets it take
+// the accepted outcome's place, only for those commits.
+const rebasedPrompt = (old, commits) => `${reviewPrompt({ key: old.key }, { ...old.fixed, commits })}
+
+These commits were reviewed and accepted before, as ${JSON.stringify(old.fixed.commits)}. Since then the session rebased the branch ${old.branch} onto ${BASE}, after another branch that changes some of the same files was merged, and resolved a conflict by hand. Compare the two (git range-diff <first old sha>^..<last old sha> <first sha>^..<last sha>) and judge the resolution too: it keeps what ${BASE} holds now and still does what the fix did, and the red check holds on the rebased commits.`
+
+if (REBASED) {
+  const reviewed = await parallel(REBASED.map(({ outcome, commits }) => () =>
+    agent(rebasedPrompt(outcome, commits), { label: `review:${outcome.slug}`, phase: 'Review', schema: REVIEW })
+      .then(review => {
+        log(`${outcome.slug}: ${review ? (review.accept ? 'accepted' : 'not accepted') : 'review failed'}`)
+        // No answer leaves the accepted outcome as it was; run the review again
+        return review && {
+          ...outcome,
+          fixed: { ...outcome.fixed, commits },
+          review,
+          rebased: { commits: outcome.fixed.commits, review: outcome.review },
+        }
+      })))
+  return { outcomes: reviewed.filter(Boolean), base: BASE, run: RUN }
 }
 
 const results = await parallel(args.groups.map(g => () => runGroup(g)))

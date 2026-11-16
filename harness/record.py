@@ -50,8 +50,10 @@ def _objects(value: object) -> Records | None:
 def merged(before: Records, new: Records) -> tuple[Records, list[str]]:
     """The outcomes so far with a fix stage's added, and the keys it may not write: a fix
     that has an outcome keeps it, unless its agent didn't answer or the plan took it up
-    once more (`replaced` then holds its earlier state); the same outcome again, as a
-    resumed workflow returns it, changes nothing."""
+    once more (`replaced` then holds its earlier state), or it was accepted and its branch
+    rebased: an outcome whose `rebased` names the commits recorded takes their place, with
+    the review of the rebased commits. The same outcome again, as a resumed workflow
+    returns it, changes nothing."""
     by_key = {str(r.get("key")): r for r in before}
     again = taken_up(before)
     settled: list[str] = []
@@ -64,9 +66,20 @@ def merged(before: Records, new: Records) -> tuple[Records, list[str]]:
             continue
         elif k in again:
             by_key[k] = {**r, "replaced": state(old)}
+        elif _rebase_of(r, old):
+            by_key[k] = r
         else:
             settled.append(k)
     return list(by_key.values()), sorted(settled)
+
+
+def _rebase_of(new: dict[str, Any], old: dict[str, Any]) -> bool:
+    """Whether the new outcome is the old one's, accepted, after a rebase of its commits."""
+    rebased = new.get("rebased")
+    if not isinstance(rebased, dict) or state(old) != "accepted":
+        return False
+    commits = cast("dict[str, Any]", old.get("fixed") or {}).get("commits")
+    return cast("dict[str, Any]", rebased).get("commits") == commits
 
 
 def once(records: Records, unverified: Records) -> tuple[Records, Records]:
