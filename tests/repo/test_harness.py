@@ -1448,6 +1448,39 @@ def _result(run: Path, result: dict[str, Any], **more: Any) -> Path:
     return path
 
 
+REBASED_SHA = "b" * 40
+
+
+def _rebased(old: dict[str, Any]) -> dict[str, Any]:
+    """The outcome of a fix whose branch was rebased after another merge and reviewed
+    again: its new commits and review, the earlier ones under `rebased`."""
+    fixed = {**old["fixed"], "commits": [f"{REBASED_SHA} test: a result with umlauts keeps them"]}
+    review = {**old["review"], "reason": "the rebased commits, red check redone"}
+    earlier = {"commits": old["fixed"]["commits"], "review": old["review"]}
+    return {**old, "fixed": fixed, "review": review, "rebased": earlier}
+
+
+def test_a_fix_rebased_and_reviewed_again_takes_its_new_commits(tmp_path: Path) -> None:
+    """A rebase that resolved a conflict changes a commit's diff: the gate lets through only
+    commits a review accepted, so the rebased ones are reviewed again and replace them."""
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [OUTCOME]}), FAKE_SCANNER) == 0
+    again = _rebased(OUTCOME)
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [again]}), FAKE_SCANNER) == 0
+    assert _lines(tmp_path / "outcomes.jsonl") == [again]
+
+
+def test_a_rebase_of_commits_not_recorded_or_not_accepted_is_refused(tmp_path: Path) -> None:
+    rejected = {**OUTCOME, "review": {**REVIEW, "accept": False}}
+    other = {**OUTCOME, "key": OTHER_KEY}
+    outcomes = {"outcomes": [rejected, other]}
+    assert record.main(tmp_path, _result(tmp_path, outcomes), FAKE_SCANNER) == 0
+    elsewhere = _rebased(other)
+    elsewhere["rebased"] = {**elsewhere["rebased"], "commits": [f"{'c' * 40} test: another"]}
+    again = {"outcomes": [_rebased(rejected), elsewhere]}
+    assert record.main(tmp_path, _result(tmp_path, again), FAKE_SCANNER) == 1
+    assert _lines(tmp_path / "outcomes.jsonl") == [rejected, other]
+
+
 def test_a_result_with_a_secret_is_recorded_nowhere(tmp_path: Path) -> None:
     """The run's records are committed and pushed by hand, past the gate's scan: an agent
     that quoted a secret, made up or not, would put it in Git."""
