@@ -1,0 +1,694 @@
+{
+  "tools": [
+    {
+      "tool": "create_draft_journal_entry",
+      "writes": true,
+      "unbounded": [
+        "accounts[].credit",
+        "accounts[].debit"
+      ]
+    },
+    {
+      "tool": "create_draft_payment_entry",
+      "writes": true,
+      "unbounded": [
+        "paid_amount",
+        "references[].allocated_amount"
+      ]
+    },
+    {
+      "tool": "create_draft_purchase_invoice",
+      "writes": true,
+      "unbounded": [
+        "items[].qty",
+        "items[].rate"
+      ]
+    },
+    {
+      "tool": "create_draft_purchase_return",
+      "writes": true,
+      "unbounded": [
+        "items[].qty"
+      ]
+    },
+    {
+      "tool": "create_draft_sales_invoice",
+      "writes": true,
+      "unbounded": [
+        "items[].qty",
+        "items[].rate"
+      ]
+    },
+    {
+      "tool": "create_draft_sales_return",
+      "writes": true,
+      "unbounded": [
+        "items[].qty"
+      ]
+    },
+    {
+      "tool": "get_bank_transaction",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "get_customer",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "get_item",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "get_journal_entry",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "get_payment_entry",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "get_purchase_invoice",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "get_sales_invoice",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "get_supplier",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "list_accounts",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "list_bank_accounts",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "list_bank_transactions",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "list_cost_centers",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "list_customers",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "list_items",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "list_journal_entries",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "list_payment_entries",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "list_purchase_invoices",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "list_purchase_tax_templates",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "list_sales_invoices",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "list_sales_tax_templates",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "list_suppliers",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "report_accounts_payable",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "report_accounts_receivable",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "report_general_ledger",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "report_trial_balance",
+      "writes": false,
+      "unbounded": []
+    },
+    {
+      "tool": "update_draft_journal_entry",
+      "writes": true,
+      "unbounded": [
+        "accounts[].credit",
+        "accounts[].debit"
+      ]
+    },
+    {
+      "tool": "update_draft_payment_entry",
+      "writes": true,
+      "unbounded": [
+        "paid_amount",
+        "references[].allocated_amount"
+      ]
+    },
+    {
+      "tool": "update_draft_purchase_invoice",
+      "writes": true,
+      "unbounded": [
+        "items[].qty",
+        "items[].rate"
+      ]
+    },
+    {
+      "tool": "update_draft_purchase_return",
+      "writes": true,
+      "unbounded": [
+        "items[].qty"
+      ]
+    },
+    {
+      "tool": "update_draft_sales_invoice",
+      "writes": true,
+      "unbounded": [
+        "items[].qty",
+        "items[].rate"
+      ]
+    },
+    {
+      "tool": "update_draft_sales_return",
+      "writes": true,
+      "unbounded": [
+        "items[].qty"
+      ]
+    }
+  ],
+  "requests": [
+    {
+      "at": "src/enterich/erpnext.py:120",
+      "in": "get_list",
+      "method": "'GET'",
+      "path": "_resource(doctype)"
+    },
+    {
+      "at": "src/enterich/erpnext.py:130",
+      "in": "user",
+      "method": "'GET'",
+      "path": "f'/api/method/{LOGGED_USER_METHOD}'"
+    },
+    {
+      "at": "src/enterich/erpnext.py:136",
+      "in": "get_doc",
+      "method": "'GET'",
+      "path": "'/api/method/frappe.client.get'"
+    },
+    {
+      "at": "src/enterich/erpnext.py:146",
+      "in": "run_report",
+      "method": "'GET'",
+      "path": "'/api/method/frappe.desk.query_report.run'"
+    },
+    {
+      "at": "src/enterich/erpnext.py:155",
+      "in": "tax_rows",
+      "method": "'GET'",
+      "path": "f'/api/method/{TAXES_METHOD}'"
+    },
+    {
+      "at": "src/enterich/erpnext.py:164",
+      "in": "return_of",
+      "method": "'GET'",
+      "path": "path"
+    },
+    {
+      "at": "src/enterich/erpnext.py:169",
+      "in": "insert",
+      "method": "'POST'",
+      "path": "_resource(doctype)"
+    },
+    {
+      "at": "src/enterich/erpnext.py:175",
+      "in": "update",
+      "method": "'PUT'",
+      "path": "path"
+    },
+    {
+      "at": "src/enterich/erpnext.py:187",
+      "in": "add_comment",
+      "method": "'POST'",
+      "path": "f'/api/method/{COMMENT_METHOD}'"
+    }
+  ],
+  "client_calls": [
+    {
+      "at": "src/enterich/tools/__init__.py:136",
+      "in": "_comment",
+      "call": "add_comment",
+      "first": "str(op.doctype)"
+    },
+    {
+      "at": "src/enterich/tools/__init__.py:206",
+      "in": "get_named",
+      "call": "get_doc",
+      "first": "doctype"
+    },
+    {
+      "at": "src/enterich/tools/__init__.py:262",
+      "in": "report_rows",
+      "call": "run_report",
+      "first": "report"
+    },
+    {
+      "at": "src/enterich/tools/bank_and_cash.py:245",
+      "in": "list_bank_accounts",
+      "call": "get_list",
+      "first": "'Bank Account'"
+    },
+    {
+      "at": "src/enterich/tools/bank_and_cash.py:268",
+      "in": "list_bank_transactions",
+      "call": "get_list",
+      "first": "'Bank Transaction'"
+    },
+    {
+      "at": "src/enterich/tools/bank_and_cash.py:306",
+      "in": "list_payment_entries",
+      "call": "get_list",
+      "first": "'Payment Entry'"
+    },
+    {
+      "at": "src/enterich/tools/bank_and_cash.py:362",
+      "in": "_check_references",
+      "call": "get_list",
+      "first": "side.invoice"
+    },
+    {
+      "at": "src/enterich/tools/bank_and_cash.py:421",
+      "in": "_same_reference",
+      "call": "get_list",
+      "first": "'Payment Entry'"
+    },
+    {
+      "at": "src/enterich/tools/drafts.py:65",
+      "in": "tax_rows",
+      "call": "tax_rows",
+      "first": "doctype"
+    },
+    {
+      "at": "src/enterich/tools/drafts.py:76",
+      "in": "duplicates",
+      "call": "get_list",
+      "first": "doctype"
+    },
+    {
+      "at": "src/enterich/tools/drafts.py:117",
+      "in": "insert",
+      "call": "insert",
+      "first": "doctype"
+    },
+    {
+      "at": "src/enterich/tools/drafts.py:120",
+      "in": "insert",
+      "call": "get_list",
+      "first": "doctype"
+    },
+    {
+      "at": "src/enterich/tools/drafts.py:125",
+      "in": "insert",
+      "call": "user",
+      "first": null
+    },
+    {
+      "at": "src/enterich/tools/drafts.py:138",
+      "in": "insert",
+      "call": "insert",
+      "first": "doctype"
+    },
+    {
+      "at": "src/enterich/tools/drafts.py:159",
+      "in": "editable",
+      "call": "user",
+      "first": null
+    },
+    {
+      "at": "src/enterich/tools/drafts.py:181",
+      "in": "save_update",
+      "call": "update",
+      "first": "doctype"
+    },
+    {
+      "at": "src/enterich/tools/invoicing.py:115",
+      "in": "list_parties",
+      "call": "get_list",
+      "first": "side.party"
+    },
+    {
+      "at": "src/enterich/tools/invoicing.py:130",
+      "in": "get_party",
+      "call": "get_list",
+      "first": "'Address'"
+    },
+    {
+      "at": "src/enterich/tools/invoicing.py:180",
+      "in": "list_invoices",
+      "call": "get_list",
+      "first": "side.invoice"
+    },
+    {
+      "at": "src/enterich/tools/invoicing.py:260",
+      "in": "list_templates",
+      "call": "get_list",
+      "first": "side.template"
+    },
+    {
+      "at": "src/enterich/tools/master_data.py:49",
+      "in": "list_items",
+      "call": "get_list",
+      "first": "'Item'"
+    },
+    {
+      "at": "src/enterich/tools/procure_to_pay.py:319",
+      "in": "_same_bill",
+      "call": "get_list",
+      "first": "'Purchase Invoice'"
+    },
+    {
+      "at": "src/enterich/tools/record_to_report.py:299",
+      "in": "_tree",
+      "call": "get_list",
+      "first": "doctype"
+    },
+    {
+      "at": "src/enterich/tools/record_to_report.py:333",
+      "in": "list_journal_entries",
+      "call": "get_list",
+      "first": "'Journal Entry'"
+    },
+    {
+      "at": "src/enterich/tools/record_to_report.py:417",
+      "in": "_fiscal_year",
+      "call": "get_list",
+      "first": "'Fiscal Year'"
+    },
+    {
+      "at": "src/enterich/tools/record_to_report.py:518",
+      "in": "_journal_duplicates",
+      "call": "get_list",
+      "first": "'Journal Entry'"
+    },
+    {
+      "at": "src/enterich/tools/returns.py:98",
+      "in": "return_of",
+      "call": "return_of",
+      "first": "side.invoice"
+    },
+    {
+      "at": "src/enterich/tools/returns.py:193",
+      "in": "same_invoice",
+      "call": "get_list",
+      "first": "side.invoice"
+    }
+  ],
+  "log_calls": [
+    {
+      "at": "src/enterich/__main__.py:20",
+      "in": "main",
+      "call": "event",
+      "event": "error",
+      "fields": [
+        "exception",
+        "problems"
+      ]
+    },
+    {
+      "at": "src/enterich/__main__.py:24",
+      "in": "main",
+      "call": "event",
+      "event": "start",
+      "fields": [
+        "version",
+        "resource_url",
+        "issuer",
+        "client",
+        "subject",
+        "company",
+        "leeway",
+        "operations",
+        "warnings"
+      ]
+    },
+    {
+      "at": "src/enterich/app.py:170",
+      "in": "_mcp",
+      "call": "failure",
+      "event": null,
+      "fields": []
+    },
+    {
+      "at": "src/enterich/app.py:227",
+      "in": "_log_rejection",
+      "call": "event",
+      "event": "rejection",
+      "fields": [
+        "**"
+      ]
+    },
+    {
+      "at": "src/enterich/auth.py:104",
+      "in": "_refresh",
+      "call": "event",
+      "event": "jwks",
+      "fields": [
+        "outcome",
+        "reason",
+        "keys"
+      ]
+    },
+    {
+      "at": "src/enterich/auth.py:108",
+      "in": "_refresh",
+      "call": "event",
+      "event": "jwks",
+      "fields": [
+        "outcome",
+        "keys"
+      ]
+    },
+    {
+      "at": "src/enterich/log.py:72",
+      "in": "failure",
+      "call": "event",
+      "event": "error",
+      "fields": [
+        "**",
+        "exception",
+        "message",
+        "traceback"
+      ]
+    },
+    {
+      "at": "src/enterich/tools/__init__.py:288",
+      "in": "_run",
+      "call": "failure",
+      "event": null,
+      "fields": [
+        "operation",
+        "call"
+      ]
+    },
+    {
+      "at": "src/enterich/tools/__init__.py:359",
+      "in": "_log",
+      "call": "event",
+      "event": "operation",
+      "fields": [
+        "operation",
+        "call",
+        "request_id",
+        "arguments",
+        "sub",
+        "sid",
+        "outcome",
+        "duration",
+        "erpnext_calls",
+        "erpnext_duration"
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "setting": "resource_url",
+      "type": "str"
+    },
+    {
+      "setting": "mcp_path",
+      "type": "str"
+    },
+    {
+      "setting": "issuer",
+      "type": "str"
+    },
+    {
+      "setting": "jwks_url",
+      "type": "str"
+    },
+    {
+      "setting": "client_id",
+      "type": "str"
+    },
+    {
+      "setting": "subject",
+      "type": "str"
+    },
+    {
+      "setting": "required_scopes",
+      "type": "tuple[str, ...]"
+    },
+    {
+      "setting": "token_algorithms",
+      "type": "tuple[str, ...]"
+    },
+    {
+      "setting": "clock_leeway",
+      "type": "int"
+    },
+    {
+      "setting": "erpnext_url",
+      "type": "str"
+    },
+    {
+      "setting": "erpnext_host",
+      "type": "str"
+    },
+    {
+      "setting": "erpnext_public_url",
+      "type": "str"
+    },
+    {
+      "setting": "erpnext_api_key",
+      "type": "SecretStr"
+    },
+    {
+      "setting": "erpnext_api_secret",
+      "type": "SecretStr"
+    },
+    {
+      "setting": "company",
+      "type": "str"
+    },
+    {
+      "setting": "tools",
+      "type": "tuple[str, ...]"
+    },
+    {
+      "setting": "timezone",
+      "type": "ZoneInfo"
+    },
+    {
+      "setting": "host",
+      "type": "str"
+    },
+    {
+      "setting": "port",
+      "type": "int"
+    },
+    {
+      "setting": "log_level",
+      "type": "LogLevel"
+    },
+    {
+      "setting": "max_drafts_per_hour",
+      "type": "int | None"
+    },
+    {
+      "setting": "warnings",
+      "type": "tuple[str, ...]"
+    }
+  ],
+  "silenced": [
+    {
+      "at": "src/enterich/config.py:130",
+      "line": "\"host\": reader.optional(\"HOST\", \"0.0.0.0\"),  # noqa: S104 - a container listens on all addresses"
+    }
+  ],
+  "since": {
+    "commit": "a0af20abb78704b1624ab494e4fbe3fd150ac7a3",
+    "changed": [
+      ".claude/workflows/improve-security.js",
+      ".claude/workflows/improve-tests-fix.js",
+      "CHANGELOG.md",
+      "SECURITY.md",
+      "docs/guides/configuration.md",
+      "docs/specs/req-001-core.md",
+      "docs/specs/req-002-service.md",
+      "harness/README.md",
+      "harness/gate.py",
+      "harness/promises.jsonl",
+      "harness/record.py",
+      "harness/runs/2026-11-15-security/findings.jsonl",
+      "harness/runs/2026-11-15-security/gates.jsonl",
+      "harness/runs/2026-11-15-security/outcomes.json",
+      "harness/runs/2026-11-15-security/outcomes.jsonl",
+      "harness/runs/2026-11-15-security/retrospective.md",
+      "harness/runs/2026-11-15-security/workflows.jsonl",
+      "harness/surface.py",
+      "src/enterich/config.py",
+      "tests/e2e/compose.yml",
+      "tests/e2e/seed.py",
+      "tests/e2e/test_rights.py",
+      "tests/e2e/test_site_settings.py",
+      "tests/repo/test_deployment_neutral.py",
+      "tests/repo/test_harness.py",
+      "tests/unit/test_config.py"
+    ],
+    "promises": [
+      "configuration",
+      "docs",
+      "drafts-only",
+      "limits",
+      "nothing-of-a-deployment",
+      "one-company",
+      "outside-text",
+      "secrets-and-log",
+      "secrets-never-in-git",
+      "token-check",
+      "tools-offered",
+      "uncatalogued-request"
+    ]
+  }
+}

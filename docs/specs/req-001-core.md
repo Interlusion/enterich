@@ -453,7 +453,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-F019: Drafts per hour
 
-**Description**: When the configuration sets a limit of drafts per hour, a create operation SHALL count the documents of its DocType in the assigned company that the agent user created in the last 60 minutes, whatever their state now, and SHALL refuse the create without a write when they reach the limit, saying that the operator sets it. Creates that run at the same time in one Enterich process SHALL count each other. Enterich instances don't see each other's creates in progress: with several on one ERPNext site, creates that run at the same time in different instances can together pass the limit, by at most one create per instance besides the first. Without the limit, no create is counted.
+**Description**: When the configuration sets a limit of drafts per hour, a create operation SHALL count the documents of its DocType in the assigned company that the agent user created in the last 60 minutes, whatever their state now, and SHALL refuse the create without a write when they reach the limit, saying that the operator sets it. Creates that run at the same time in one Enterich process SHALL count each other. Enterich instances don't see each other's creates in progress: with several on one ERPNext site, creates that run at the same time in different instances can together pass the limit, by at most one create per instance besides the first. A create Enterich gave up on at its time limit can still be written by ERPNext after the count of a later create. Without the limit, no create is counted.
 
 **Related URS**: REQ-001-URS-F010, REQ-001-URS-NF001
 
