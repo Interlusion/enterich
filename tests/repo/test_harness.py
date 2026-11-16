@@ -2014,6 +2014,47 @@ def test_the_security_inventory_of_the_repository_is_written(
     ]
 
 
+def test_a_promise_is_touched_by_a_change_under_its_start_or_to_its_source() -> None:
+    promises = [
+        {"promise": "token-check", "source": "SECURITY.md", "start": ["src/enterich/auth.py"]},
+        {"promise": "one-company", "source": "SECURITY.md", "start": ["src/enterich/tools"]},
+        {"promise": "fixed-schema", "source": "AGENTS.md", "start": ["tests/snapshots/tools.json"]},
+        {"promise": "docs", "source": "SECURITY.md", "start": ["docs/guides"]},
+    ]
+    assert surface.touched(promises, ["src/enterich/tools/drafts.py"]) == ["one-company"]
+    assert surface.touched(promises, ["AGENTS.md"]) == ["fixed-schema"]
+    # A sibling whose name starts like a start path is no change under it
+    assert surface.touched(promises, ["src/enterich/tools_old.py", "docs/guides2/a.md"]) == []
+    assert surface.touched(promises, ["SECURITY.md"]) == ["docs", "one-company", "token-check"]
+
+
+def test_the_files_changed_since_a_commit_are_listed(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    since = _git(repo, "rev-parse", "HEAD").strip()
+    (repo / "docs" / "spec.md").write_text("the contract, changed\n")
+    (repo / "a.txt").write_text("new\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "docs: b")
+    assert surface.changed(since, repo) == ["a.txt", "docs/spec.md"]
+    assert surface.changed("HEAD", repo) == []
+
+
+def test_an_inventory_since_a_commit_names_what_changed_and_the_promises_touched(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert surface.main(tmp_path, since="HEAD") == 0
+    counts = json.loads(capsys.readouterr().out)
+    found = json.loads((tmp_path / "surface.json").read_text())
+    head = _git(inventory.ROOT, "rev-parse", "HEAD").strip()
+    assert found["since"] == {"commit": head, "changed": [], "promises": []}
+    assert (counts["changed"], counts["touched"]) == (0, 0)
+
+
+def test_an_inventory_without_since_surveys_every_promise(tmp_path: Path) -> None:
+    assert surface.main(tmp_path) == 0
+    assert "since" not in json.loads((tmp_path / "surface.json").read_text())
+
+
 # The security lens's findings in triage and the plan
 
 BREACH: dict[str, Any] = {
