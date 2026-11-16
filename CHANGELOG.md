@@ -4,6 +4,8 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-16
+
 ### Security
 
 - **Configuration guide:** Frappe's built-in MCP endpoint is turned off with Enable MCP in System Settings (`enable_mcp`). The guide named the site config key `disable_mcp_server`, which Frappe 16.54 ignores, so a site set up by the guide kept the endpoint and its generic tools open to the agent user's API key.
@@ -132,4 +134,5 @@ The first release.
 [0.3.0]: https://github.com/Interlusion/enterich/compare/v0.2.1...v0.3.0
 [0.4.0]: https://github.com/Interlusion/enterich/compare/v0.3.0...v0.4.0
 [0.5.0]: https://github.com/Interlusion/enterich/compare/v0.4.0...v0.5.0
-[unreleased]: https://github.com/Interlusion/enterich/compare/v0.5.0...HEAD
+[0.6.0]: https://github.com/Interlusion/enterich/compare/v0.5.0...v0.6.0
+[unreleased]: https://github.com/Interlusion/enterich/compare/v0.6.0...HEAD
