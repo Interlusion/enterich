@@ -1,0 +1,194 @@
+[
+  {
+    "branch": "auto/security-e2e-ceiling",
+    "also": [],
+    "files": [
+      "tests/e2e/test_ceiling.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "unproven:docs:docs/guides/configuration.md:What the site must provide",
+        "slug": "docs-configuration-what-the-site-must-provide",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  },
+  {
+    "branch": "auto/security-e2e-seed",
+    "also": [],
+    "files": [
+      "tests/e2e/seed.py",
+      "tests/e2e/test_rights.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "unproven:docs:tests/e2e/seed.py:seed",
+        "slug": "docs-seed-seed",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  },
+  {
+    "branch": "auto/security-integration-conftest",
+    "also": [],
+    "files": [
+      "tests/integration/conftest.py",
+      "tests/integration/mcp.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "unproven:no-approval:tests/integration/mcp.py:Session",
+        "slug": "no-approval-mcp-session",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  },
+  {
+    "branch": "auto/security-integration-order-to-cash-drafts",
+    "also": [],
+    "files": [
+      "tests/integration/test_order_to_cash_drafts.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "breach:limits:src/enterich/tools/drafts.py:insert",
+        "slug": "limits-drafts-insert",
+        "ratchet": null,
+        "ratchet_done": false
+      },
+      {
+        "key": "unproven:limits:src/enterich/tools/__init__.py:_attempt",
+        "slug": "limits-init-attempt",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  },
+  {
+    "branch": "auto/security-integration-return-drafts",
+    "also": [],
+    "files": [
+      "tests/integration/test_return_drafts.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "unproven:drafts-only:src/enterich/tools/drafts.py:insert",
+        "slug": "drafts-only-drafts-insert",
+        "ratchet": null,
+        "ratchet_done": false
+      },
+      {
+        "key": "unproven:fixed-schema:src/enterich/tools/returns.py:_plain",
+        "slug": "fixed-schema-returns-plain",
+        "ratchet": null,
+        "ratchet_done": false
+      },
+      {
+        "key": "unproven:uncatalogued-request:src/enterich/tools/returns.py:_plain",
+        "slug": "uncatalogued-request-returns-plain",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  },
+  {
+    "branch": "auto/security-repo-harness",
+    "also": [],
+    "files": [
+      "tests/repo/test_harness.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "breach:secrets-never-in-git:harness/gate.py:main",
+        "slug": "secrets-never-in-git-gate-main",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  },
+  {
+    "branch": "auto/security-repo-workflows",
+    "also": [],
+    "files": [
+      "tests/repo/test_workflows.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "unproven:secrets-never-in-git:.github/workflows/ci.yml:secrets",
+        "slug": "secrets-never-in-git-ci-secrets",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  },
+  {
+    "branch": "auto/security-unit-config",
+    "also": [],
+    "files": [
+      "tests/unit/test_config.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "unproven:configuration:src/enterich/config.py:_is_loopback",
+        "slug": "configuration-config-is-loopback",
+        "ratchet": null,
+        "ratchet_done": false
+      },
+      {
+        "key": "unproven:configuration:src/enterich/config.py:load",
+        "slug": "configuration-config-load",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  },
+  {
+    "branch": "auto/security-unit-erpnext",
+    "also": [],
+    "files": [
+      "tests/unit/test_erpnext.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "unproven:outside-text:src/enterich/erpnext.py:_first_message",
+        "slug": "outside-text-erpnext-first-message",
+        "ratchet": null,
+        "ratchet_done": false
+      },
+      {
+        "key": "unproven:secrets-and-log:src/enterich/erpnext.py:Erpnext._refusal",
+        "slug": "secrets-and-log-erpnext-erpnext-refusal",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  },
+  {
+    "branch": "auto/security-unit-log",
+    "also": [],
+    "files": [
+      "tests/unit/test_log.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "unproven:secrets-and-log:src/enterich/log.py:failure",
+        "slug": "secrets-and-log-log-failure",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  }
+]

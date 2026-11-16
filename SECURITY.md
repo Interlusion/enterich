@@ -31,6 +31,7 @@ In scope is anything that breaks what Enterich promises in its [core](docs/specs
 Out of scope:
 
 - ERPNext and Frappe themselves, and the authorization server (for example Keycloak): report those to their projects.
+- Securing the ERPNext site beyond what the configuration guide asks of it, such as settings and endpoints that don't concern the agent user: that belongs to the deployment's own setup.
 - A deployment that grants the agent user more than the configuration guide says, or what an agent does within the tools offered and the ERPNext rights granted.
 - An agent following instructions found in data that Enterich did mark as outside text: Enterich tells the agent to treat it as data, and drafts wait for a person.
 - Denial of service by sheer volume against an instance, which the platform in front of Enterich limits.

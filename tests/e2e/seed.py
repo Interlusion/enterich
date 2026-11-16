@@ -201,6 +201,7 @@ def seed(site: Site) -> Seed:
     company(site)
     fiscal_year(site, site_today().year)
     agent(site)
+    site_settings(site)
     item = ensure(
         site,
         "Item",
@@ -427,6 +428,27 @@ def report_role(site: Site, report: str) -> None:
     standard = site.call("frappe.client.get", doctype="Report", name=report)
     roles = [{"role": r["role"]} for r in standard["roles"]]
     site.insert({"doctype": "Custom Role", "report": report, "roles": [*roles, {"role": ROLE}]})
+
+
+# The switches of the configuration guide's site settings, as it says to set them
+SITE_SETTINGS: dict[tuple[str, str], int] = {
+    ("System Settings", "disable_document_sharing"): 1,
+    ("System Settings", "log_api_requests"): 1,
+    ("System Settings", "enable_mcp"): 0,
+}
+
+
+def site_settings(site: Site) -> None:
+    """The guide's switches, set again on each run: the setup wizard writes System Settings."""
+    for (doctype, field), value in SITE_SETTINGS.items():
+        if site.call("frappe.client.get_single_value", doctype=doctype, field=field) != value:
+            site.call(
+                "frappe.client.set_value",
+                doctype=doctype,
+                name=doctype,
+                fieldname=field,
+                value=value,
+            )
 
 
 # The accounts the seed books on, from the setup wizard's chart

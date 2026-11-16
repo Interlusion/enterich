@@ -5,7 +5,8 @@ run's `outcomes.json`, which `harness/outcomes.py` writes), changes no test file
 for another branch (the run's `groups.json`, which `harness/plan.py` writes), no code or
 changelog a branch that passed before it in the same call changes, only what the tests lens
 may change and nothing the pipeline may not (a file moved away counts at its old place),
-and passes every check, the end-to-end tests included: none skipped, expected to fail or
+and passes every check, a secret scan of its commits and their messages and the
+end-to-end tests included: none skipped, expected to fail or
 left out, and every test `main` had where the branch left it still runs and passes, in as
 many cases (only the operator removes, moves or weakens a test). Each branch is
 checked in a worktree of its own; the results go to the run's `gates.jsonl`. With `--push`, a
@@ -14,10 +15,14 @@ a second run of the checks, so there is no reason to push past the gate. A push 
 is recorded as not pushed, and the gate goes on. What is checked, recorded and pushed is
 the commit the branch was at when the gate read it, wherever the branch has moved since. A
 branch is compared with `main` as the remote has it (`origin/main`), fetched first: a local
-`main` behind it would count commits merged since as the branch's own.
+`main` behind it would count commits merged since as the branch's own. With `--bundle`, the
+branches that passed and change only tests are put in turn on `main` as one branch named
+after the run, which is checked and pushed in their place: one pull request for them, one for
+each branch that changes code. If they conflict or the bundle fails, each goes on its own.
 
     E2E_ERPNEXT_URL=http://127.0.0.1:8080 \\
-        uv run python harness/gate.py harness/runs/<date>-tests auto/tests-… [--base …] [--push]
+        uv run python harness/gate.py harness/runs/<date>-tests auto/tests-… [--base …] \\
+        [--push] [--bundle]
 """
 
 import argparse
@@ -29,12 +34,12 @@ import subprocess
 import sys
 import tempfile
 from collections import Counter
-from collections.abc import Generator, Iterable, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from itertools import pairwise
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TextIO, cast
 
 ROOT = Path(__file__).resolve().parent.parent
 BASE = "origin/main"
@@ -89,6 +94,11 @@ CHECKS = {
     # E2E_ERPNEXT_URL set: the end-to-end tests run with the others; -rp names each that passed
     "tests": ["uv", "run", "pytest", "-q", "-p", "no:cacheprovider", "-rp"],
 }
+# gitleaks as CI runs it, from the image it pins, on the branch's patch: the pipeline
+# pushes to a public repository, and CI scans only pull requests and pushes to main
+SCANNER_IMAGE_DIR = ".github/gitleaks"
+SCANNER_IMAGE = "enterich-gate-gitleaks"
+SCANNER = ["docker", "run", "--rm", "-i", SCANNER_IMAGE, "stdin", "--redact", "--no-banner"]
 COLLECT = ["uv", "run", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider"]
 TEST = re.compile(r"^[\w./-]+\.py::\S")
 PASSED = "PASSED "
@@ -236,11 +246,14 @@ def problems(
     return found
 
 
-def _git(*args: str, repo: Path = ROOT, stdin: str | None = None) -> str:
+def _git(
+    *args: str, repo: Path = ROOT, stdin: str | None = None, env: Mapping[str, str] | None = None
+) -> str:
     done = subprocess.run(  # noqa: S603 - fixed arguments, no shell
         ["git", *args],  # noqa: S607 - git from PATH, as every script here
         cwd=repo,
         input=stdin,
+        env={**os.environ, **env} if env else None,
         capture_output=True,
         text=True,
         check=True,
@@ -292,6 +305,72 @@ def patch_ids(commits: Sequence[str], repo: Path = ROOT) -> dict[str, str]:
     return found
 
 
+def patch(repo: Path, fork: str, commit: str) -> str:
+    """What a push of the commit makes public beyond `main`: every commit since the fork,
+    its message and its diff, a secret removed again included."""
+    return _git("log", "-p", "--no-color", "--no-ext-diff", f"{fork}..{commit}", repo=repo)
+
+
+def secret(text: str, what: str, scanner: Sequence[str] = SCANNER) -> bool:
+    """Whether the scanner finds a secret in the text; it says what, redacted."""
+    done = subprocess.run(  # noqa: S603 - fixed arguments, no shell
+        scanner, input=text, capture_output=True, text=True, check=False
+    )
+    if done.returncode != 0:
+        print(
+            f"{what}: the secret scan failed\n{(done.stdout + done.stderr)[-3000:]}",
+            file=sys.stderr,
+        )
+    return done.returncode != 0
+
+
+def leaks(repo: Path, fork: str, commit: str, scanner: Sequence[str] = SCANNER) -> bool:
+    """Whether the scanner finds a secret in the branch's patch."""
+    return secret(patch(repo, fork, commit), commit, scanner)
+
+
+def tests_only(passed: Mapping[str, Sequence[str]]) -> list[str]:
+    """The branches, of those passed (branch: paths), that change nothing but tests."""
+    return [b for b, paths in passed.items() if all(p.startswith("tests/") for p in paths)]
+
+
+def bundle_name(run: Path) -> str:
+    """The branch a run's bundle is pushed as: the run's directory's name."""
+    return f"auto/{run.name}"
+
+
+def bundle(repo: Path, base: str, picks: Sequence[tuple[str, str]]) -> str | None:
+    """One commit holding each branch's commits (branch, commit), in turn on the base, as
+    the branches' commits were reviewed; None if they conflict. Nothing else changes. Each
+    commit keeps its own date as the committer's, so the same branches on the same base make
+    the same bundle again."""
+    tree = Path(tempfile.mkdtemp(prefix="enterich-bundle-"))
+    try:
+        _git("worktree", "add", "-q", "--detach", str(tree), base, repo=repo)
+        for _, commit in picks:
+            fork = _git("merge-base", base, commit, repo=repo).strip()
+            for rev in _git("rev-list", "--reverse", f"{fork}..{commit}", repo=repo).split():
+                date = _git("show", "-s", "--format=%cI", rev, repo=repo).strip()
+                try:
+                    _git("cherry-pick", rev, repo=tree, env={"GIT_COMMITTER_DATE": date})
+                except subprocess.CalledProcessError:
+                    return None
+        return _git("rev-parse", "HEAD", repo=tree).strip()
+    finally:
+        _git("worktree", "remove", "--force", str(tree), repo=repo)
+        shutil.rmtree(tree, ignore_errors=True)
+
+
+def build_scanner() -> None:
+    """The scanner's image, built from the Dockerfile CI builds it from."""
+    subprocess.run(  # noqa: S603 - fixed arguments, no shell
+        ["docker", "build", "-q", "-t", SCANNER_IMAGE, SCANNER_IMAGE_DIR],  # noqa: S607
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+    )
+
+
 @contextmanager
 def _tree(commit: str) -> Generator[Path]:
     """A worktree of the commit with its packages, removed afterwards."""
@@ -314,10 +393,10 @@ def _tests_at(commit: str) -> Counter[str]:
     return tests_collected(done.stdout)
 
 
-def _checks(branch: str, commit: str, before: Mapping[str, int]) -> dict[str, bool]:
+def _checks(branch: str, commit: str, before: Mapping[str, int], fork: str) -> dict[str, bool]:
     """Every check at the commit; `before` is what the tests are compared with, the tests
-    `main` had where the branch left it."""
-    results: dict[str, bool] = {}
+    `main` had where the branch left it at `fork`."""
+    results: dict[str, bool] = {"secrets": not leaks(ROOT, fork, commit)}
     with _tree(commit) as tree:
         for name, command in CHECKS.items():
             done = subprocess.run(command, cwd=tree, capture_output=True, text=True, check=False)  # noqa: S603
@@ -366,7 +445,7 @@ def pushed(repo: Path, commit: str, branch: str) -> bool:
     return True
 
 
-def main(run: Path, branches: list[str], base: str, push: bool) -> int:
+def main(run: Path, branches: list[str], base: str, push: bool, bundled: bool = False) -> int:
     if not os.environ.get("E2E_ERPNEXT_URL"):
         print("E2E_ERPNEXT_URL is not set: the gate runs the end-to-end tests", file=sys.stderr)
         return 2
@@ -380,6 +459,7 @@ def main(run: Path, branches: list[str], base: str, push: bool) -> int:
         return 2
     groups = cast("list[dict[str, Any]]", json.loads(plan.read_text()))
     fetch(ROOT, base)
+    build_scanner()
     summary = cast("dict[str, Any]", json.loads(outcomes.read_text()))
     if "accepted" not in summary:
         print(
@@ -394,6 +474,7 @@ def main(run: Path, branches: list[str], base: str, push: bool) -> int:
     at = {branch: _git("rev-parse", branch).strip() for branch in branches}
     states = {branch: branch_state(ROOT, base, at[branch]) for branch in branches}
     passed_paths: dict[str, list[str]] = {}
+    checked: dict[str, dict[str, bool]] = {}
     # The tests main had where a branch left it, read once per such commit
     forks: dict[str, Counter[str]] = {}
 
@@ -420,12 +501,20 @@ def main(run: Path, branches: list[str], base: str, push: bool) -> int:
             )
             # The rules are checked every time; the checks once per commit when pushing
             earlier = passed_earlier(records, branch, commit) if push else None
-            checks = {} if found else earlier or _checks(branch, commit, before(commit))
+            checks = (
+                {}
+                if found
+                else earlier
+                or _checks(branch, commit, before(commit), _git("merge-base", base, commit).strip())
+            )
             passed = not found and all(checks.values())
             if passed:
                 passed_paths[branch] = state.paths
-            sent = passed and push and pushed(ROOT, commit, branch)
-            failed += not passed or (push and not sent)
+                checked[branch] = checks
+            # A branch that changes only tests waits for the bundle, with the others like it
+            held = bundled and passed and branch in tests_only({branch: state.paths})
+            sent = passed and push and not held and pushed(ROOT, commit, branch)
+            failed += not passed or (push and not held and not sent)
             record = {
                 "branch": branch,
                 "commit": commit,
@@ -434,9 +523,68 @@ def main(run: Path, branches: list[str], base: str, push: bool) -> int:
                 "passed": passed,
                 "pushed": sent,
             }
+            if held:
+                record["into"] = bundle_name(run)
             out.write(json.dumps(record) + "\n")
             print(f"{branch}: {'passed' if passed else 'failed'}", flush=True)
+        waiting = tests_only(passed_paths) if bundled else []
+        if waiting:
+            failed += _bundled(run, waiting, at, checked, records, base, push, before, out)
     return 1 if failed else 0
+
+
+def _bundled(
+    run: Path,
+    waiting: list[str],
+    at: Mapping[str, str],
+    checked: Mapping[str, dict[str, bool]],
+    records: list[dict[str, Any]],
+    base: str,
+    push: bool,
+    before: Callable[[str], Counter[str]],
+    out: TextIO,
+) -> int:
+    """The bundle of the passed branches that change only tests, checked and pushed in
+    their place; if it conflicts or fails, each is pushed as it passed. The failures."""
+    name = bundle_name(run)
+    commit = bundle(ROOT, base, [(b, at[b]) for b in waiting]) if len(waiting) > 1 else None
+    checks: dict[str, bool] = {}
+    if commit is not None:
+        fork = _git("merge-base", base, commit).strip()
+        earlier = passed_earlier(records, name, commit) if push else None
+        checks = earlier or _checks(name, commit, before(commit), fork)
+    passed = commit is not None and all(checks.values())
+    if commit is not None:
+        sent = passed and push and pushed(ROOT, commit, name)
+        record: dict[str, Any] = {
+            "branch": name,
+            "commit": commit,
+            "of": waiting,
+            "problems": [],
+            "checks": checks,
+            "passed": passed,
+            "pushed": sent,
+        }
+        out.write(json.dumps(record) + "\n")
+        print(f"{name}: {'passed' if passed else 'failed'}, of {len(waiting)} branches")
+        if passed:
+            return int(push and not sent)
+    elif len(waiting) > 1:
+        print(f"{name}: its branches conflict; each goes on its own", file=sys.stderr)
+    failed = 0
+    for branch in waiting:
+        sent = push and pushed(ROOT, at[branch], branch)
+        failed += push and not sent
+        alone: dict[str, Any] = {
+            "branch": branch,
+            "commit": at[branch],
+            "problems": [],
+            "checks": checked[branch],
+            "passed": True,
+            "pushed": sent,
+        }
+        out.write(json.dumps(alone) + "\n")
+    return failed
 
 
 if __name__ == "__main__":
@@ -445,5 +593,8 @@ if __name__ == "__main__":
     parser.add_argument("branches", nargs="+")
     parser.add_argument("--base", default=BASE)
     parser.add_argument("--push", action="store_true")
+    parser.add_argument(
+        "--bundle", action="store_true", help="push the branches that change only tests as one"
+    )
     a = parser.parse_args()
-    sys.exit(main(a.run, a.branches, a.base, a.push))
+    sys.exit(main(a.run, a.branches, a.base, a.push, a.bundle))

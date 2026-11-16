@@ -25,9 +25,11 @@ from typing import Any, cast
 try:
     from harness.jsonl import read as _records
     from harness.outcomes import NOT_ACCEPTED, state
+    from harness.triage import lens as lens_of
 except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
     from outcomes import NOT_ACCEPTED, state  # type: ignore[import-not-found, no-redef]
+    from triage import lens as lens_of  # type: ignore[import-not-found, no-redef]
 
 Node = tuple[str, str]
 TEST_FILE = re.compile(r"\btests/[\w/]+\.py\b")
@@ -42,7 +44,7 @@ def _files(fix: dict[str, Any]) -> list[str]:
 
 
 def _name(files: list[str], ratchets: list[dict[str, Any]], origin: str) -> str:
-    """A branch's name after `auto/tests-`: its first ratchet, else its first file with its
+    """A branch's name after `auto/<lens>-`: its first ratchet, else its first file with its
     directory (`unit-shapes`), else the survey its fixes came from."""
     if ratchets:
         return cast("str", ratchets[0]["slug"])
@@ -56,6 +58,7 @@ def groups(
     fixes: list[dict[str, Any]],
     ratchets: list[dict[str, Any]],
     before: dict[str, str] | None = None,
+    lens: str = "tests",
 ) -> list[dict[str, Any]]:
     """The fixes in groups that share no test file: what a fix's verdict names ties it to
     the others naming it, a ratchet ties its findings together. A file an accepted fix
@@ -90,7 +93,7 @@ def groups(
         named = {f"ratchet:{f['ratchet']}" for f in members if f.get("ratchet")}
         first = sorted((r for r in ratchets if r["key"] in named), key=lambda r: r["key"])
         earlier = sorted({known[f] for f in files if f in known})
-        name = f"auto/tests-{_name(files, first, cast('str', members[0]['origin']))}"
+        name = f"auto/{lens}-{_name(files, first, cast('str', members[0]['origin']))}"
         # A ratchet a review accepted earlier isn't run again: its test is on the branch
         done = {r["key"] for r in first if not r.get("run", True)}
         planned.append(
@@ -183,7 +186,7 @@ def main(run: Path) -> int:
     handed = _records(run / "fixes.jsonl")
     ended = _records(run / "outcomes.jsonl")
     fixes, ratchets = left(handed, _records(run / "ratchets.jsonl"), ended)
-    planned = groups(fixes, ratchets, held(ended))
+    planned = groups(fixes, ratchets, held(ended), lens_of(run))
     (run / "groups.json").write_text(json.dumps(planned, indent=2) + "\n", encoding="utf-8")
     unnamed = sum(1 for f in fixes if not _files(f))
     sizes = sorted((len(g["fixes"]) for g in planned), reverse=True)

@@ -13,7 +13,18 @@ from typing import Any
 
 import pytest
 
-from harness import cleanup, gate, inventory, mutation, outcomes, plan, record, sweep, triage
+from harness import (
+    cleanup,
+    gate,
+    inventory,
+    mutation,
+    outcomes,
+    plan,
+    record,
+    surface,
+    sweep,
+    triage,
+)
 
 
 def test_the_inventory_reads_a_requirements_definition_of_done() -> None:
@@ -700,6 +711,69 @@ def test_the_gate_reads_the_commit_it_checks_not_where_the_branch_is_now(tmp_pat
     assert state.paths == ["a.txt"]
 
 
+def test_a_runs_bundle_takes_the_branches_that_change_only_tests() -> None:
+    """Their pull requests are the operator's to merge: one for all of them, and one for
+    each branch that changes code or the changelog."""
+    passed = {
+        "auto/a": ["tests/unit/test_a.py"],
+        "auto/b": ["CHANGELOG.md", "src/enterich/a.py", "tests/unit/test_b.py"],
+        "auto/c": ["tests/e2e/test_c.py", "tests/snapshots/c.json"],
+    }
+    assert gate.tests_only(passed) == ["auto/a", "auto/c"]
+    assert gate.bundle_name(Path("harness/runs/2026-11-15-security")) == "auto/2026-11-15-security"
+
+
+def _branch(repo: Path, branch: str, *files: tuple[str, str]) -> str:
+    """A branch from main with one commit per file, its subject the file's stem."""
+    _git(repo, "switch", "-q", "-c", branch, "main")
+    for name, text in files:
+        (repo / name).parent.mkdir(parents=True, exist_ok=True)
+        (repo / name).write_text(text)
+        _git(repo, "add", ".")
+        _git(repo, "commit", "-q", "-m", f"test: {Path(name).stem}")
+    _git(repo, "switch", "-q", "main")
+    return _git(repo, "rev-parse", branch)
+
+
+def _committer(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name, value in {"NAME": "t", "EMAIL": "t@example.com"}.items():
+        monkeypatch.setenv(f"GIT_COMMITTER_{name}", value)
+        monkeypatch.setenv(f"GIT_AUTHOR_{name}", value)
+
+
+def test_a_bundle_holds_each_branchs_commits_in_turn_on_main(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _committer(monkeypatch)
+    repo = _repo(tmp_path)
+    a = _branch(repo, "auto/a", ("tests/test_a.py", "a\n"))
+    b = _branch(repo, "auto/b", ("tests/test_b.py", "b\n"), ("tests/test_b2.py", "b2\n"))
+    commit = gate.bundle(repo, "main", [("auto/a", a), ("auto/b", b)])
+    assert commit is not None
+    subjects = _git(repo, "log", "--reverse", "--format=%s", f"main..{commit}").splitlines()
+    assert subjects == ["test: test_a", "test: test_b", "test: test_b2"]
+    assert _git(repo, "show", f"{commit}:tests/test_b2.py") == "b2"
+    # Made again, it is the same commit: a gate run with --push after one without reuses
+    # its checks, as for any branch that passed at the same commit
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2030-01-01T00:00:00+00:00")
+    assert gate.bundle(repo, "main", [("auto/a", a), ("auto/b", b)]) == commit
+    # The branches stay where they were, and no worktree is left
+    assert (_git(repo, "rev-parse", "auto/a"), _git(repo, "rev-parse", "auto/b")) == (a, b)
+    assert len(_git(repo, "worktree", "list").splitlines()) == 1
+
+
+def test_a_bundle_whose_branches_conflict_is_none_and_leaves_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _committer(monkeypatch)
+    repo = _repo(tmp_path)
+    a = _branch(repo, "auto/a", ("tests/test_a.py", "a\n"))
+    b = _branch(repo, "auto/b", ("tests/test_a.py", "another a\n"))
+    assert gate.bundle(repo, "main", [("auto/a", a), ("auto/b", b)]) is None
+    assert len(_git(repo, "worktree", "list").splitlines()) == 1
+    assert _git(repo, "status", "--porcelain") == ""
+
+
 def test_no_workflow_names_a_session_or_a_model() -> None:
     """Commit trailers belong to the session that runs a workflow, never to the method."""
     scripts = sorted((gate.ROOT / ".claude" / "workflows").glob("*.js"))
@@ -1374,10 +1448,60 @@ def _result(run: Path, result: dict[str, Any], **more: Any) -> Path:
     return path
 
 
+REBASED_SHA = "b" * 40
+
+
+def _rebased(old: dict[str, Any]) -> dict[str, Any]:
+    """The outcome of a fix whose branch was rebased after another merge and reviewed
+    again: its new commits and review, the earlier ones under `rebased`."""
+    fixed = {**old["fixed"], "commits": [f"{REBASED_SHA} test: a result with umlauts keeps them"]}
+    review = {**old["review"], "reason": "the rebased commits, red check redone"}
+    earlier = {"commits": old["fixed"]["commits"], "review": old["review"]}
+    return {**old, "fixed": fixed, "review": review, "rebased": earlier}
+
+
+def test_a_fix_rebased_and_reviewed_again_takes_its_new_commits(tmp_path: Path) -> None:
+    """A rebase that resolved a conflict changes a commit's diff: the gate lets through only
+    commits a review accepted, so the rebased ones are reviewed again and replace them."""
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [OUTCOME]}), FAKE_SCANNER) == 0
+    again = _rebased(OUTCOME)
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [again]}), FAKE_SCANNER) == 0
+    assert _lines(tmp_path / "outcomes.jsonl") == [again]
+
+
+def test_a_rebase_of_commits_not_recorded_or_not_accepted_is_refused(tmp_path: Path) -> None:
+    rejected = {**OUTCOME, "review": {**REVIEW, "accept": False}}
+    other = {**OUTCOME, "key": OTHER_KEY}
+    outcomes = {"outcomes": [rejected, other]}
+    assert record.main(tmp_path, _result(tmp_path, outcomes), FAKE_SCANNER) == 0
+    elsewhere = _rebased(other)
+    elsewhere["rebased"] = {**elsewhere["rebased"], "commits": [f"{'c' * 40} test: another"]}
+    again = {"outcomes": [_rebased(rejected), elsewhere]}
+    assert record.main(tmp_path, _result(tmp_path, again), FAKE_SCANNER) == 1
+    assert _lines(tmp_path / "outcomes.jsonl") == [rejected, other]
+
+
+def test_a_result_with_a_secret_is_recorded_nowhere(tmp_path: Path) -> None:
+    """The run's records are committed and pushed by hand, past the gate's scan: an agent
+    that quoted a secret, made up or not, would put it in Git."""
+    leaked = {**FINDING, "verdict": {**FINDING["verdict"], "reason": "the key LEAKED"}}
+    result = {"records": [leaked], "unverified": [DOD_GAP], "surveysFailed": 0}
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 1
+    assert not (tmp_path / "findings.jsonl").exists()
+    assert not (tmp_path / "unverified.jsonl").exists()
+    assert not (tmp_path / "workflows.jsonl").exists()
+
+
+def test_outcomes_with_a_secret_are_recorded_nowhere(tmp_path: Path) -> None:
+    told = {**OUTCOME, "fixed": {**OUTCOME["fixed"], "red": "the token LEAKED"}}
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [told]}), FAKE_SCANNER) == 1
+    assert not (tmp_path / "outcomes.jsonl").exists()
+
+
 def test_a_surveys_result_becomes_the_runs_findings(tmp_path: Path) -> None:
     """The session no longer writes a workflow's result to the records by hand."""
     result = {"records": [FINDING], "unverified": [DOD_GAP], "surveysFailed": 0}
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [FINDING]
     assert _lines(tmp_path / "unverified.jsonl") == [DOD_GAP]
     assert _lines(tmp_path / "workflows.jsonl") == [
@@ -1398,7 +1522,7 @@ def test_a_survey_recorded_again_replaces_only_what_its_surveys_found(tmp_path: 
         "surveysFailed": 1,
         "surveyed": ["spec:req-001-core.md", "mutants:1"],
     }
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [swept, unanswered, new]
 
 
@@ -1406,7 +1530,7 @@ def test_a_survey_result_without_its_surveys_keeps_the_sweeps_findings(tmp_path:
     swept = {**FINDING, "origin": f"sweep:mutant-gap:{MUTANT}"}
     _write(tmp_path / "findings.jsonl", [{**DOD_GAP, "origin": "spec:a"}, swept])
     result: dict[str, Any] = {"records": [], "unverified": [], "surveysFailed": 0}
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [swept]
 
 
@@ -1419,7 +1543,7 @@ def test_a_finding_the_sweep_holds_isnt_recorded_again_by_a_survey(tmp_path: Pat
     found_again = {**FINDING, "claim": "found again", "origin": "mutants:1"}
     judged_now = {**DOD_GAP, "origin": "spec:a"}
     result = {"records": [found_again, judged_now], "unverified": [], "surveyed": ["mutants:1"]}
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [
         {**swept, "also": ["mutants:1"]},
         {**judged_now, "also": ["mutants:2"]},
@@ -1427,7 +1551,7 @@ def test_a_finding_the_sweep_holds_isnt_recorded_again_by_a_survey(tmp_path: Pat
     assert _lines(tmp_path / "unverified.jsonl") == []
     assert triage.main(tmp_path) == 0
     # Recorded once more, as a resumed workflow returns it: nothing changes
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl")[0] == {**swept, "also": ["mutants:1"]}
 
 
@@ -1437,13 +1561,13 @@ def test_a_finding_two_surveys_made_is_recorded_once(tmp_path: Path) -> None:
     first, second = {**weak, "origin": "spec:a"}, {**weak, "origin": "spec:b"}
     later = {**weak, "origin": "spec:c", "verdict": None}
     result = {"records": [first, second], "unverified": [later], "surveysFailed": 0}
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [{**first, "also": ["spec:b", "spec:c"]}]
     assert _lines(tmp_path / "unverified.jsonl") == []
 
 
 def test_a_fix_stages_result_becomes_the_runs_outcomes(tmp_path: Path) -> None:
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [OUTCOME]})) == 0
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [OUTCOME]}), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "outcomes.jsonl") == [OUTCOME]
 
 
@@ -1455,7 +1579,8 @@ def test_a_second_fix_stage_adds_its_outcomes_and_replaces_an_agents_missing_ans
     _write(tmp_path / "outcomes.jsonl", [OUTCOME, unanswered])
     answered = {**OUTCOME, "key": OTHER_KEY}
     third = {**OUTCOME, "key": "dod-gap:new"}
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [answered, third]})) == 0
+    outcome = _result(tmp_path, {"outcomes": [answered, third]})
+    assert record.main(tmp_path, outcome, FAKE_SCANNER) == 0
     assert _lines(tmp_path / "outcomes.jsonl") == [OUTCOME, answered, third]
 
 
@@ -1470,16 +1595,16 @@ def test_a_fix_the_plan_handed_out_once_more_gets_its_second_outcome(tmp_path: P
     closed = _ended("dod-gap:c", branch=branch, fixed=refuted, review=None)
     _write(tmp_path / "outcomes.jsonl", [rejected, moved, closed])
     second = [_ended("dod-gap:b", branch="auto/tests-unit-log"), _ended("dod-gap:c", branch=branch)]
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": second})) == 0
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": second}), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "outcomes.jsonl") == [
         rejected,
         {**second[0], "replaced": "elsewhere"},
         {**second[1], "replaced": "refuted"},
     ]
     # The same again, from a resumed workflow, changes nothing; a third outcome is refused
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": second})) == 0
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": second}), FAKE_SCANNER) == 0
     third = [{**second[0], "review": {**REVIEW, "accept": False}}]
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": third})) == 1
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": third}), FAKE_SCANNER) == 1
     assert _lines(tmp_path / "outcomes.jsonl")[1] == {**second[0], "replaced": "elsewhere"}
 
 
@@ -1499,7 +1624,7 @@ def test_a_second_fix_stage_runs_from_plan_to_outcomes(tmp_path: Path) -> None:
         _accepted("dod-gap:c", "auto/tests-unit-config", CONFIG),
         _ended("dod-gap:d", branch="auto/tests-unit-config", fixed=None, review=None),
     ]
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": stage})) == 0
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": stage}), FAKE_SCANNER) == 0
     assert outcomes.main(tmp_path) == 0
     assert _plan(tmp_path, fixes) == [
         ("auto/tests-unit-config", [CONFIG], ["dod-gap:d"]),
@@ -1509,7 +1634,7 @@ def test_a_second_fix_stage_runs_from_plan_to_outcomes(tmp_path: Path) -> None:
         _accepted("dod-gap:b", "auto/tests-unit-log", LOG),
         _accepted("dod-gap:d", "auto/tests-unit-config", CONFIG),
     ]
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": stage})) == 0
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": stage}), FAKE_SCANNER) == 0
     assert outcomes.main(tmp_path) == 0
     summary = json.loads((tmp_path / "outcomes.json").read_text())
     assert (summary["states"], summary["missing"]) == ({"accepted": 4}, [])
@@ -1519,7 +1644,7 @@ def test_a_second_fix_stage_runs_from_plan_to_outcomes(tmp_path: Path) -> None:
 def test_a_second_outcome_for_a_fix_that_has_one_is_refused(tmp_path: Path) -> None:
     before = _write(tmp_path / "outcomes.jsonl", [OUTCOME]).read_text()
     again = {**OUTCOME, "review": {**REVIEW, "accept": False}}
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [again]})) == 1
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [again]}), FAKE_SCANNER) == 1
     assert (tmp_path / "outcomes.jsonl").read_text() == before
     assert not (tmp_path / "workflows.jsonl").exists()
 
@@ -1527,14 +1652,14 @@ def test_a_second_outcome_for_a_fix_that_has_one_is_refused(tmp_path: Path) -> N
 def test_a_resumed_fix_stage_may_return_the_same_outcome_again(tmp_path: Path) -> None:
     """A workflow resumed after a stop replays its finished agents' answers."""
     _write(tmp_path / "outcomes.jsonl", [OUTCOME])
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [OUTCOME]})) == 0
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [OUTCOME]}), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "outcomes.jsonl") == [OUTCOME]
 
 
 @pytest.mark.parametrize("result", [None, [], {"groups": []}, {"records": {}}, {"outcomes": [1]}])
 def test_a_result_of_no_known_shape_is_refused(tmp_path: Path, result: Any) -> None:
     """A workflow that failed leaves no result; nothing is written from it."""
-    assert record.main(tmp_path, _result(tmp_path, result)) == 1
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 1
     assert sorted(p.name for p in tmp_path.iterdir()) == ["workflow.output"]
 
 
@@ -1743,17 +1868,458 @@ def test_a_sweeps_verdicts_are_added_to_the_runs_findings(tmp_path: Path) -> Non
     swept = {**LIKE, "origin": f"sweep:mutant-gap:{MUTANT}"}
     later = {**swept, "mutants": [MUTANT_ELSEWHERE], "verdict": None}
     result = {"records": [swept], "unverified": [later], "surveysFailed": 0, "sweep": True}
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [FINDING, swept]
     assert _lines(tmp_path / "unverified.jsonl") == [DOD_GAP, later]
     assert _lines(tmp_path / "workflows.jsonl")[0]["wrote"] == "sweep"
     # Resumed, the same verdicts change nothing; a key judged before keeps its verdict
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [FINDING, swept]
     refuted = {**swept, "verdict": {**LIKE["verdict"], "confirmed": False}}
     # The candidate left unverified is judged in a second sweep, and is no longer waiting
     judged = {**later, "verdict": LIKE["verdict"]}
     again: dict[str, Any] = {**result, "records": [refuted, judged], "unverified": []}
-    assert record.main(tmp_path, _result(tmp_path, again)) == 0
+    assert record.main(tmp_path, _result(tmp_path, again), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [FINDING, swept, judged]
     assert _lines(tmp_path / "unverified.jsonl") == [DOD_GAP]
+
+
+# The security lens's inventory (harness/surface.py)
+
+POLICY = """# Security policy
+
+## Scope
+
+In scope is anything that breaks a promise, for example:
+
+- **The token check:** a request that gets through without a valid access token.
+- **The tool limits:**
+  - reaching another company's data;
+  - calling a tool the configuration doesn't offer.
+
+Out of scope:
+
+- ERPNext and Frappe themselves.
+"""
+
+
+def _vocabulary(tmp_path: Path, *promises: dict[str, Any]) -> list[dict[str, Any]]:
+    (tmp_path / "SECURITY.md").write_text(POLICY, encoding="utf-8")
+    return list(promises)
+
+
+TOKEN = {"promise": "token-check", "source": "SECURITY.md", "text": "**The token check:**"}
+COMPANY = {"promise": "one-company", "source": "SECURITY.md", "text": "another company's data"}
+OFFERED = {"promise": "tools-offered", "source": "SECURITY.md", "text": "calling a tool"}
+
+
+def test_the_policys_scope_is_its_bullets_without_those_that_only_head_others() -> None:
+    assert surface.scope(POLICY) == [
+        "**The token check:** a request that gets through without a valid access token.",
+        "reaching another company's data;",
+        "calling a tool the configuration doesn't offer.",
+    ]
+
+
+def test_a_vocabulary_that_follows_the_policy_is_kept(tmp_path: Path) -> None:
+    assert surface.unkept(_vocabulary(tmp_path, TOKEN, COMPANY, OFFERED), tmp_path) == []
+
+
+def test_a_line_of_the_policys_scope_without_a_promise_stops_the_inventory(
+    tmp_path: Path,
+) -> None:
+    problems = surface.unkept(_vocabulary(tmp_path, TOKEN, COMPANY), tmp_path)
+    assert problems == [
+        "SECURITY.md: 0 promises for the line: calling a tool the configuration doesn't offer."
+    ]
+
+
+def test_a_line_of_the_policys_scope_with_two_promises_stops_the_inventory(
+    tmp_path: Path,
+) -> None:
+    twice = {"promise": "tools", "source": "SECURITY.md", "text": "the configuration"}
+    problems = surface.unkept(_vocabulary(tmp_path, TOKEN, COMPANY, OFFERED, twice), tmp_path)
+    assert problems == [
+        "SECURITY.md: 2 promises for the line: calling a tool the configuration doesn't offer."
+    ]
+
+
+def test_a_promise_whose_source_no_longer_holds_its_text_stops_the_inventory(
+    tmp_path: Path,
+) -> None:
+    gone = {"promise": "fixed-schema", "source": "AGENTS.md", "text": "**Tools have a fixed"}
+    nowhere = {**TOKEN, "promise": "token-again", "start": ["src/enterich/gone.py"]}
+    problems = surface.unkept(
+        _vocabulary(tmp_path, TOKEN, COMPANY, OFFERED, gone, nowhere), tmp_path
+    )
+    assert problems == [
+        "fixed-schema: AGENTS.md doesn't hold its text",
+        "token-again: src/enterich/gone.py doesn't exist",
+        "SECURITY.md: 2 promises for the line: **The token check:** a request that gets through "
+        "without a v",
+    ]
+
+
+def test_two_promises_of_one_name_stop_the_inventory(tmp_path: Path) -> None:
+    problems = surface.unkept(_vocabulary(tmp_path, TOKEN, COMPANY, OFFERED, OFFERED), tmp_path)
+    assert problems[0] == "tools-offered: two promises of this name"
+
+
+def test_the_repositorys_vocabulary_follows_its_policy_and_its_specs() -> None:
+    promises = surface._records(surface.PROMISES)  # pyright: ignore[reportPrivateUsage]
+    assert surface.unkept(promises) == []
+    known = {r.id for r in inventory.requirements()}
+    assert {rid for p in promises for rid in p["requirements"]} <= known
+
+
+def test_a_text_input_without_a_bound_is_found_by_its_path() -> None:
+    schema = {
+        "$defs": {
+            "Row": {
+                "properties": {
+                    "account": {"type": "string", "maxLength": 140},
+                    "debit": {"anyOf": [{"type": "number"}, {"type": "string"}, {"type": "null"}]},
+                    "kind": {"type": "string", "enum": ["a", "b"]},
+                }
+            }
+        },
+        "properties": {
+            "accounts": {"type": "array", "items": {"$ref": "#/$defs/Row"}},
+            "posting_date": {"anyOf": [{"type": "string", "format": "date"}, {"type": "null"}]},
+            "remarks": {"type": "string"},
+            "name": {"type": "string", "pattern": "^x$"},
+        },
+    }
+    assert surface.unbounded(schema) == ["accounts[].debit", "remarks"]
+
+
+def _project(tmp_path: Path) -> Path:
+    src = tmp_path / "src" / "enterich"
+    (src / "tools").mkdir(parents=True)
+    (src / "erpnext.py").write_text(
+        "class Erpnext:\n"
+        "    async def insert(self, doctype, doc):\n"
+        "        return await self._call('POST', _resource(doctype), {}, doc)\n"
+        "    async def _call(self, method, path, params, body=None): ...\n",
+        encoding="utf-8",
+    )
+    (src / "tools" / "drafts.py").write_text(
+        "async def insert(context, doc):\n"
+        "    line = {}\n"
+        "    line.update(doc)\n"
+        "    url = context.erpnext.geturl()\n"
+        "    saved = await context.erpnext.insert('Journal Entry', line)\n"
+        "    log.event('operation', sub=context.sub, **fields)\n"
+        "    log.failure(exc, secrets, operation='x')\n"
+        "    other.event('not the log')\n"
+        "    return saved  # noqa: S104 - an example\n",
+        encoding="utf-8",
+    )
+    (src / "config.py").write_text(
+        "class Settings(BaseModel):\n"
+        "    issuer: str\n"
+        "    erpnext_api_key: SecretStr\n"
+        "    max_drafts_per_hour: int | None = None\n"
+        "    def secrets(self): ...\n"
+        "class Other:\n"
+        "    left_out: str\n",
+        encoding="utf-8",
+    )
+    return tmp_path
+
+
+def test_every_request_to_erpnext_is_listed_with_its_method_and_path(tmp_path: Path) -> None:
+    assert surface.requests(_project(tmp_path)) == [
+        {
+            "at": "src/enterich/erpnext.py:3",
+            "in": "insert",
+            "method": "'POST'",
+            "path": "_resource(doctype)",
+        }
+    ]
+
+
+def test_only_calls_of_the_erpnext_clients_methods_are_client_calls(tmp_path: Path) -> None:
+    # Neither a dict's update nor another attribute of the client
+    assert surface.client_calls(_project(tmp_path)) == [
+        {
+            "at": "src/enterich/tools/drafts.py:5",
+            "in": "insert",
+            "call": "insert",
+            "first": "'Journal Entry'",
+        }
+    ]
+
+
+def test_every_log_call_is_listed_with_its_event_and_fields(tmp_path: Path) -> None:
+    assert surface.log_calls(_project(tmp_path)) == [
+        {
+            "at": "src/enterich/tools/drafts.py:6",
+            "in": "insert",
+            "call": "event",
+            "event": "operation",
+            "fields": ["sub", "**"],
+        },
+        {
+            "at": "src/enterich/tools/drafts.py:7",
+            "in": "insert",
+            "call": "failure",
+            "event": None,
+            "fields": ["operation"],
+        },
+    ]
+
+
+def test_the_settings_are_the_fields_of_the_configurations_class(tmp_path: Path) -> None:
+    assert surface.settings(_project(tmp_path)) == [
+        {"setting": "issuer", "type": "str"},
+        {"setting": "erpnext_api_key", "type": "SecretStr"},
+        {"setting": "max_drafts_per_hour", "type": "int | None"},
+    ]
+
+
+def test_a_silenced_security_rule_is_listed_as_written(tmp_path: Path) -> None:
+    assert surface.silenced(_project(tmp_path)) == [
+        {
+            "at": "src/enterich/tools/drafts.py:9",
+            "line": "return saved  # noqa: S104 - an example",
+        }
+    ]
+
+
+def test_the_security_inventory_of_the_repository_is_written(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert surface.main(tmp_path) == 0
+    counts = json.loads(capsys.readouterr().out)
+    promises = [json.loads(line) for line in (tmp_path / "promises.jsonl").read_text().splitlines()]
+    found = json.loads((tmp_path / "surface.json").read_text())
+    assert counts["promises"] == len(promises) > 0
+    # Each promise carries its requirements in full: the token check's, with its tests
+    check = next(p for p in promises if p["promise"] == "token-check")
+    by_id = {r["id"]: r for r in check["requirements"]}
+    assert by_id["REQ-002-PRS-NF001"]["dod"]
+    assert by_id["REQ-002-PRS-NF001"]["tests"]
+    # Every tool of the snapshot, the three writes among the requests
+    assert counts["tools"] == len(json.loads((inventory.ROOT / surface.TOOLS).read_text()))
+    assert {r["method"] for r in found["requests"]} == {"'GET'", "'POST'", "'PUT'"}
+    assert [r["in"] for r in found["requests"] if r["method"] != "'GET'"] == [
+        "insert",
+        "update",
+        "add_comment",
+    ]
+
+
+def test_a_promise_is_touched_by_a_change_under_its_start_or_to_its_source() -> None:
+    promises = [
+        {"promise": "token-check", "source": "SECURITY.md", "start": ["src/enterich/auth.py"]},
+        {"promise": "one-company", "source": "SECURITY.md", "start": ["src/enterich/tools"]},
+        {"promise": "fixed-schema", "source": "AGENTS.md", "start": ["tests/snapshots/tools.json"]},
+        {"promise": "docs", "source": "SECURITY.md", "start": ["docs/guides"]},
+    ]
+    assert surface.touched(promises, ["src/enterich/tools/drafts.py"]) == ["one-company"]
+    assert surface.touched(promises, ["AGENTS.md"]) == ["fixed-schema"]
+    # A sibling whose name starts like a start path is no change under it
+    assert surface.touched(promises, ["src/enterich/tools_old.py", "docs/guides2/a.md"]) == []
+    assert surface.touched(promises, ["SECURITY.md"]) == ["docs", "one-company", "token-check"]
+
+
+def test_the_files_changed_since_a_commit_are_listed(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    since = _git(repo, "rev-parse", "HEAD").strip()
+    (repo / "docs" / "spec.md").write_text("the contract, changed\n")
+    (repo / "a.txt").write_text("new\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "docs: b")
+    assert surface.changed(since, repo) == ["a.txt", "docs/spec.md"]
+    assert surface.changed("HEAD", repo) == []
+
+
+def test_an_inventory_since_a_commit_names_what_changed_and_the_promises_touched(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert surface.main(tmp_path, since="HEAD") == 0
+    counts = json.loads(capsys.readouterr().out)
+    found = json.loads((tmp_path / "surface.json").read_text())
+    head = _git(inventory.ROOT, "rev-parse", "HEAD").strip()
+    assert found["since"] == {"commit": head, "changed": [], "promises": []}
+    assert (counts["changed"], counts["touched"]) == (0, 0)
+
+
+def test_an_inventory_without_since_surveys_every_promise(tmp_path: Path) -> None:
+    assert surface.main(tmp_path) == 0
+    assert "since" not in json.loads((tmp_path / "surface.json").read_text())
+
+
+# The security lens's findings in triage and the plan
+
+BREACH: dict[str, Any] = {
+    "kind": "breach",
+    "promise": "one-company",
+    "location": "src/enterich/tools/drafts.py:editable",
+    "requirement": "REQ-001-PRS-F007",
+    "mutants": [],
+    "claim": "An update reaches a draft of another company",
+    "evidence": "drafts.py:92 reads the company after the write",
+    "proposal": "Check the company before the write",
+    "origin": "promise:one-company",
+    "verdict": {
+        "confirmed": True,
+        "class": "fix",
+        "pattern": None,
+        "test_files": ["tests/integration/test_service.py"],
+        "reproduction": "A throwaway test against the fake: the update of OTHER-1 was sent",
+        "reason": "reproduced",
+    },
+}
+UNPROVEN: dict[str, Any] = {
+    **BREACH,
+    "kind": "unproven",
+    "claim": "No test would notice an update without the company check",
+    "verdict": {**BREACH["verdict"], "reproduction": None},
+}
+
+
+@pytest.mark.parametrize(
+    ("name", "lens"),
+    [
+        ("2026-11-14-tests", "tests"),
+        ("2026-11-14-tests-2", "tests"),
+        ("2026-11-15-security", "security"),
+        ("2026-11-15-security-2", "security"),
+        # The first lens, if the name says none
+        ("run", "tests"),
+    ],
+)
+def test_a_runs_lens_is_in_its_directorys_name(name: str, lens: str) -> None:
+    assert triage.lens(Path("harness/runs") / name) == lens
+
+
+def test_a_security_findings_key_names_its_promise() -> None:
+    """One function can break two promises: two findings, two suppressions."""
+    assert triage.key(BREACH) == "breach:one-company:src/enterich/tools/drafts.py:editable"
+    assert triage.key(UNPROVEN) == "unproven:one-company:src/enterich/tools/drafts.py:editable"
+    assert triage.slug(BREACH) == "one-company-drafts-editable"
+
+
+def test_a_complete_security_record_can_be_triaged() -> None:
+    assert triage.check(BREACH, promises={"one-company"}) == []
+    assert triage.check(UNPROVEN, promises={"one-company"}) == []
+
+
+@pytest.mark.parametrize(
+    ("record", "problem"),
+    [
+        ({**BREACH, "promise": None}, "promise None"),
+        ({**BREACH, "promise": "be-nice"}, "promise 'be-nice'"),
+        # A breach is confirmed only as reproduced
+        ({**BREACH, "verdict": {**BREACH["verdict"], "reproduction": None}}, "reproduction"),
+        ({**BREACH, "verdict": {**BREACH["verdict"], "reproduction": " "}}, "reproduction"),
+        # A tests finding names no promise
+        ({**FINDING, "promise": "one-company"}, "promise 'one-company'"),
+    ],
+)
+def test_a_security_record_with_a_wrong_field_is_refused(
+    record: dict[str, Any], problem: str
+) -> None:
+    assert any(problem in p for p in triage.check(record, promises={"one-company"}))
+
+
+def test_a_refuted_breach_needs_no_reproduction() -> None:
+    verdict = {**BREACH["verdict"], "confirmed": False, "class": "drop", "reproduction": None}
+    assert triage.check({**BREACH, "verdict": verdict}, promises={"one-company"}) == []
+
+
+def _security_run(tmp_path: Path) -> Path:
+    run = tmp_path / "2026-11-15-security"
+    run.mkdir()
+    return run
+
+
+def test_triage_reports_a_security_run_by_its_own_kinds(tmp_path: Path) -> None:
+    run = _security_run(tmp_path)
+    promises = _write(tmp_path / "promises.jsonl", [{"promise": "one-company"}])
+    _write(run / "findings.jsonl", [BREACH, UNPROVEN])
+    empty = _write(tmp_path / "empty.jsonl", [])
+    done = triage.main(
+        run, suppressions=empty, backlog=tmp_path / "backlog", patterns=empty, promises=promises
+    )
+    assert done == 0
+    report = (run / "report.md").read_text()
+    assert report.startswith("# Security lens: 2026-11-15-security\n")
+    assert "| breach | 1 | 1 |" in report
+    assert "| unproven | 1 | 1 |" in report
+    assert "mutant-gap" not in report
+    # No survivors.jsonl in a security run: a fix has no diffs
+    assert [(f["key"], f["diffs"]) for f in _lines(run / "fixes.jsonl")] == [
+        (triage.key(BREACH), {}),
+        (triage.key(UNPROVEN), {}),
+    ]
+
+
+def test_a_finding_of_another_lens_is_refused_in_a_run(tmp_path: Path) -> None:
+    run = _security_run(tmp_path)
+    promises = _write(tmp_path / "promises.jsonl", [{"promise": "one-company"}])
+    _write(run / "findings.jsonl", [FINDING])
+    empty = _write(tmp_path / "empty.jsonl", [])
+    done = triage.main(
+        run, suppressions=empty, backlog=tmp_path / "backlog", patterns=empty, promises=promises
+    )
+    assert done == 1
+
+
+def test_a_security_runs_branches_are_named_after_its_lens() -> None:
+    fix = {**BREACH, "key": triage.key(BREACH), "slug": triage.slug(BREACH), "ratchet": None}
+    [group] = plan.groups([fix], [], lens="security")
+    assert group["branch"] == "auto/security-integration-service"
+    [group] = plan.groups([fix], [])
+    assert group["branch"] == "auto/tests-integration-service"
+
+
+# The gate's secret scan: the pipeline pushes to a public repository on its own, and CI's
+# gitleaks runs only on pull requests and pushes to main
+
+# A scanner as the gate calls gitleaks: the patch on standard input, a finding as exit 1
+FAKE_SCANNER = [sys.executable, "-c", "import sys; sys.exit('LEAKED' in sys.stdin.read())"]
+
+
+def test_the_gate_scans_a_branchs_commits_and_their_messages(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "switch", "-q", "-c", "auto/x")
+    (repo / "a.txt").write_text("key = 'LEAKED'\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "test: a")
+    fork = _git(repo, "merge-base", "main", "HEAD")
+    assert "LEAKED" in gate.patch(repo, fork, _git(repo, "rev-parse", "HEAD"))
+    assert gate.leaks(repo, fork, "HEAD", FAKE_SCANNER) is True
+    # A secret removed again in a later commit is still in the history pushed
+    (repo / "a.txt").write_text("key = ''\n")
+    _git(repo, "commit", "-qam", "test: b")
+    assert gate.leaks(repo, fork, "HEAD", FAKE_SCANNER) is True
+
+
+def test_a_secret_in_a_commit_message_is_found_too(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "switch", "-q", "-c", "auto/x")
+    (repo / "a.txt").write_text("a\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "test: a\n\nThe key was LEAKED")
+    fork = _git(repo, "merge-base", "main", "HEAD")
+    assert gate.leaks(repo, fork, "HEAD", FAKE_SCANNER) is True
+
+
+def test_a_branch_without_a_secret_passes_the_scan(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "switch", "-q", "-c", "auto/x")
+    (repo / "a.txt").write_text("a\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "test: a")
+    fork = _git(repo, "merge-base", "main", "HEAD")
+    assert gate.leaks(repo, fork, "HEAD", FAKE_SCANNER) is False
+
+
+def test_the_gate_scans_with_the_gitleaks_ci_runs() -> None:
+    """One pinned image for both: Dependabot keeps it current."""
+    assert gate.SCANNER_IMAGE_DIR == ".github/gitleaks"
+    assert (gate.ROOT / gate.SCANNER_IMAGE_DIR / "Dockerfile").is_file()
+    assert gate.SCANNER[-3:] == ["stdin", "--redact", "--no-banner"]
