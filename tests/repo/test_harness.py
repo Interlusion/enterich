@@ -711,6 +711,69 @@ def test_the_gate_reads_the_commit_it_checks_not_where_the_branch_is_now(tmp_pat
     assert state.paths == ["a.txt"]
 
 
+def test_a_runs_bundle_takes_the_branches_that_change_only_tests() -> None:
+    """Their pull requests are the operator's to merge: one for all of them, and one for
+    each branch that changes code or the changelog."""
+    passed = {
+        "auto/a": ["tests/unit/test_a.py"],
+        "auto/b": ["CHANGELOG.md", "src/enterich/a.py", "tests/unit/test_b.py"],
+        "auto/c": ["tests/e2e/test_c.py", "tests/snapshots/c.json"],
+    }
+    assert gate.tests_only(passed) == ["auto/a", "auto/c"]
+    assert gate.bundle_name(Path("harness/runs/2026-11-15-security")) == "auto/2026-11-15-security"
+
+
+def _branch(repo: Path, branch: str, *files: tuple[str, str]) -> str:
+    """A branch from main with one commit per file, its subject the file's stem."""
+    _git(repo, "switch", "-q", "-c", branch, "main")
+    for name, text in files:
+        (repo / name).parent.mkdir(parents=True, exist_ok=True)
+        (repo / name).write_text(text)
+        _git(repo, "add", ".")
+        _git(repo, "commit", "-q", "-m", f"test: {Path(name).stem}")
+    _git(repo, "switch", "-q", "main")
+    return _git(repo, "rev-parse", branch)
+
+
+def _committer(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name, value in {"NAME": "t", "EMAIL": "t@example.com"}.items():
+        monkeypatch.setenv(f"GIT_COMMITTER_{name}", value)
+        monkeypatch.setenv(f"GIT_AUTHOR_{name}", value)
+
+
+def test_a_bundle_holds_each_branchs_commits_in_turn_on_main(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _committer(monkeypatch)
+    repo = _repo(tmp_path)
+    a = _branch(repo, "auto/a", ("tests/test_a.py", "a\n"))
+    b = _branch(repo, "auto/b", ("tests/test_b.py", "b\n"), ("tests/test_b2.py", "b2\n"))
+    commit = gate.bundle(repo, "main", [("auto/a", a), ("auto/b", b)])
+    assert commit is not None
+    subjects = _git(repo, "log", "--reverse", "--format=%s", f"main..{commit}").splitlines()
+    assert subjects == ["test: test_a", "test: test_b", "test: test_b2"]
+    assert _git(repo, "show", f"{commit}:tests/test_b2.py") == "b2"
+    # Made again, it is the same commit: a gate run with --push after one without reuses
+    # its checks, as for any branch that passed at the same commit
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2030-01-01T00:00:00+00:00")
+    assert gate.bundle(repo, "main", [("auto/a", a), ("auto/b", b)]) == commit
+    # The branches stay where they were, and no worktree is left
+    assert (_git(repo, "rev-parse", "auto/a"), _git(repo, "rev-parse", "auto/b")) == (a, b)
+    assert len(_git(repo, "worktree", "list").splitlines()) == 1
+
+
+def test_a_bundle_whose_branches_conflict_is_none_and_leaves_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _committer(monkeypatch)
+    repo = _repo(tmp_path)
+    a = _branch(repo, "auto/a", ("tests/test_a.py", "a\n"))
+    b = _branch(repo, "auto/b", ("tests/test_a.py", "another a\n"))
+    assert gate.bundle(repo, "main", [("auto/a", a), ("auto/b", b)]) is None
+    assert len(_git(repo, "worktree", "list").splitlines()) == 1
+    assert _git(repo, "status", "--porcelain") == ""
+
+
 def test_no_workflow_names_a_session_or_a_model() -> None:
     """Commit trailers belong to the session that runs a workflow, never to the method."""
     scripts = sorted((gate.ROOT / ".claude" / "workflows").glob("*.js"))
