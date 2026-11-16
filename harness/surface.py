@@ -7,14 +7,18 @@ The promises are the lens's fixed vocabulary, `harness/promises.jsonl`: what `SE
 names as in scope and the rules of `AGENTS.md` about what Enterich may do, each by a text
 of its source. A promise whose text its source no longer holds, or a line of the security
 policy's scope without a promise, stops the inventory: the vocabulary follows the policy.
-Deterministic and read-only; writes to the run directory given.
+With `--since <commit>`, usually where the last run's records were committed, it also names
+the files changed since then and the promises they touch: a change to a promise's source or
+under one of its start paths. A run after the first surveys those promises, on those
+changes. Deterministic and read-only; writes to the run directory given.
 
-    uv run python harness/surface.py harness/runs/<date>-security
+    uv run python harness/surface.py harness/runs/<date>-security [--since <commit>]
 """
 
 import ast
 import json
 import re
+import subprocess
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -242,6 +246,38 @@ def silenced(root: Path = ROOT) -> Records:
     ]
 
 
+def _git(root: Path, *args: str) -> str:
+    return subprocess.run(  # noqa: S603 - fixed arguments, no shell
+        ["git", *args],  # noqa: S607
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+
+
+def changed(since: str, root: Path = ROOT) -> list[str]:
+    """The files changed between the commit and HEAD, from the repository root."""
+    return sorted(_git(root, "diff", "--name-only", since, "HEAD").splitlines())
+
+
+def touched(promises: Records, files: list[str]) -> list[str]:
+    """The promises a change to the files touches: one to its source, or under a start."""
+
+    def under(path: str, start: str) -> bool:
+        return path == start or path.startswith(start.rstrip("/") + "/")
+
+    return sorted(
+        str(p["promise"])
+        for p in promises
+        if any(
+            f == p.get("source")
+            or any(under(f, s) for s in cast("list[str]", p.get("start") or []))
+            for f in files
+        )
+    )
+
+
 def traced(promises: Records) -> Records:
     """Each promise with its requirements as the tests lens's inventory reads them: the
     Definition of Done and the tests citing each."""
@@ -258,7 +294,7 @@ def traced(promises: Records) -> Records:
     ]
 
 
-def main(run: Path, root: Path = ROOT) -> int:
+def main(run: Path, root: Path = ROOT, since: str | None = None) -> int:
     promises = _records(PROMISES)
     known = {r.id for r in inventory.requirements()}
     problems = unkept(promises, root)
@@ -280,16 +316,25 @@ def main(run: Path, root: Path = ROOT) -> int:
         "settings": settings(root),
         "silenced": silenced(root),
     }
-    run.mkdir(parents=True, exist_ok=True)
-    text = "".join(json.dumps(p, ensure_ascii=False) + "\n" for p in traced(promises))
-    (run / "promises.jsonl").write_text(text, encoding="utf-8")
-    (run / "surface.json").write_text(json.dumps(surface, indent=2) + "\n", encoding="utf-8")
     counts: dict[str, int] = {"promises": len(promises)}
     counts |= {k: len(v) for k, v in surface.items()}
     counts["unbounded_inputs"] = sum(len(t["unbounded"]) for t in surface["tools"])
+    written: dict[str, Any] = dict(surface)
+    if since is not None:
+        files = changed(since, root)
+        hit = touched(promises, files)
+        commit = _git(root, "rev-parse", since).strip()
+        written["since"] = {"commit": commit, "changed": files, "promises": hit}
+        counts |= {"changed": len(files), "touched": len(hit)}
+    run.mkdir(parents=True, exist_ok=True)
+    text = "".join(json.dumps(p, ensure_ascii=False) + "\n" for p in traced(promises))
+    (run / "promises.jsonl").write_text(text, encoding="utf-8")
+    (run / "surface.json").write_text(json.dumps(written, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(counts))
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(Path(sys.argv[1])))
+    arguments = sys.argv[1:]
+    after = arguments[arguments.index("--since") + 1] if "--since" in arguments else None
+    sys.exit(main(Path(arguments[0]), since=after))

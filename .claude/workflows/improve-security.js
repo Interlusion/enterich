@@ -1,20 +1,22 @@
 export const meta = {
   name: 'improve-security',
   description: 'Security lens of the improvement pipeline (ADR-008): survey each promise of the security policy for a way to break it and for a test that would notice, verify each finding adversarially',
-  whenToUse: 'After harness/surface.py has written a run directory (harness/runs/<date>-security); args: {run, promises: the "promise" names of the run\'s promises.jsonl, verifyPerSurvey, patterns, reserve}',
+  whenToUse: 'After harness/surface.py has written a run directory (harness/runs/<date>-security); args: {run, promises: the "promise" names of the run\'s promises.jsonl (with since: those its surface.json names under "since"), since: the commit given to surface.py, verifyPerSurvey, patterns, reserve}',
   phases: [
     { title: 'Survey', detail: 'one agent per promise: how could it be broken, and which test would notice' },
     { title: 'Verify', detail: 'one skeptic per finding, defaulting to refuted; a breach is confirmed only as reproduced' },
   ],
 }
 
-// args: {run: 'harness/runs/<date>-security', promises: ['token-check', ...],
-//        verifyPerSurvey: 10, patterns: [{pattern, means}, ...], reserve}. A script here
+// args: {run: 'harness/runs/<date>-security', promises: ['token-check', ...], since,
+//        verifyPerSurvey: 10, patterns: [{pattern, means}, ...], reserve}. With since, the
+// commit harness/surface.py was given, the surveys read what changed after it. A script here
 // reads no file, so the session hands in the promises' names (harness/surface.py wrote
 // their records to the run) and the operator's patterns (harness/patterns.jsonl).
 const RUN = args.run
 const PROMISES = args.promises
 const PATTERNS = args.patterns || []
+const SINCE = args.since || null
 // ADR-008: a run stops when its budget is spent. With a token target set for the turn, no
 // verifier starts once less than the reserve is left; the findings it would have judged
 // are returned unverified, as those beyond the cap are. Without a target, nothing stops.
@@ -92,7 +94,9 @@ const surveyPrompt = promise => `You survey one promise for the security lens of
 
 Run directory: ${RUN}. In ${RUN}/promises.jsonl take the record whose "promise" is "${promise}": "source" and "text" say where the promise is written (read it there in full), "requirements" holds each requirement that states it with its Definition of Done ("dod") and the tests citing it ("tests", "tests_by_section"), and "start" names where to begin reading. ${RUN}/surface.json lists what the promise is kept on: the published tools with their text inputs that have no bound ("tools"), every request Enterich sends ERPNext ("requests") and where the code calls the client ("client_calls"), every log call with its fields ("log_calls"), the settings, and every silenced security rule of the linter ("silenced"). If ${RUN}/survivors.jsonl exists, its records are mutants of src/enterich/ no test killed: one in the code that keeps this promise is evidence that no test would notice.
 
-Take the attacker's side, then the tester's:
+${SINCE ? `This run covers what changed since commit ${SINCE}; a run before it surveyed what was there. ${RUN}/surface.json's "since" lists the files changed ("changed"). Begin with git diff ${SINCE} HEAD for those under this promise's "start" paths and its source, and look at how the changes break the promise or leave a check that no test would notice; follow the code beyond them as far as a change reaches. Report what was there before only where a change made it worse.
+
+` : ''}Take the attacker's side, then the tester's:
 1. How could this promise be broken? By a caller holding a valid token (the agent, steered by outside text), by a caller without one, by text an outside party wrote into ERPNext, by ERPNext's own answers, or by a deployer following the guides. Follow the code from the entry (src/enterich/app.py, src/enterich/tools/) to where the promise is kept; don't stop at the first check you find.
 2. For each place the promise is kept: which test would fail if that check were removed or weakened? Read the tests; a test that only passes through the place doesn't count.
 
