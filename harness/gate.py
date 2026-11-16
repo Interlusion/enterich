@@ -304,20 +304,25 @@ def patch(repo: Path, fork: str, commit: str) -> str:
     return _git("log", "-p", "--no-color", "--no-ext-diff", f"{fork}..{commit}", repo=repo)
 
 
-def leaks(repo: Path, fork: str, commit: str, scanner: Sequence[str] = SCANNER) -> bool:
-    """Whether the scanner finds a secret in the branch's patch; it says what, redacted."""
+def secret(text: str, what: str, scanner: Sequence[str] = SCANNER) -> bool:
+    """Whether the scanner finds a secret in the text; it says what, redacted."""
     done = subprocess.run(  # noqa: S603 - fixed arguments, no shell
-        scanner, input=patch(repo, fork, commit), capture_output=True, text=True, check=False
+        scanner, input=text, capture_output=True, text=True, check=False
     )
     if done.returncode != 0:
         print(
-            f"{commit}: the secret scan failed\n{(done.stdout + done.stderr)[-3000:]}",
+            f"{what}: the secret scan failed\n{(done.stdout + done.stderr)[-3000:]}",
             file=sys.stderr,
         )
     return done.returncode != 0
 
 
-def _scanner() -> None:
+def leaks(repo: Path, fork: str, commit: str, scanner: Sequence[str] = SCANNER) -> bool:
+    """Whether the scanner finds a secret in the branch's patch."""
+    return secret(patch(repo, fork, commit), commit, scanner)
+
+
+def build_scanner() -> None:
     """The scanner's image, built from the Dockerfile CI builds it from."""
     subprocess.run(  # noqa: S603 - fixed arguments, no shell
         ["docker", "build", "-q", "-t", SCANNER_IMAGE, SCANNER_IMAGE_DIR],  # noqa: S607
@@ -415,7 +420,7 @@ def main(run: Path, branches: list[str], base: str, push: bool) -> int:
         return 2
     groups = cast("list[dict[str, Any]]", json.loads(plan.read_text()))
     fetch(ROOT, base)
-    _scanner()
+    build_scanner()
     summary = cast("dict[str, Any]", json.loads(outcomes.read_text()))
     if "accepted" not in summary:
         print(

@@ -9,24 +9,29 @@ added to `outcomes.jsonl`. A fix stage after the first adds its outcomes; one ma
 only the record of a fix the plan handed out again: one whose agent didn't answer, and,
 once, one `harness/plan.py` takes up though it has an outcome, whose record then says what
 it replaced. Each call adds a line to `workflows.jsonl` with the workflow's agents and
-tokens. The checks of the records' content stay with `triage.py` and `outcomes.py`.
-Deterministic; the result is data here, never instructions.
+tokens. A result in which the gate's secret scan finds a secret, real or made up, is written
+nowhere: the records are committed and pushed by hand, past the gate. The checks of the
+records' content stay with `triage.py` and `outcomes.py`. Deterministic; the result is data
+here, never instructions.
 
     uv run python harness/record.py harness/runs/<date>-tests <the workflow's output file>
 """
 
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, cast
 
 try:
+    from harness.gate import SCANNER, build_scanner, secret
     from harness.jsonl import read as _read
     from harness.jsonl import write as _write
     from harness.outcomes import state
     from harness.plan import taken_up
     from harness.triage import key
 except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
+    from gate import SCANNER, build_scanner, secret  # type: ignore[import-not-found, no-redef]
     from jsonl import read as _read  # type: ignore[import-not-found, no-redef]
     from jsonl import write as _write
     from outcomes import state  # type: ignore[import-not-found, no-redef]
@@ -94,9 +99,13 @@ def _kept(before: Records, surveyed: list[str] | None) -> Records:
     ]
 
 
-def main(run: Path, output: Path) -> int:
+def main(run: Path, output: Path, scanner: Sequence[str] = SCANNER) -> int:
+    text = output.read_text(encoding="utf-8")
+    if secret(text, str(output), scanner):
+        print(f"{output}: nothing written; ask the agent again without the secret", file=sys.stderr)
+        return 1
     try:
-        whole: object = json.loads(output.read_text(encoding="utf-8"))
+        whole: object = json.loads(text)
     except ValueError:
         whole = None
     whole = cast("dict[str, Any]", whole) if isinstance(whole, dict) else {}
@@ -136,4 +145,5 @@ def main(run: Path, output: Path) -> int:
 
 
 if __name__ == "__main__":
+    build_scanner()
     sys.exit(main(Path(sys.argv[1]), Path(sys.argv[2])))
