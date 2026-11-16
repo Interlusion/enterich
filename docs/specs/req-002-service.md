@@ -293,6 +293,20 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 - Verification: inspection and test.
 - Evidence: the area specs' Rights sections; the configuration guide; the end-to-end test against a real ERPNext v16 site.
 
+#### REQ-002-PRS-NF014: Nothing of a deployment in the repository
+
+**Description**: The repository SHALL name no host or email address of a deployment. Each host in a URL SHALL be a reserved example or test name, an address that isn't public, or a public site on the repository's list of public hosts; each email address SHALL be at a reserved example domain. Each pushed commit SHALL pass a secret scan.
+
+**Related URS**: REQ-002-URS-NF008
+
+**Definition of Done**:
+
+- A check over every tracked file finds each host in a URL and each email address, and fails on one that isn't allowed, naming file, line and host; a company's host in a URL and an email address at its domain, planted in a file, each fail it.
+- A new public host passes only with an entry on the list.
+- CI scans each pushed commit for secrets, and the improvement pipeline's gate scans each branch before it pushes.
+- Verification: test and inspection.
+- Evidence: Enterich's test suite; the CI workflow.
+
 ## Acceptance Criteria Summary
 
 - Only tokens of the configured agent identity, for Enterich, from the configured issuer, are accepted; every token case of REQ-002-PRS-NF001 is refused; a missing token starts a client's sign-in through the metadata.
