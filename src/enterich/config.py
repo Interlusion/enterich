@@ -231,6 +231,8 @@ class _Reader:
         if raw is None:
             return tuple(sorted(operations))
         names = tuple(n.strip() for n in raw.split(",") if n.strip())
+        if not names:
+            self.fail("TOOLS", "must name at least one operation; unset, all are offered")
         unknown = sorted(set(names) - set(operations))
         if unknown:
             self.fail("TOOLS", "unknown operations: " + ", ".join(unknown))
