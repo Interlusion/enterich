@@ -1385,10 +1385,27 @@ def _result(run: Path, result: dict[str, Any], **more: Any) -> Path:
     return path
 
 
+def test_a_result_with_a_secret_is_recorded_nowhere(tmp_path: Path) -> None:
+    """The run's records are committed and pushed by hand, past the gate's scan: an agent
+    that quoted a secret, made up or not, would put it in Git."""
+    leaked = {**FINDING, "verdict": {**FINDING["verdict"], "reason": "the key LEAKED"}}
+    result = {"records": [leaked], "unverified": [DOD_GAP], "surveysFailed": 0}
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 1
+    assert not (tmp_path / "findings.jsonl").exists()
+    assert not (tmp_path / "unverified.jsonl").exists()
+    assert not (tmp_path / "workflows.jsonl").exists()
+
+
+def test_outcomes_with_a_secret_are_recorded_nowhere(tmp_path: Path) -> None:
+    told = {**OUTCOME, "fixed": {**OUTCOME["fixed"], "red": "the token LEAKED"}}
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [told]}), FAKE_SCANNER) == 1
+    assert not (tmp_path / "outcomes.jsonl").exists()
+
+
 def test_a_surveys_result_becomes_the_runs_findings(tmp_path: Path) -> None:
     """The session no longer writes a workflow's result to the records by hand."""
     result = {"records": [FINDING], "unverified": [DOD_GAP], "surveysFailed": 0}
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [FINDING]
     assert _lines(tmp_path / "unverified.jsonl") == [DOD_GAP]
     assert _lines(tmp_path / "workflows.jsonl") == [
@@ -1409,7 +1426,7 @@ def test_a_survey_recorded_again_replaces_only_what_its_surveys_found(tmp_path: 
         "surveysFailed": 1,
         "surveyed": ["spec:req-001-core.md", "mutants:1"],
     }
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [swept, unanswered, new]
 
 
@@ -1417,7 +1434,7 @@ def test_a_survey_result_without_its_surveys_keeps_the_sweeps_findings(tmp_path:
     swept = {**FINDING, "origin": f"sweep:mutant-gap:{MUTANT}"}
     _write(tmp_path / "findings.jsonl", [{**DOD_GAP, "origin": "spec:a"}, swept])
     result: dict[str, Any] = {"records": [], "unverified": [], "surveysFailed": 0}
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [swept]
 
 
@@ -1430,7 +1447,7 @@ def test_a_finding_the_sweep_holds_isnt_recorded_again_by_a_survey(tmp_path: Pat
     found_again = {**FINDING, "claim": "found again", "origin": "mutants:1"}
     judged_now = {**DOD_GAP, "origin": "spec:a"}
     result = {"records": [found_again, judged_now], "unverified": [], "surveyed": ["mutants:1"]}
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [
         {**swept, "also": ["mutants:1"]},
         {**judged_now, "also": ["mutants:2"]},
@@ -1438,7 +1455,7 @@ def test_a_finding_the_sweep_holds_isnt_recorded_again_by_a_survey(tmp_path: Pat
     assert _lines(tmp_path / "unverified.jsonl") == []
     assert triage.main(tmp_path) == 0
     # Recorded once more, as a resumed workflow returns it: nothing changes
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl")[0] == {**swept, "also": ["mutants:1"]}
 
 
@@ -1448,13 +1465,13 @@ def test_a_finding_two_surveys_made_is_recorded_once(tmp_path: Path) -> None:
     first, second = {**weak, "origin": "spec:a"}, {**weak, "origin": "spec:b"}
     later = {**weak, "origin": "spec:c", "verdict": None}
     result = {"records": [first, second], "unverified": [later], "surveysFailed": 0}
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [{**first, "also": ["spec:b", "spec:c"]}]
     assert _lines(tmp_path / "unverified.jsonl") == []
 
 
 def test_a_fix_stages_result_becomes_the_runs_outcomes(tmp_path: Path) -> None:
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [OUTCOME]})) == 0
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [OUTCOME]}), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "outcomes.jsonl") == [OUTCOME]
 
 
@@ -1466,7 +1483,8 @@ def test_a_second_fix_stage_adds_its_outcomes_and_replaces_an_agents_missing_ans
     _write(tmp_path / "outcomes.jsonl", [OUTCOME, unanswered])
     answered = {**OUTCOME, "key": OTHER_KEY}
     third = {**OUTCOME, "key": "dod-gap:new"}
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [answered, third]})) == 0
+    outcome = _result(tmp_path, {"outcomes": [answered, third]})
+    assert record.main(tmp_path, outcome, FAKE_SCANNER) == 0
     assert _lines(tmp_path / "outcomes.jsonl") == [OUTCOME, answered, third]
 
 
@@ -1481,16 +1499,16 @@ def test_a_fix_the_plan_handed_out_once_more_gets_its_second_outcome(tmp_path: P
     closed = _ended("dod-gap:c", branch=branch, fixed=refuted, review=None)
     _write(tmp_path / "outcomes.jsonl", [rejected, moved, closed])
     second = [_ended("dod-gap:b", branch="auto/tests-unit-log"), _ended("dod-gap:c", branch=branch)]
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": second})) == 0
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": second}), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "outcomes.jsonl") == [
         rejected,
         {**second[0], "replaced": "elsewhere"},
         {**second[1], "replaced": "refuted"},
     ]
     # The same again, from a resumed workflow, changes nothing; a third outcome is refused
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": second})) == 0
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": second}), FAKE_SCANNER) == 0
     third = [{**second[0], "review": {**REVIEW, "accept": False}}]
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": third})) == 1
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": third}), FAKE_SCANNER) == 1
     assert _lines(tmp_path / "outcomes.jsonl")[1] == {**second[0], "replaced": "elsewhere"}
 
 
@@ -1510,7 +1528,7 @@ def test_a_second_fix_stage_runs_from_plan_to_outcomes(tmp_path: Path) -> None:
         _accepted("dod-gap:c", "auto/tests-unit-config", CONFIG),
         _ended("dod-gap:d", branch="auto/tests-unit-config", fixed=None, review=None),
     ]
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": stage})) == 0
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": stage}), FAKE_SCANNER) == 0
     assert outcomes.main(tmp_path) == 0
     assert _plan(tmp_path, fixes) == [
         ("auto/tests-unit-config", [CONFIG], ["dod-gap:d"]),
@@ -1520,7 +1538,7 @@ def test_a_second_fix_stage_runs_from_plan_to_outcomes(tmp_path: Path) -> None:
         _accepted("dod-gap:b", "auto/tests-unit-log", LOG),
         _accepted("dod-gap:d", "auto/tests-unit-config", CONFIG),
     ]
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": stage})) == 0
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": stage}), FAKE_SCANNER) == 0
     assert outcomes.main(tmp_path) == 0
     summary = json.loads((tmp_path / "outcomes.json").read_text())
     assert (summary["states"], summary["missing"]) == ({"accepted": 4}, [])
@@ -1530,7 +1548,7 @@ def test_a_second_fix_stage_runs_from_plan_to_outcomes(tmp_path: Path) -> None:
 def test_a_second_outcome_for_a_fix_that_has_one_is_refused(tmp_path: Path) -> None:
     before = _write(tmp_path / "outcomes.jsonl", [OUTCOME]).read_text()
     again = {**OUTCOME, "review": {**REVIEW, "accept": False}}
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [again]})) == 1
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [again]}), FAKE_SCANNER) == 1
     assert (tmp_path / "outcomes.jsonl").read_text() == before
     assert not (tmp_path / "workflows.jsonl").exists()
 
@@ -1538,14 +1556,14 @@ def test_a_second_outcome_for_a_fix_that_has_one_is_refused(tmp_path: Path) -> N
 def test_a_resumed_fix_stage_may_return_the_same_outcome_again(tmp_path: Path) -> None:
     """A workflow resumed after a stop replays its finished agents' answers."""
     _write(tmp_path / "outcomes.jsonl", [OUTCOME])
-    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [OUTCOME]})) == 0
+    assert record.main(tmp_path, _result(tmp_path, {"outcomes": [OUTCOME]}), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "outcomes.jsonl") == [OUTCOME]
 
 
 @pytest.mark.parametrize("result", [None, [], {"groups": []}, {"records": {}}, {"outcomes": [1]}])
 def test_a_result_of_no_known_shape_is_refused(tmp_path: Path, result: Any) -> None:
     """A workflow that failed leaves no result; nothing is written from it."""
-    assert record.main(tmp_path, _result(tmp_path, result)) == 1
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 1
     assert sorted(p.name for p in tmp_path.iterdir()) == ["workflow.output"]
 
 
@@ -1754,18 +1772,18 @@ def test_a_sweeps_verdicts_are_added_to_the_runs_findings(tmp_path: Path) -> Non
     swept = {**LIKE, "origin": f"sweep:mutant-gap:{MUTANT}"}
     later = {**swept, "mutants": [MUTANT_ELSEWHERE], "verdict": None}
     result = {"records": [swept], "unverified": [later], "surveysFailed": 0, "sweep": True}
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [FINDING, swept]
     assert _lines(tmp_path / "unverified.jsonl") == [DOD_GAP, later]
     assert _lines(tmp_path / "workflows.jsonl")[0]["wrote"] == "sweep"
     # Resumed, the same verdicts change nothing; a key judged before keeps its verdict
-    assert record.main(tmp_path, _result(tmp_path, result)) == 0
+    assert record.main(tmp_path, _result(tmp_path, result), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [FINDING, swept]
     refuted = {**swept, "verdict": {**LIKE["verdict"], "confirmed": False}}
     # The candidate left unverified is judged in a second sweep, and is no longer waiting
     judged = {**later, "verdict": LIKE["verdict"]}
     again: dict[str, Any] = {**result, "records": [refuted, judged], "unverified": []}
-    assert record.main(tmp_path, _result(tmp_path, again)) == 0
+    assert record.main(tmp_path, _result(tmp_path, again), FAKE_SCANNER) == 0
     assert _lines(tmp_path / "findings.jsonl") == [FINDING, swept, judged]
     assert _lines(tmp_path / "unverified.jsonl") == [DOD_GAP]
 
