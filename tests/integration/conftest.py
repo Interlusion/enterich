@@ -1,13 +1,37 @@
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 
+from enterich import tools
 from tests.conftest import Logs
 from tests.fakes.erpnext import FakeErpnext
 from tests.fakes.jwks import FakeJwks, Signer
 from tests.fakes.settings import API_KEY, API_SECRET, DRAFTS_PER_HOUR, settings
 from tests.integration.clock import TIMEZONE, freeze
-from tests.integration.mcp import Session, checked_session, client
+from tests.integration.mcp import CALLED, Session, checked_session, client
+
+
+def whole_suite(session: pytest.Session) -> bool:
+    """Whether this run collected every integration test file, unfiltered, and all passed."""
+    option = session.config.option
+    filters = (option.keyword, option.markexpr, option.deselect, getattr(option, "lf", False))
+    if session.testsfailed or any(filters):
+        return False
+    if any("::" in arg for arg in session.config.args):
+        return False
+    here = Path(__file__).parent
+    files = {item.path for item in session.items if item.path.parent == here}
+    return files == set(here.glob("test_*.py"))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def every_operation_called(request: pytest.FixtureRequest) -> Iterator[None]:
+    """After a whole integration run, every operation must have been called through
+    `Session`, the client that never confirms anything (REQ-001-PRS-F013)."""
+    yield
+    if whole_suite(request.session):
+        assert set(tools.names()) - CALLED == set()
 
 
 @pytest.fixture(autouse=True)

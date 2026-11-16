@@ -178,3 +178,47 @@ def test_a_cancelled_document_is_amended_with_create_alone(
     assert response.status_code == 200, response.text
     amendment = response.json()["data"]
     assert (amendment["name"], amendment["docstatus"]) == (f"{cancelled}-1", 0)
+
+
+# The roles ERPNext gives every desk user, the agent user too, on top of its own
+# (REQ-002-PRS-NF013)
+INHERITED = ("All", "Desk User")
+CHANGING = ("create", "write", "submit", "cancel", "amend", "delete")
+# The modules whose DocTypes post to the ledger or hold what a posting reads
+ACCOUNTING = ("Accounts", "Assets", "Buying", "Selling", "Setup", "Stock", "Subcontracting")
+
+
+def inherited_rules(site: Site) -> list[dict[str, Any]]:
+    """The rules of INHERITED in force: a DocType's Custom DocPerm rules replace its
+    DocPerm rules once it has any."""
+    fields = ["parent", "role", "permlevel", *CHANGING]
+
+    def read(doctype: str, filters: dict[str, Any]) -> list[dict[str, Any]]:
+        return site.call(
+            "frappe.client.get_list",
+            doctype=doctype,
+            parent="DocType",
+            filters=filters,
+            fields=fields,
+            limit_page_length=0,
+        )
+
+    customised = {rule["parent"] for rule in read("Custom DocPerm", {})}
+    standard = read("DocPerm", {"role": ["in", INHERITED]})
+    custom = read("Custom DocPerm", {"role": ["in", INHERITED]})
+    return [rule for rule in standard if rule["parent"] not in customised] + custom
+
+
+def test_the_roles_every_desk_user_holds_change_no_accounting_document(
+    site: Site, seeded: Seed
+) -> None:
+    """The configuration guide's inherited rights: All and Desk User post or change no
+    accounting document, so an image that grants them more fails here first."""
+    doctypes = site.get_list("DocType", fields=["name", "module", "is_submittable"])
+    accounting = {d["name"] for d in doctypes if d["module"] in ACCOUNTING or d["is_submittable"]}
+    changing = [
+        (rule["parent"], rule["role"], [right for right in CHANGING if rule[right]])
+        for rule in inherited_rules(site)
+        if rule["parent"] in accounting and any(rule[right] for right in CHANGING)
+    ]
+    assert changing == []
