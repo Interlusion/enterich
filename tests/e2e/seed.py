@@ -327,7 +327,8 @@ def fiscal_year(site: Site, year: int) -> None:
 
 def agent(site: Site) -> None:
     """The agent user with its two roles, whose rights are made to equal RIGHTS on each
-    run: a kept site follows changes to RIGHTS, and a run that removed a right is undone."""
+    run: a kept site follows changes to RIGHTS, and a run that removed a right is undone;
+    and the guide's User Permission on the company, marked as default."""
     for role in (ROLE, OWN_ROLE):
         ensure(site, "Role", {"role_name": role}, desk_access=1)
     permissions(site)
@@ -347,6 +348,13 @@ def agent(site: Site) -> None:
     held = site.call("frappe.client.get", doctype="User", name=name)["roles"]
     if {r["role"] for r in held} != {r["role"] for r in roles}:
         site.update("User", name, {"roles": roles})
+    ensure(
+        site,
+        "User Permission",
+        {"user": name, "allow": "Company", "for_value": COMPANY},
+        is_default=1,
+        apply_to_all_doctypes=1,
+    )
 
 
 MANAGER = "frappe.core.page.permission_manager.permission_manager"
@@ -431,7 +439,9 @@ def report_role(site: Site, report: str) -> None:
 
 
 # The switches of the configuration guide's site settings, as it says to set them
-SITE_SETTINGS: dict[tuple[str, str], int] = {
+SITE_SETTINGS: dict[tuple[str, str], int | str] = {
+    ("Selling Settings", "cust_master_name"): "Naming Series",
+    ("Buying Settings", "supp_master_name"): "Naming Series",
     ("System Settings", "disable_document_sharing"): 1,
     ("System Settings", "log_api_requests"): 1,
     ("System Settings", "enable_mcp"): 0,

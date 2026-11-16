@@ -18,6 +18,8 @@ from typing import Any
 import pytest
 
 from tests.e2e.seed import (
+    AGENT,
+    COMPANY,
     DEBTORS,
     OWN_WRITE,
     RIGHTS,
@@ -344,3 +346,13 @@ def test_a_removed_right_refuses_the_operations_that_need_it(
         else:
             assert answer.error, (op, answer.text)
             assert REFUSED.search(answer.text), (op, answer.text)
+
+
+def test_the_agent_user_has_the_guides_user_permission(site: Site, seeded: Seed) -> None:
+    """ERPNext's own barrier behind Enterich's company filter: the configuration guide's
+    User Permission on the assigned company, marked as default, and no other."""
+    fields = ["allow", "for_value", "is_default", "apply_to_all_doctypes"]
+    held = site.get_list("User Permission", {"user": AGENT}, fields)
+    assert held == [
+        {"allow": "Company", "for_value": COMPANY, "is_default": 1, "apply_to_all_doctypes": 1}
+    ]
