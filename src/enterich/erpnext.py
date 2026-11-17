@@ -238,7 +238,7 @@ class Erpnext:
     def _refusal(self, status: int, answer: Any) -> Refused:
         exc_type = answer.get("exc_type") if isinstance(answer, dict) else None  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         exc_type = exc_type if isinstance(exc_type, str) else None
-        message = _first_message(answer)
+        message = _raised_message(answer)
         label = f"{status} {exc_type}" if exc_type else str(status)
         text = f"ERPNext refused the request ({label})."
         if message:
@@ -259,21 +259,34 @@ def _number(value: Decimal) -> float:
     return float(value)
 
 
-def _first_message(answer: Any) -> str | None:
-    """The first of `_server_messages` as plain text; nothing else of the body."""
+def _raised_message(answer: Any) -> str | None:
+    """The message of `_server_messages` ERPNext raised the refusal with, as plain text: the
+    last, since ERPNext sends notices before it and adds none after; nothing else of the
+    body. A message sent as a list, or as a table of rows, gives its items."""
     if not isinstance(answer, dict):
         return None
     raw = answer.get("_server_messages")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     try:
         messages = json.loads(raw) if isinstance(raw, str) else None
         listed = cast("list[Any]", messages) if isinstance(messages, list) else []
-        first = json.loads(listed[0]) if listed and isinstance(listed[0], str) else None
+        last = json.loads(listed[-1]) if listed and isinstance(listed[-1], str) else None
     except ValueError, RecursionError:
         return None
-    message = first.get("message") if isinstance(first, dict) else first  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-    if not isinstance(message, str):
-        return None
-    return " ".join(html.unescape(_TAG.sub("", message)).split()) or None
+    message = last.get("message") if isinstance(last, dict) else last  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    return " ".join(html.unescape(_TAG.sub("", _text(message))).split()) or None
+
+
+def _text(message: Any, depth: int = 0) -> str:
+    """A message's text: a string as it is; a list's items joined, and a table's rows, each
+    of its cells; anything else gives none."""
+    if isinstance(message, str):
+        return message
+    if isinstance(message, int | float) and not isinstance(message, bool):
+        return str(message)
+    if isinstance(message, list) and depth < 2:
+        parts = (_text(m, depth + 1) for m in cast("list[Any]", message))
+        return ("; " if depth == 0 else ", ").join(p for p in parts if p)
+    return ""
 
 
 def _check_fields(doctype: str, fields: Sequence[str], rows: list[dict[str, Any]]) -> None:

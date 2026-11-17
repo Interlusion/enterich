@@ -10,6 +10,7 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ### Fixed
 
+- A refusal reaches the agent with the message ERPNext raised it with, the last of its messages, not a notice ERPNext sent before it. Before, a purchase draft of a stock item without an expense account was reported with "Expense Head changed…", and the agent never saw why ERPNext refused it, such as a supplier's `bill_no` given twice or a missing field. A message ERPNext sends as a list now reaches the agent with its items; before, the refusal came without a reason (REQ-001-PRS-F008).
 - **Configuration guide:** Disable Prepared Report Automation is set with `bench execute`. The guide named the System Console, which runs code only where server scripts are enabled, and they aren't by default.
 
 ## [0.6.0] - 2026-11-16
