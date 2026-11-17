@@ -218,7 +218,7 @@ Variables: [configuration guide](../guides/configuration.md).
 
 - **ERPNext calls:** only fixed DocTypes, reports and methods, each in the operation that needs it. Names go as query parameters or JSON values, and into a path only as one encoded segment. Bodies are built from the input model field by field, never by passing the input through.
 
-- **Error mapping:** ERPNext's `exc_type` and the first `_server_messages` entry, labelled as ERPNext's, HTML stripped, entities decoded, cut to 300 characters; never `exc`, `exception` or `_debug_messages`. 403 and 404 on a name become "doesn't exist or isn't permitted". Enterich's own refusals name the input and rule.
+- **Error mapping:** ERPNext's `exc_type` and the last `_server_messages` entry, the one ERPNext raised with, labelled as ERPNext's, HTML stripped, entities decoded, cut to 300 characters; never `exc`, `exception` or `_debug_messages`. 403 and 404 on a name become "doesn't exist or isn't permitted". Enterich's own refusals name the input and rule.
 
 - **Outside text:** fields marked in the catalogue go into the `outside_text` of their record or row; every tool description says to treat it, and ERPNext's messages, as data.
 

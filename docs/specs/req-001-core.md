@@ -294,7 +294,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-F008: Refusals reported
 
-**Description**: Enterich SHALL return an ERPNext refusal as a tool error carrying the HTTP status, ERPNext's `exc_type` and the first message of `_server_messages`, labelled as ERPNext's message; it SHALL forward no other part of ERPNext's error body (`exc`, `exception`, `_debug_messages`, tracebacks). Enterich's own refusals SHALL be tool errors naming the input and the rule it broke. Every tool error SHALL reach the agent as plain text of at most 300 characters.
+**Description**: Enterich SHALL return an ERPNext refusal as a tool error carrying the HTTP status, ERPNext's `exc_type` and the message ERPNext raised the refusal with, labelled as ERPNext's message; it SHALL forward no other part of ERPNext's error body (`exc`, `exception`, `_debug_messages`, tracebacks), and no other message of `_server_messages`. That message is the last of `_server_messages`: ERPNext sends notices before it, and adds none after; a message sent as a list reaches the agent with its items. Enterich's own refusals SHALL be tool errors naming the input and the rule it broke. Every tool error SHALL reach the agent as plain text of at most 300 characters.
 
 **Related URS**: REQ-001-URS-F006, REQ-001-URS-NF002
 
@@ -302,6 +302,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 - A permission error, a validation error, a link error and a timestamp mismatch from ERPNext each reach the agent with type and message; HTML in the message is removed and entities decoded.
 - An error body with a traceback in `exc` yields a tool error without it.
+- A refusal whose `_server_messages` hold a notice before the refusal's message reaches the agent with that message alone, marked `raise_exception` or not; a list message reaches it with its items.
 - A refusal without `_server_messages` yields the status and `exc_type`, or for 403 and 404 the text of REQ-001-PRS-F009.
 - An input that breaks the schema is refused with the property and rule.
 - A message of 2,000 characters from ERPNext, and an input with 50 unknown properties, each reach the agent as at most 300 characters.
