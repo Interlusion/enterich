@@ -190,7 +190,7 @@ A bank transaction's `party_type` and `party` are the party set on the line, by 
 | bank transactions | Bank Transaction | `company` | `date` desc, `name` desc |
 | payment entries | Payment Entry | `company` | `posting_date` desc, `name` desc |
 | a draft's bank account | Bank Account, its `account`, `company`, `is_company_account` and `disabled` | — | — |
-| a draft's references | Sales Invoice or Purchase Invoice, with `name`, `customer` or `supplier`, `docstatus`, `is_return` and `outstanding_amount` | `company`, `name` among the given invoices | — |
+| a draft's references | Sales Invoice or Purchase Invoice, with `name`, `customer` or `supplier`, `docstatus`, `is_return`, `outstanding_amount` and, for a purchase invoice, `on_hold` | `company`, `name` among the given invoices | — |
 | duplicate check | Payment Entry | `company`, `docstatus` 0 or 1, `party_type`, `party`, `reference_no`; on update also `name` other than the draft | — |
 
 ### Rights
