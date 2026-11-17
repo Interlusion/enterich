@@ -363,6 +363,21 @@ def test_erpnexts_own_bill_check_still_refuses(mcp: Session, erp: FakeErpnext) -
     assert "Supplier Invoice No exists in Purchase Invoice ACC-PINV-2026-00001" in result.text
 
 
+def test_the_bill_check_reaches_the_agent_not_the_notice_before_it(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    """REQ-001-PRS-F008: for a stock item, ERPNext sends the Expense Head notice before its
+    refusal; the agent gets the refusal's message alone."""
+    erp.unique_bills = True
+    erp.stock_items.add("PAPER")
+    result = create(mcp, bill_no="R-4711", allow_duplicate=True)
+    assert result.error
+    assert result.text.endswith(
+        "ERPNext's message: Supplier Invoice No exists in Purchase Invoice ACC-PINV-2026-00001"
+    )
+    assert "Expense Head" not in result.text
+
+
 @pytest.mark.parametrize("arguments", [{}, {"bill_no": "R-9000"}])
 def test_a_create_sent_again_is_refused_naming_the_first_draft(
     mcp: Session, erp: FakeErpnext, arguments: dict[str, Any]

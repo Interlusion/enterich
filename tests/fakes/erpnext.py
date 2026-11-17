@@ -3,6 +3,7 @@
 import copy
 import json
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any, cast
@@ -504,11 +505,16 @@ class FakeErpnext:
             return httpx2.Response(417, json=error(417, "LinkValidationError", message))
         if not doc.get("set_posting_time"):
             doc["posting_date"] = self.today
+        # ERPNext sets a stock item's expense account first, then checks the due date, then
+        # the supplier's bill (validate_supplier_invoice)
+        notices = self._expense_notices(doc) if doctype == "Purchase Invoice" else []
+        if problem := _due_date(doctype, doc, party):
+            refusal = error(417, "ValidationError", problem, notices=notices)
+            return httpx2.Response(417, json=refusal)
         if self.unique_bills and doc.get("bill_no") and (other := self._same_bill(doc)):
             message = f"Supplier Invoice No exists in Purchase Invoice {other}"
-            return httpx2.Response(417, json=error(417, "ValidationError", message))
-        if problem := _due_date(doctype, doc, party):
-            return httpx2.Response(417, json=error(417, "ValidationError", problem))
+            refusal = error(417, "ValidationError", message, notices=notices)
+            return httpx2.Response(417, json=refusal)
         rows = [r for r in _rows(doc, "items") if not r.get("is_free_item")]
         for row in rows:
             code = row["item_code"]
@@ -891,6 +897,22 @@ class FakeErpnext:
         self.add("Payment Entry", doc)
         return httpx2.Response(200, json={"data": doc})
 
+    def _expense_notices(self, doc: dict[str, Any]) -> list[str]:
+        """The notice ERPNext sends for each stock item row whose expense account it sets
+        to Stock Received But Not Billed (set_expense_account), before the refusals of
+        validate: those of the due date and the supplier's bill."""
+        if doc.get("update_stock"):
+            return []
+        return [
+            f"Row {i}: Expense Head changed to <strong>{STOCK_NOT_BILLED}</strong> as no "
+            f"Purchase Receipt is created against Item <strong>{r['item_code']}</strong>.<br>"
+            "This is done to handle accounting for cases when Purchase Receipt is created "
+            "after Purchase Invoice"
+            for i, r in enumerate(_rows(doc, "items"), 1)
+            if r["item_code"] in self.stock_items
+            and ACCOUNTS.get(str(r.get("expense_account", "")).lower()) != STOCK_NOT_BILLED
+        ]
+
     def _same_bill(self, doc: dict[str, Any]) -> str | None:
         """Another invoice of the supplier with the bill number in the same (calendar) year."""
         for other in self.docs.get("Purchase Invoice", {}).values():
@@ -1146,15 +1168,22 @@ def _like(pattern: str) -> re.Pattern[str]:
 
 
 def error(
-    status: int, exc_type: str, message: str, traceback: str | None = None, *, bare: bool = False
+    status: int,
+    exc_type: str,
+    message: str,
+    traceback: str | None = None,
+    *,
+    bare: bool = False,
+    notices: Sequence[str] = (),
 ) -> dict[str, Any]:
     """An error body as Frappe sends it; a missing document's carries no traceback, and nor
-    does one a route raises without it (`bare`)."""
+    does one a route raises without it (`bare`). The refusal's message is marked
+    `raise_exception`; `notices`: messages ERPNext sent before it, unmarked."""
+    raised = {"message": message, "title": "Message", "indicator": "red", "raise_exception": 1}
+    sent = [{"message": n, "title": "Message"} for n in notices]
     body: dict[str, Any] = {
         "exc_type": exc_type,
-        "_server_messages": json.dumps(
-            [json.dumps({"message": message, "title": "Message", "indicator": "red"})]
-        ),
+        "_server_messages": json.dumps([json.dumps(m) for m in [*sent, raised]]),
     }
     if exc_type != "DoesNotExistError" and not bare:
         body["exception"] = f"frappe.exceptions.{exc_type}: {message}"

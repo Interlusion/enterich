@@ -9,6 +9,8 @@ tests instead of passing the integration tests. A report's mode is set with `ben
 needs the compose site's backend container."""
 
 import asyncio
+import json
+import re
 import time
 from collections.abc import Awaitable, Callable, Generator, Iterator
 from contextlib import contextmanager
@@ -506,32 +508,89 @@ def test_a_pricing_rule_sets_the_rows_the_fake_sets(
 
 
 UNIQUENESS = ("Accounts Settings", "check_supplier_invoice_uniqueness")
+# The bill_no draft's cases: whether the expense account is given, and dates whose due date
+# ERPNext refuses, which it checks before the bill
+BILL_CASES: dict[str, tuple[bool, Record]] = {
+    "expense account given": (True, {}),
+    "none given": (False, {}),
+    "a due date before the posting date too": (
+        False,
+        {"set_posting_time": 1, "posting_date": "2026-11-10", "due_date": "2026-11-01"},
+    ),
+}
 
 
+@contextmanager
+def _setting(site: Site, setting: tuple[str, str]) -> Generator[None]:
+    """A check of a single DocType's settings set, then cleared."""
+    doctype, field = setting
+
+    def set_to(value: int) -> None:
+        site.call(
+            "frappe.client.set_value", doctype=doctype, name=doctype, fieldname=field, value=value
+        )
+
+    set_to(1)
+    try:
+        yield
+    finally:
+        set_to(0)
+
+
+def _messages(body: Record, account: str, draft: str) -> list[tuple[str, bool]]:
+    """An error body's messages, each with its `raise_exception` mark: ERPNext's messages,
+    not Enterich's text of them. HTML tags become spaces, and the expense account and the
+    first draft's name placeholders, since the site's and the fake's differ."""
+    return [
+        (
+            " ".join(re.sub(r"<[^>]*>", " ", str(m["message"])).split())
+            .replace(account, "<account>")
+            .replace(draft, "<draft>"),
+            bool(m.get("raise_exception")),
+        )
+        for m in (json.loads(raw) for raw in json.loads(body["_server_messages"]))
+    ]
+
+
+@pytest.mark.parametrize("case", list(BILL_CASES))
 def test_erpnext_refuses_a_suppliers_bill_no_twice_as_the_fake_does(
-    url: str, site: Site, seeded: Seed
+    url: str, site: Site, seeded: Seed, agent: httpx2.Client, case: str
 ) -> None:
     """With Accounts Settings' supplier invoice uniqueness, a second draft of the supplier's
-    bill_no is refused, naming the first. The expense account is given, so the refusal is
-    ERPNext's only message."""
-    row = {"item_code": seeded.item, "qty": 1, "rate": 20, "expense_account": STOCK_NOT_BILLED}
-    body = {"supplier": seeded.supplier, "bill_no": "E2E-BILL-TWICE", "items": [row]}
-    doctype, field = UNIQUENESS
-    site.call("frappe.client.set_value", doctype=doctype, name=doctype, fieldname=field, value=1)
-    try:
+    bill_no is refused, naming the first. Without an expense account, ERPNext sends a notice
+    of the account it set for the stock item first; the refusal's message comes last, and is
+    the one Enterich reports (REQ-001-PRS-F008)."""
+    given, dates = BILL_CASES[case]
+
+    def draft(account: str, **fields: Any) -> Record:
+        """The draft, with the site's or the fake's Stock Received But Not Billed if given."""
+        row: Record = {"item_code": seeded.item, "qty": 1, "rate": 20}
+        if given:
+            row["expense_account"] = account
+        return {"supplier": seeded.supplier, "bill_no": "E2E-BILL-TWICE", "items": [row], **fields}
+
+    body = draft(STOCK_NOT_BILLED)
+    again = draft(STOCK_NOT_BILLED, **dates)
+    with _setting(site, UNIQUENESS):
         first = _sent(_on_site(url, seeded), lambda c: c.insert("Purchase Invoice", body))
-        real = _refusal(_on_site(url, seeded), lambda c: c.insert("Purchase Invoice", body))
-    finally:
-        site.call(
-            "frappe.client.set_value", doctype=doctype, name=doctype, fieldname=field, value=0
-        )
-    remove(site, [("Purchase Invoice", first["name"])])
-    erp = fake.FakeErpnext(unique_bills=True)
+        try:
+            real = _refusal(_on_site(url, seeded), lambda c: c.insert("Purchase Invoice", again))
+            raw = agent.post("/api/resource/Purchase Invoice", json=again).json()
+        finally:
+            remove(site, [("Purchase Invoice", first["name"])])
+    erp = fake.FakeErpnext(unique_bills=True, stock_items={seeded.item})
     erp.add("Supplier", fake.supplier(seeded.supplier))
-    faked_first = _sent(_on_fake(erp), lambda c: c.insert("Purchase Invoice", body))
-    faked = _refusal(_on_fake(erp), lambda c: c.insert("Purchase Invoice", body))
+    faked_body = draft(fake.STOCK_NOT_BILLED)
+    faked_again = draft(fake.STOCK_NOT_BILLED, **dates)
+    faked_first = _sent(_on_fake(erp), lambda c: c.insert("Purchase Invoice", faked_body))
+    faked = _refusal(_on_fake(erp), lambda c: c.insert("Purchase Invoice", faked_again))
+    request = httpx2.Request("POST", "http://erp/api/resource/Purchase Invoice", json=faked_again)
+    faked_raw = asyncio.run(erp.handle(request)).json()
     status, exc_type, text = real
     assert faked == (status, exc_type, text.replace(first["name"], faked_first["name"]))
+    assert _messages(faked_raw, fake.STOCK_NOT_BILLED, faked_first["name"]) == _messages(
+        raw, STOCK_NOT_BILLED, first["name"]
+    )
 
 
 REPORT = "General Ledger"
