@@ -23,16 +23,18 @@ from pathlib import Path
 from typing import Any, cast
 
 try:
+    from harness import project
     from harness.jsonl import read as _records
     from harness.outcomes import NOT_ACCEPTED, state
     from harness.triage import lens as lens_of
 except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
+    import project  # type: ignore[import-not-found, no-redef]
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
     from outcomes import NOT_ACCEPTED, state  # type: ignore[import-not-found, no-redef]
     from triage import lens as lens_of  # type: ignore[import-not-found, no-redef]
 
 Node = tuple[str, str]
-TEST_FILE = re.compile(r"\btests/[\w/]+\.py\b")
+TEST_FILE = re.compile(rf"\b{re.escape(project.SOURCES['tests'])}/[\w/]+\.py\b")
 
 
 def _slug(text: str) -> str:

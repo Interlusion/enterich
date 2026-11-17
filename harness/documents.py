@@ -19,9 +19,10 @@ from pathlib import Path
 from typing import Any, cast
 
 try:
-    from harness import surface
+    from harness import project, surface
     from harness.jsonl import read as _records
 except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
+    import project  # type: ignore[import-not-found, no-redef]
     import surface  # type: ignore[import-not-found, no-redef]
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
 
@@ -29,14 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DOCUMENTS = ROOT / "harness" / "documents.jsonl"
 # The documents that say what Enterich does; the backlog, the analyses and the changelog
 # keep what was true on their day
-SCOPE = (
-    "README.md",
-    "SECURITY.md",
-    "docs/guides/*.md",
-    "docs/specs/*.md",
-    "docs/arc42/*.md",
-    "docs/arc42/adr/*.md",
-)
+SCOPE = project.strings(project.DOCS, "scope")
 
 Records = list[dict[str, Any]]
 

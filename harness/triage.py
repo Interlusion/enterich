@@ -24,16 +24,18 @@ from pathlib import Path
 from typing import Any, cast
 
 try:
+    from harness import project
     from harness.jsonl import read as _records
 except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
+    import project  # type: ignore[import-not-found, no-redef]
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
 
 ROOT = Path(__file__).resolve().parent.parent
 SUPPRESSIONS = ROOT / "harness" / "suppressions.jsonl"
-BACKLOG = ROOT / "docs" / "backlog"
+BACKLOG = ROOT / project.SOURCES["backlog"]
 PATTERNS = ROOT / "harness" / "patterns.jsonl"
 PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-TEST_FILE = re.compile(r"^tests/[\w/]+\.py$")
+TEST_FILE = re.compile(rf"^{re.escape(project.SOURCES['tests'])}/[\w/]+\.py$")
 # A pattern confirmed in this many findings across this many files is a class: it gets a
 # ratchet. Two neighbouring findings are closed by two tests
 RATCHET_FROM = 3
@@ -56,7 +58,8 @@ SHOWN = {"breach", "drift"}
 KINDS = {kind for kinds in LENSES.values() for kind in kinds}
 CLASSES = {"fix", "proposal", "drop"}
 TEXT_FIELDS = ("kind", "location", "claim", "evidence", "proposal")
-MUTANT = re.compile(r"^enterich\.[\w.ǁ]+__mutmut_\d+$")
+PACKAGE = project.SOURCES["package"]
+MUTANT = re.compile(rf"^{re.escape(PACKAGE)}\.[\w.ǁ]+__mutmut_\d+$")
 
 
 def vocabulary(path: Path = PATTERNS) -> dict[str, str]:
@@ -109,7 +112,7 @@ def slug(record: dict[str, Any]) -> str:
         text = f"{record.get('promise')} {Path(path).stem} {name}"
         return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60].rstrip("-")
     if kind == "mutant-gap":
-        name, _, number = rest.removeprefix("enterich.").rpartition("__mutmut_")
+        name, _, number = rest.removeprefix(f"{PACKAGE}.").rpartition("__mutmut_")
         words = [w.removeprefix("x_").replace("ǁ", " ") for w in name.split(".")]
         text = f"{' '.join(words)} {number}"
     elif kind == "dod-gap":
@@ -175,7 +178,7 @@ def check(
         isinstance(files, list)
         and all(isinstance(f, str) and TEST_FILE.match(f) for f in cast("list[Any]", files))
     ):
-        problems.append("verdict.test_files: test modules under tests/")
+        problems.append(f"verdict.test_files: test modules under {project.SOURCES['tests']}/")
     return problems
 
 

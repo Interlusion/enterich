@@ -41,63 +41,33 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any, TextIO, cast
 
+try:
+    from harness import project
+except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
+    import project  # type: ignore[import-not-found, no-redef]
+
 ROOT = Path(__file__).resolve().parent.parent
-BASE = "origin/main"
-COMMIT = re.compile(r"^(feat|fix|docs|ci|chore|refactor|test)(\([\w-]+\))?!?: \S")
-# What the tests lens changes: tests, the code a test shows wrong, and the changelog line
-# of that fix. Anything else is outside it, whatever it is called; another lens brings its own
-ALLOWED = ("tests/", "src/enterich/", "CHANGELOG.md")
-# ADR-008's Compliance list; the tool-list snapshot changes only with its spec, and the
-# pipeline doesn't change its own scripts, the operator's suppressions or its workflows
-FORBIDDEN = (
-    "docs/specs/",
-    "docs/arc42/adr/",
-    "AGENTS.md",
-    "CLAUDE.md",
-    ".github/",
-    "Dockerfile",
-    "server.json",
-    "pyproject.toml",
-    "uv.lock",
-    "tests/snapshots/",
-    "harness/",
-    ".claude/",
-    # What the checks run and read: a branch could weaken the checks it is judged by
-    "scripts/",
-    ".mdformat.toml",
-    "lychee.toml",
-)
+BASE = project.GATE["base"]
+REMOTE = project.GATE["remote"]
+# Where the tests lie: a `test:` commit changes only these
+TESTS = project.SOURCES["tests"].rstrip("/") + "/"
+TYPES = "|".join(map(re.escape, project.strings(project.GATE, "commit_types")))
+COMMIT = re.compile(rf"^({TYPES})(\([\w-]+\))?!?: \S")
+# What a fix branch changes: tests, the code a test shows wrong, and the changelog line of
+# that fix. Anything else is outside it, whatever it is called
+ALLOWED = (TESTS, f"{project.SOURCES['code']}/", *project.strings(project.GATE, "allowed_besides"))
+# ADR-008's Compliance list, and what the checks run and read
+FORBIDDEN = project.strings(project.GATE, "forbidden")
 # Files the checks and the agents read wherever they lie, such as a ruff.toml in tests/
-FORBIDDEN_NAMES = (
-    "ruff.toml",
-    ".ruff.toml",
-    "pytest.ini",
-    ".pytest.ini",
-    "pytest.toml",
-    ".pytest.toml",
-    "tox.ini",
-    "setup.cfg",
-    "pyproject.toml",
-    "pyrightconfig.json",
-    ".mdformat.toml",
-    "lychee.toml",
-    ".lycheeignore",
-    "AGENTS.md",
-    "CLAUDE.md",
-)
+FORBIDDEN_NAMES = project.strings(project.GATE, "forbidden_names")
 CHECKS = {
-    "ruff": ["uv", "run", "ruff", "check"],
-    "format": ["uv", "run", "ruff", "format", "--check"],
-    "types": ["uv", "run", "basedpyright"],
-    "markdown": ["uv", "run", "mdformat", "--check", "."],
-    "links": ["scripts/check-links.sh"],
-    # E2E_ERPNEXT_URL set: the end-to-end tests run with the others; -rp names each that passed
-    "tests": ["uv", "run", "pytest", "-q", "-p", "no:cacheprovider", "-rp"],
+    name: list(cast("list[str]", command))
+    for name, command in cast("dict[str, Any]", project.GATE["checks"]).items()
 }
 # gitleaks as CI runs it, from the image it pins, on the branch's patch: the pipeline
 # pushes to a public repository, and CI scans only pull requests and pushes to main
-SCANNER_IMAGE_DIR = ".github/gitleaks"
-SCANNER_IMAGE = "enterich-gate-gitleaks"
+SCANNER_IMAGE_DIR = project.GATE["scanner_image_dir"]
+SCANNER_IMAGE = project.GATE["scanner_image"]
 SCANNER = ["docker", "run", "--rm", "-i", SCANNER_IMAGE, "stdin", "--redact", "--no-banner"]
 COLLECT = ["uv", "run", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider"]
 TEST = re.compile(r"^[\w./-]+\.py::\S")
@@ -128,7 +98,7 @@ def beyond_tests(changes: Sequence[tuple[str, Sequence[str]]]) -> list[str]:
     return [
         subject
         for subject, paths in changes
-        if subject.startswith("test") and any(not p.startswith("tests/") for p in paths)
+        if subject.startswith("test") and any(not p.startswith(TESTS) for p in paths)
     ]
 
 
@@ -137,7 +107,7 @@ def shared(paths: Iterable[str], passed: Mapping[str, Sequence[str]]) -> dict[st
     call also changes, each with that branch: the second to merge would conflict. A branch
     that failed holds nothing back."""
     theirs = {p: branch for branch in reversed(list(passed)) for p in passed[branch]}
-    return {p: theirs[p] for p in sorted(paths) if not p.startswith("tests/") and p in theirs}
+    return {p: theirs[p] for p in sorted(paths) if not p.startswith(TESTS) and p in theirs}
 
 
 def unproven(output: str) -> int:
@@ -331,7 +301,7 @@ def leaks(repo: Path, fork: str, commit: str, scanner: Sequence[str] = SCANNER) 
 
 def tests_only(passed: Mapping[str, Sequence[str]]) -> list[str]:
     """The branches, of those passed (branch: paths), that change nothing but tests."""
-    return [b for b, paths in passed.items() if all(p.startswith("tests/") for p in paths)]
+    return [b for b, paths in passed.items() if all(p.startswith(TESTS) for p in paths)]
 
 
 def bundle_name(run: Path) -> str:
@@ -344,7 +314,7 @@ def bundle(repo: Path, base: str, picks: Sequence[tuple[str, str]]) -> str | Non
     the branches' commits were reviewed; None if they conflict. Nothing else changes. Each
     commit keeps its own date as the committer's, so the same branches on the same base make
     the same bundle again."""
-    tree = Path(tempfile.mkdtemp(prefix="enterich-bundle-"))
+    tree = Path(tempfile.mkdtemp(prefix="harness-bundle-"))
     try:
         _git("worktree", "add", "-q", "--detach", str(tree), base, repo=repo)
         for _, commit in picks:
@@ -374,7 +344,7 @@ def build_scanner() -> None:
 @contextmanager
 def _tree(commit: str) -> Generator[Path]:
     """A worktree of the commit with its packages, removed afterwards."""
-    tree = Path(tempfile.mkdtemp(prefix="enterich-gate-"))
+    tree = Path(tempfile.mkdtemp(prefix="harness-gate-"))
     try:
         _git("worktree", "add", "--detach", str(tree), commit)
         subprocess.run(["uv", "sync", "--locked", "-q"], cwd=tree, check=True)  # noqa: S607
@@ -434,11 +404,11 @@ def fetch(repo: Path, base: str) -> None:
         )
 
 
-def pushed(repo: Path, commit: str, branch: str) -> bool:
+def pushed(repo: Path, commit: str, branch: str, remote: str = REMOTE) -> bool:
     """Pushes the commit as the branch and says whether that worked: a push the remote
     refuses, or one that doesn't reach it, is no reason to lose the gate's record."""
     try:
-        _git("push", "origin", f"{commit}:refs/heads/{branch}", repo=repo)
+        _git("push", remote, f"{commit}:refs/heads/{branch}", repo=repo)
     except subprocess.CalledProcessError as error:
         print(f"{branch}: the push failed\n{error.stderr}", file=sys.stderr)
         return False

@@ -12,16 +12,21 @@ import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+try:
+    from harness import project
+except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
+    import project  # type: ignore[import-not-found, no-redef]
+
 ROOT = Path(__file__).resolve().parent.parent
-SPECS = ROOT / "docs" / "specs"
-TESTS = ROOT / "tests"
-# The harness's own tests cite requirement IDs as data, not as what they check
-LEFT_OUT = {TESTS / "repo" / "test_harness.py"}
-# Requirement IDs in full, as the specs index writes them
-ID = re.compile(r"REQ-\d{3}-(?:URS|PRS)-N?F\d{3}")
-HEADING = re.compile(r"^#### (REQ-\d{3}-(?:URS|PRS)-N?F\d{3}): (.+)$")
-# The DoD's closing lines say how it is verified, not what
-CLOSING = ("- Verification:", "- Evidence:")
+SPECS = ROOT / project.SOURCES["specs"]
+TESTS = ROOT / project.SOURCES["tests"]
+# Tests that cite requirement IDs as data, not as what they check
+LEFT_OUT = {
+    p for glob in project.strings(project.SOURCES, "tests_left_out") for p in ROOT.glob(glob)
+}
+ID = re.compile(project.SOURCES["requirement_id"])
+HEADING = re.compile(rf"^#### ({ID.pattern}): (.+)$")
+CLOSING = project.strings(project.SOURCES, "dod_closing")
 
 
 @dataclass
@@ -44,7 +49,7 @@ class Test:
 
 def requirements() -> list[Requirement]:
     found: list[Requirement] = []
-    for spec in sorted(SPECS.glob("req-*.md")):
+    for spec in sorted(SPECS.glob(project.SOURCES["spec_glob"])):
         if spec.name.endswith(".history.md"):
             continue
         current: Requirement | None = None

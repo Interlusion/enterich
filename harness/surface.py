@@ -25,17 +25,18 @@ from pathlib import Path
 from typing import Any, cast
 
 try:
-    from harness import inventory
+    from harness import inventory, project
     from harness.jsonl import read as _records
 except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
     import inventory  # type: ignore[import-not-found, no-redef]
+    import project  # type: ignore[import-not-found, no-redef]
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
 
 ROOT = Path(__file__).resolve().parent.parent
 PROMISES = ROOT / "harness" / "promises.jsonl"
-POLICY = "SECURITY.md"
-SRC = Path("src") / "enterich"
-TOOLS = Path("tests") / "snapshots" / "tools.json"
+POLICY = project.SECURITY["policy"]
+SRC = Path(project.SOURCES["code"])
+TOOLS = Path(project.SECURITY["tool_snapshot"])
 # What bounds a text input: a length, a fixed set, or a form
 BOUNDS = ("maxLength", "enum", "const", "format", "pattern")
 NOQA = re.compile(r"#\s*noqa:[^#\n]*\bS\d{3}")
