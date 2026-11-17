@@ -39,7 +39,7 @@ const TRAILERS = args.trailers
 const REBASED = args.rebased || null
 if (!TRAILERS && !REBASED) throw new Error('args.trailers: the commit trailers of the session that runs this')
 // What the tests lens changes, as harness/gate.py checks it (ALLOWED, FORBIDDEN and
-// FORBIDDEN_NAMES there; a test holds this line to that list)
+// FORBIDDEN_NAMES there, from harness/project.toml; a test holds this line to that list)
 const MAY_CHANGE = 'tests/, src/enterich/ and CHANGELOG.md'
 const NEVER = 'tests/snapshots/, or a file that configures a check or instructs an agent ' +
   '(such as a pytest.ini, ruff.toml, pyproject.toml, .mdformat.toml, AGENTS.md or CLAUDE.md) anywhere'

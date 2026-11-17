@@ -18,14 +18,16 @@ from pathlib import Path
 from typing import Any, cast
 
 try:
+    from harness import project
     from harness.jsonl import read as _records
     from harness.triage import key
 except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
+    import project  # type: ignore[import-not-found, no-redef]
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
     from triage import key  # type: ignore[import-not-found, no-redef]
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "src" / "enterich"
+SRC = ROOT / project.SOURCES["code"]
 
 Records = list[dict[str, Any]]
 
@@ -106,7 +108,8 @@ def module_names(src: Path = SRC) -> set[str]:
 def location(mutant: str) -> str:
     """A survivor's function as a finding names it: `src/enterich/auth.py:Verifier._verify`."""
     module, _, function = mutant.rpartition("__mutmut_")[0].rpartition(".")
-    path = Path("src", *module.split("."))
+    # The package lies in the code's parent directory: src/enterich holds enterich
+    path = Path(project.SOURCES["code"]).parent.joinpath(*module.split("."))
     file = path / "__init__.py" if (ROOT / path).is_dir() else path.with_suffix(".py")
     # mutmut's names: x_<function>, or xǁ<class>ǁ<method>
     if function.startswith("xǁ"):

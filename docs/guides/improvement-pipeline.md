@@ -156,7 +156,7 @@ What checks each rule of [ADR-008's Compliance](../arc42/adr/ADR-008-improvement
 | Rule | Checked by |
 | :- | :- |
 | Commits only on `auto/` branches | The gate, by the branch's name; the agents' instructions |
-| Nothing the pipeline may not change (the lists are `FORBIDDEN` and `FORBIDDEN_NAMES` in `harness/gate.py`, the checks' own settings among them), and for the tests lens only tests, code and the changelog (`ALLOWED` there) | The gate, a file moved away at its old place too and each path as it is, whatever its name holds; the review agent |
+| Nothing the pipeline may not change (the lists are `forbidden` and `forbidden_names` in `harness/project.toml`, the checks' own settings among them), and for the tests lens only tests, code and the changelog (`allowed_besides` there, with the tests and the code) | The gate, a file moved away at its old place too and each path as it is, whatever its name holds; the review agent |
 | A failing test before every change | The gate checks the order of commits, and that a `test:` commit changes only tests. That the test was red, the fix agent shows and the review agent redoes |
 | Only reviewed fixes on a branch | The gate lets through only the commits of fixes a review accepted, by hash, or by a diff that is the same to the letter (`git patch-id --verbatim`) |
 | Every check green, the end-to-end tests included | The gate, in a worktree of the commit it read, which is the one it pushes, failing the tests if any was skipped, expected to fail or left out; CI again on the pull request, without the end-to-end tests |
@@ -177,9 +177,9 @@ What checks each rule of [ADR-008's Compliance](../arc42/adr/ADR-008-improvement
 
 ## Method, engine and repository
 
-Three things are interleaved today. The **method** is the stages, the record schemas and the rules. The **engine** is the Workflow scripts in `.claude/workflows/`. The **repository's values** are the paths, the requirement ID pattern, the checks and the forbidden list. The agents' schemas and what they judge by are written in the workflow scripts; the repository's values are constants in the scripts and lines in the prompts.
+Three things are interleaved today. The **method** is the stages, the record schemas and the rules. The **engine** is the Workflow scripts in `.claude/workflows/`. The **repository's values** are the paths, the requirement ID pattern, the checks and the forbidden list. The agents' schemas and what they judge by are written in the workflow scripts; the repository's values are in `harness/project.toml`, which the scripts read, and in lines of the prompts.
 
-The end state separates them, and none of the split is built: the method as a parent skill in the skills repository, a child in each repository that fills in named hooks. [Analysis 002, §3.8](../analysis/analysis-002-improvement-pipeline-after-two-runs.md#38-generic-method-and-repository-parts) sorts each part of today's harness into one or the other.
+The end state separates them, and only its first step is built, the repository's values in one file: the method as a parent skill in the skills repository, a child in each repository that fills in named hooks. [Analysis 002, §3.8](../analysis/analysis-002-improvement-pipeline-after-two-runs.md#38-generic-method-and-repository-parts) sorts each part of today's harness into one or the other; [analysis 003, §3.6](../analysis/analysis-003-improvement-pipeline-after-three-lenses.md#36-parent-and-child-refreshed) refreshes it after three lenses.
 
 ```mermaid
 flowchart TD
@@ -205,7 +205,7 @@ flowchart TD
 | How fixes are grouped | Built: by the test files the verdicts name, one branch per file or set of files that fixes tie together. In the third run all three commits changed exactly the file their verdict named, on two branches that shared none. In the second run 139 of 145 merged fixes changed one file, and the finding's own text named it for 134 of 137; the inventory's citations would have named it for 96 of 145 | Whether verdicts name the files that well in a large run. A fix that crosses many files, or a ratchet, ties them into one long branch: by the files the second run's fixes changed, the longest would hold 50 of 145. Changes to `src/` and `CHANGELOG.md` aren't planned. Waves and a rebase before the gate ([analysis 002, §3.2](../analysis/analysis-002-improvement-pipeline-after-two-runs.md#32-merge-conflicts-are-a-planning-problem)) aren't built |
 | Verifying every finding | No cap in the second run; 15 of 172 refuted | Whether every kind of finding needs it |
 | What a change to the flow costs | ADR-008 is Accepted, so it is superseded, not rewritten. It fixes the stages, the rules, the lens order and when a run stops; it leaves open the ratchet's place, how fixes are grouped, the verify cap and the measure for a lens | Which of the fixed parts should move out of the ADR when it is next superseded |
-| One fact in several places | The forbidden list is in ADR-008, `harness/gate.py` and the fix workflow's prompt; a test holds the prompt's list of what a fix may change to the gate's. The key of a finding is computed in `harness/triage.py` and in the survey workflow, and no test holds those equal | One source, or a test that compares them, for the key too |
+| One fact in several places | The forbidden list is in ADR-008, `harness/project.toml` and the fix workflow's prompt; a test holds the prompt's list of what a fix may change to the gate's. The key of a finding is computed in `harness/triage.py` and in the survey workflow, and no test holds those equal | One source, or a test that compares them, for the key too |
 | The driver | The session, by hand: it starts each script and workflow in turn and drops what no review accepted. `record.py` writes the workflows' results to the run's records, and `plan.py` run again plans what a fix stage left | One driver for a run's stages (the pilot's decision 4) |
 
 ## References
@@ -213,5 +213,6 @@ flowchart TD
 - [ADR-008](../arc42/adr/ADR-008-improvement-pipeline.md): the decision and its rules
 - [Harness README](../../harness/README.md): the commands of each stage, suppressions, keys
 - [Analysis 002](../analysis/analysis-002-improvement-pipeline-after-two-runs.md): the pipeline after two runs
+- [Analysis 003](../analysis/analysis-003-improvement-pipeline-after-three-lenses.md): the pipeline after three lenses, and what to prepare for the parent and child skills
 - Retrospectives: [the pilot](../../harness/runs/2026-11-12-tests/retrospective.md), [the second run](../../harness/runs/2026-11-12-tests-2/retrospective.md), [the third run](../../harness/runs/2026-11-14-tests/retrospective.md), [the fourth run](../../harness/runs/2026-11-14-tests-2/retrospective.md)
 - [Development guide](development.md): the steps of a change, which every fix follows

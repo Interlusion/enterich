@@ -1,0 +1,104 @@
+# The improvement pipeline's values for this repository (ADR-008): where its contract, code
+# and documents are, and what the gate checks and lets through. The scripts in harness/ read
+# them from here, and hold the method; once the method moves to the skills repository, this
+# file is what a repository's child skill fills in (analysis 003, section 3.6).
+
+[sources]
+# The contract: specs whose requirements carry IDs and a Definition of Done
+specs = "docs/specs"
+spec_glob = "req-*.md"
+# Requirement IDs in full, as the specs index writes them; a requirement's heading is
+# "#### <ID>: <title>"
+requirement_id = 'REQ-\d{3}-(?:URS|PRS)-N?F\d{3}'
+# The Definition of Done's closing lines say how it is verified, not what
+dod_closing = ["- Verification:", "- Evidence:"]
+tests = "tests"
+# Tests that cite requirement IDs as data, not as what they check: the harness's own, each
+# a glob from the repository root
+tests_left_out = ["tests/repo/test_harness*.py"]
+# The code under mutation ([tool.mutmut] in pyproject.toml), and the package its mutants'
+# IDs start with
+code = "src/enterich"
+package = "enterich"
+# The backlog, whose open items keep a suppressed finding tracked
+backlog = "docs/backlog"
+
+[security]
+# The security lens's sources: the policy whose scope lines are its promises, and the
+# published tool list
+policy = "SECURITY.md"
+tool_snapshot = "tests/snapshots/tools.json"
+
+[docs]
+# The documents that say what the product does, each in one record of documents.jsonl
+scope = [
+  "README.md",
+  "SECURITY.md",
+  "docs/guides/*.md",
+  "docs/specs/*.md",
+  "docs/arc42/*.md",
+  "docs/arc42/adr/*.md",
+]
+
+[gate]
+base = "origin/main"
+# Where the gate pushes the branches that passed
+remote = "origin"
+commit_types = ["feat", "fix", "docs", "ci", "chore", "refactor", "test"]
+# What a fix branch may change: tests and the code a test shows wrong (sources.tests and
+# sources.code), and besides them the changelog line of that fix. Anything else is outside
+# it, whatever it is called
+allowed_besides = ["CHANGELOG.md"]
+# ADR-008's Compliance list; the tool-list snapshot changes only with its spec, and the
+# pipeline doesn't change its own scripts, the operator's suppressions or its workflows;
+# nor what the checks run and read, so a branch can't weaken the checks it is judged by
+forbidden = [
+  "docs/specs/",
+  "docs/arc42/adr/",
+  "AGENTS.md",
+  "CLAUDE.md",
+  ".github/",
+  "Dockerfile",
+  "server.json",
+  "pyproject.toml",
+  "uv.lock",
+  "tests/snapshots/",
+  "harness/",
+  ".claude/",
+  "scripts/",
+  ".mdformat.toml",
+  "lychee.toml",
+]
+# Files the checks and the agents read wherever they lie, such as a ruff.toml in tests/
+forbidden_names = [
+  "ruff.toml",
+  ".ruff.toml",
+  "pytest.ini",
+  ".pytest.ini",
+  "pytest.toml",
+  ".pytest.toml",
+  "tox.ini",
+  "setup.cfg",
+  "pyproject.toml",
+  "pyrightconfig.json",
+  ".mdformat.toml",
+  "lychee.toml",
+  ".lycheeignore",
+  "AGENTS.md",
+  "CLAUDE.md",
+]
+# gitleaks as CI runs it, from the image CI pins
+scanner_image_dir = ".github/gitleaks"
+scanner_image = "enterich-gate-gitleaks"
+
+# Every check a branch must pass, run in a worktree of its commit. With E2E_ERPNEXT_URL set,
+# the end-to-end tests run with the others. The check named "tests" is the one whose results
+# the gate compares with main's: it must report each test that passed (-rp) and run every
+# test main collects
+[gate.checks]
+ruff = ["uv", "run", "ruff", "check"]
+format = ["uv", "run", "ruff", "format", "--check"]
+types = ["uv", "run", "basedpyright"]
+markdown = ["uv", "run", "mdformat", "--check", "."]
+links = ["scripts/check-links.sh"]
+tests = ["uv", "run", "pytest", "-q", "-p", "no:cacheprovider", "-rp"]
