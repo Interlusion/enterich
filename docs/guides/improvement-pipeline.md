@@ -179,7 +179,7 @@ What checks each rule of [ADR-008's Compliance](../arc42/adr/ADR-008-improvement
 
 Three things are interleaved today. The **method** is the stages, the record schemas and the rules. The **engine** is the Workflow scripts in `.claude/workflows/`. The **repository's values** are the paths, the requirement ID pattern, the checks and the forbidden list. The agents' schemas and what they judge by are written in the workflow scripts; the repository's values are constants in the scripts and lines in the prompts.
 
-The end state separates them, and none of the split is built: the method as a parent skill in the skills repository, a child in each repository that fills in named hooks. [Analysis 002, §3.8](../analysis/analysis-002-improvement-pipeline-after-two-runs.md#38-generic-method-and-repository-parts) sorts each part of today's harness into one or the other.
+The end state separates them, and none of the split is built: the method as a parent skill in the skills repository, a child in each repository that fills in named hooks. [Analysis 002, §3.8](../analysis/analysis-002-improvement-pipeline-after-two-runs.md#38-generic-method-and-repository-parts) sorts each part of today's harness into one or the other; [analysis 003, §3.6](../analysis/analysis-003-improvement-pipeline-after-three-lenses.md#36-parent-and-child-refreshed) refreshes it after three lenses.
 
 ```mermaid
 flowchart TD
@@ -213,5 +213,6 @@ flowchart TD
 - [ADR-008](../arc42/adr/ADR-008-improvement-pipeline.md): the decision and its rules
 - [Harness README](../../harness/README.md): the commands of each stage, suppressions, keys
 - [Analysis 002](../analysis/analysis-002-improvement-pipeline-after-two-runs.md): the pipeline after two runs
+- [Analysis 003](../analysis/analysis-003-improvement-pipeline-after-three-lenses.md): the pipeline after three lenses, and what to prepare for the parent and child skills
 - Retrospectives: [the pilot](../../harness/runs/2026-11-12-tests/retrospective.md), [the second run](../../harness/runs/2026-11-12-tests-2/retrospective.md), [the third run](../../harness/runs/2026-11-14-tests/retrospective.md), [the fourth run](../../harness/runs/2026-11-14-tests-2/retrospective.md)
 - [Development guide](development.md): the steps of a change, which every fix follows
