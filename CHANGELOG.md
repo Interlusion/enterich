@@ -8,6 +8,10 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 - **Tool descriptions:** `create_draft_sales_invoice` and `create_draft_purchase_invoice` say that a draft without `posting_date` has no fixed date: ERPNext gives it the day of each save, so an update on a later day moves it and the due date. Before, they said it defaulted to today. `get_item` says its accounts and cost centres are the item's own defaults, and an empty one means the item group's or the company's apply. `create_draft_payment_entry` says a payment without `references` is an advance without a warning.
 
+### Fixed
+
+- **Configuration guide:** Disable Prepared Report Automation is set with `bench execute`. The guide named the System Console, which runs code only where server scripts are enabled, and they aren't by default.
+
 ## [0.6.0] - 2026-11-16
 
 ### Security

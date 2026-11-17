@@ -242,7 +242,7 @@ Checked against ERPNext v16.52 source:
 
 - An invoice saved with `set_posting_time` 0 gets today, in the site's time zone (System Settings), as posting date at every save.
 - Saving through `/api/resource` runs `set_missing_values`: customer name, currency, price list, accounts and the customer's payment terms template are filled in. POST and PUT answer with the saved document under `data`.
-- A row saved without a rate, or at 0, gets the price list rate with the pricing rules applied. A given rate is kept unless a price pricing rule matches the row; then the rule sets the rate anew at every save and its name goes into the row's `pricing_rules`. Product pricing rules append free-item rows (`is_free_item`).
+- A row saved without a rate, or at 0, gets the price list rate with the pricing rules applied. A given rate is kept unless a pricing rule matches the row; then its name goes into the row's `pricing_rules` and the rate is set anew at every save: a price rule's rate, or for a product rule the price list rate where the item has one. Product pricing rules append free-item rows (`is_free_item`).
 - The customer's address, contact, payment terms, price list and accounts are filled in on save only where the draft has none (`update_if_missing`); a customer address of another customer is refused (`validate_party_address_and_contact`).
 - ERPNext looks up prices and pricing rules without a permission check, and creates or changes an Item Price from a draft only for a user with write on Item Price; the agent user has none.
 - A due date before the posting date, or later than the payment terms allow, is refused on save unless the user is a credit controller.
