@@ -15,8 +15,9 @@ COMPANY = "Example GmbH"
 # The agent user, whom the API key belongs to
 AGENT = "agent@example.com"
 
-# The v16 fields the fake lets a list select or filter on, checked against the
-# DocType JSON of ERPNext 16.52 and Frappe 16.54; ERPNext refuses any other.
+# The v16 fields the fake lets a list select or filter on; ERPNext refuses any other.
+# tests/e2e/test_fake.py holds them, and the fake's records, refusals and report rows, to
+# the end-to-end site.
 STANDARD_FIELDS = {"name", "owner", "creation", "modified", "modified_by", "docstatus", "idx"}
 FIELDS: dict[str, set[str]] = {
     "Item": {
@@ -416,8 +417,9 @@ class FakeErpnext:
                 return self._update(doctype, rest[0], cast("dict[str, Any]", body))
         if request.url.path == TAXES_METHOD and request.method == "GET":
             template = self.docs.get(params["master_doctype"], {}).get(params["master_name"])
-            if template is None:
-                return _missing(params["master_doctype"], params["master_name"])
+            if template is None:  # v16 checks the read right on a template it can't find
+                refused = error(403, "PermissionError", "Not permitted", bare=True)
+                return httpx2.Response(403, json=refused)
             rows = [{k: v for k, v in r.items() if k != "doctype"} for r in template["taxes"]]
             return httpx2.Response(200, json={"message": rows})
         if request.url.path in RETURN_METHODS:
@@ -1134,15 +1136,18 @@ def _like(pattern: str) -> re.Pattern[str]:
     return re.compile("".join(out), re.IGNORECASE | re.DOTALL)
 
 
-def error(status: int, exc_type: str, message: str, traceback: str | None = None) -> dict[str, Any]:
-    """An error body as Frappe sends it; a missing document's carries no traceback."""
+def error(
+    status: int, exc_type: str, message: str, traceback: str | None = None, *, bare: bool = False
+) -> dict[str, Any]:
+    """An error body as Frappe sends it; a missing document's carries no traceback, and nor
+    does one a route raises without it (`bare`)."""
     body: dict[str, Any] = {
         "exc_type": exc_type,
         "_server_messages": json.dumps(
             [json.dumps({"message": message, "title": "Message", "indicator": "red"})]
         ),
     }
-    if exc_type != "DoesNotExistError":
+    if exc_type != "DoesNotExistError" and not bare:
         body["exception"] = f"frappe.exceptions.{exc_type}: {message}"
         body["exc"] = json.dumps(
             [traceback or f"Traceback (most recent call last):\n  ... {exc_type}"]
