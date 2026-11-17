@@ -273,6 +273,7 @@ def test_inputs_outside_the_schema_are_refused_before_erpnext(
 
 
 def test_a_template_of_another_company_answers_as_unknown(mcp: Session, erp: FakeErpnext) -> None:
+    """A tax template of another company is refused as unknown (REQ-001-PRS-F007)."""
     result = create(mcp, taxes_and_charges="VAT 19% - OT")
     assert result.error
     assert result.text.startswith("taxes_and_charges:")

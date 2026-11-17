@@ -68,7 +68,7 @@ flowchart LR
 | `/.well-known/oauth-protected-resource<path>` | client → Enterich | RFC 9728 metadata, no token |
 | `/healthz` | deployment → Enterich | Liveness, no token |
 | JWKS URL | Enterich → authorization server | Signing keys over HTTPS, cached 5 min |
-| ERPNext REST | Enterich → ERPNext | `/api/resource/<fixed DocType>`, `frappe.client.get`, `frappe.desk.query_report.run` with fixed reports, `get_taxes_and_charges`, `frappe.desk.form.utils.add_comment`, `frappe.auth.get_logged_user`; `Authorization: token key:secret`, the configured Host and `Accept-Language: en` |
+| ERPNext REST | Enterich → ERPNext | `/api/resource/<fixed DocType>`, `frappe.client.get`, `frappe.desk.query_report.run` with fixed reports, `get_taxes_and_charges`, `make_sales_return` and `make_debit_note` for returns, `frappe.desk.form.utils.add_comment`, `frappe.auth.get_logged_user`; `Authorization: token key:secret`, the configured Host and `Accept-Language: en` |
 
 **Out of scope:** signing in and second factors (the authorization server), network policy and rate limits (the deployment), the agent user's role (the site), browser-based clients calling Enterich directly (no CORS), everything the person does in ERPNext.
 
@@ -110,7 +110,7 @@ flowchart TB
 | `config` | Reads and validates every `ENTERICH_*` variable once at start; secrets kept out of `repr` |
 | `app` | The outer ASGI wrapper (method check, 1 MiB body limit, `/healthz`, `rejection` log from the response status, 503 when no signing keys are available) around the SDK's MCP app with `AuthSettings`; registers only the operations `ENTERICH_TOOLS` allows |
 | `auth` | The token verifier of ADR-003; returns the SDK's `AccessToken` with `sub`, `sid` and `expires_at = exp + leeway` |
-| `tools/` | One module per accounting area, named like its spec (`master_data`, `order_to_cash`, `procure_to_pay`, `record_to_report`, `bank_and_cash`): each operation with its input model, ERPNext call and result shape; `drafts` holds what every draft operation shares (tax rows, duplicate check, update checks, warnings), the package itself the run of each operation with its log line and, for a write, its comment on the draft, `invoicing` the reads the sales and purchase side share (parties, invoices, tax templates, the aged report) |
+| `tools/` | One module per accounting area, named like its spec (`master_data`, `order_to_cash`, `procure_to_pay`, `record_to_report`, `bank_and_cash`): each operation with its input model, ERPNext call and result shape; `drafts` holds what every draft operation shares (tax rows, duplicate check, update checks, warnings), the package itself the run of each operation with its log line and, for a write, its comment on the draft, `invoicing` the reads the sales and purchase side share (parties, invoices, tax templates, the aged report), `returns` what credit notes and debit notes share (ERPNext's return of the invoice, its checks and duplicate check) |
 | `shapes` | Shared input types (names, dates, decimals, limits, keys) with extra properties forbidden, list paging, child-table cutting, the `outside_text` split |
 | `erpnext` | One `httpx2` client with `trust_env=False`: base URL, Host, token header, `Accept-Language: en`, 30 s per call, 10 MiB per response, no redirects; maps refusals to [REQ-001-PRS-F008](../specs/req-001-core.md#req-001-prs-f008-refusals-reported) messages; encodes name inputs |
 | `log` | JSON-lines logging for Enterich's events and the SDK's and uvicorn's loggers |
@@ -148,13 +148,14 @@ sequenceDiagram
     participant N as ERPNext
     C->>E: tools/call create_draft_sales_invoice
     E->>E: token check, input model (extra fields refused)
+    opt taxes_and_charges given
+        E->>N: frappe.client.get(template), then get_taxes_and_charges(template)
+        Note over E: unknown or another company's: refusal naming taxes_and_charges
+    end
     E->>N: list matching drafts (customer, date), compare items
     alt match and allow_duplicate not set
         E-->>C: refusal naming the matching draft
     else no match, or allow_duplicate set
-        opt taxes_and_charges given
-            E->>N: get_taxes_and_charges(template)
-        end
         opt ENTERICH_MAX_DRAFTS_PER_HOUR set
             E->>N: list the agent user's sales invoices of the last hour
             Note over E: at the limit: refusal, nothing created
@@ -169,11 +170,11 @@ sequenceDiagram
 
 ### Updating a draft
 
-Enterich reads the document with `frappe.client.get`, refuses unless it is a draft of the assigned company that the agent user created (`owner`), with the given `modified`, then sends a PUT with the catalogue's fields for the given inputs and `modified`. ERPNext refuses the PUT if the document changed in between (`TimestampMismatchError`, [REQ-001-PRS-F004](../specs/req-001-core.md#req-001-prs-f004-stale-updates-refused)), and refuses a save of a document a person has submitted meanwhile, because the agent user lacks the submit right. Enterich learns the agent user's name at the first update, from `frappe.auth.get_logged_user`, and keeps it until it stops: it comes from the key itself, and a start doesn't depend on ERPNext. Renaming the agent user in ERPNext needs a restart; until then Enterich refuses the agent's own drafts as another user's. ERPNext enforces the rule too where the site grants write on the draft DocTypes only if creator (configuration guide); with plain write, it is Enterich's alone.
+Enterich reads the document with `frappe.client.get`, refuses unless it is a draft of the assigned company that the agent user created (`owner`), with the given `modified`, then sends a PUT with the catalogue's fields for the given inputs and `modified`. ERPNext refuses the PUT if the document changed in between (`TimestampMismatchError`, [REQ-001-PRS-F004](../specs/req-001-core.md#req-001-prs-f004-stale-updates-refused)), and refuses a save of a document a person has submitted meanwhile, because the agent user lacks the submit right. Enterich learns the agent user's name at the first update, or at the first create where `ENTERICH_MAX_DRAFTS_PER_HOUR` is set, from `frappe.auth.get_logged_user`, and keeps it until it stops: it comes from the key itself, and a start doesn't depend on ERPNext. Renaming the agent user in ERPNext needs a restart; until then Enterich refuses the agent's own drafts as another user's, and the limit of drafts per hour counts none of them. ERPNext enforces the rule too where the site grants write on the draft DocTypes only if creator (configuration guide); with plain write, it is Enterich's alone.
 
 ## 7. Deployment view
 
-Enterich is one stateless container: no volume, no database. Any number of replicas behind one URL.
+Enterich is one stateless container: no volume, no database. Any number of replicas behind one URL; the limit of drafts per hour is counted in each, so creates sent at once can pass it by one per replica besides the first ([REQ-001-PRS-F019](../specs/req-001-core.md#req-001-prs-f019-drafts-per-hour)).
 
 ```mermaid
 flowchart LR
@@ -251,7 +252,7 @@ The quality goals of section 1, made testable. Each scenario names what happens,
 | QS-01 | A manipulated agent tries to submit, cancel or delete, or sends `docstatus: 1` in a create | No operation exists for it; the extra input is refused before ERPNext; zero writes reach ERPNext | [REQ-001-PRS-F002](../specs/req-001-core.md#req-001-prs-f002-draft-create-operations), [REQ-001-PRS-F006](../specs/req-001-core.md#req-001-prs-f006-no-generic-operations) |
 | QS-02 | The agent updates a draft that a person submitted after the agent read it | Refused by Enterich's check or by ERPNext (stale `modified`, no submit right); the document is unchanged | [REQ-001-PRS-F003](../specs/req-001-core.md#req-001-prs-f003-draft-update-operations), [REQ-001-PRS-F004](../specs/req-001-core.md#req-001-prs-f004-stale-updates-refused) |
 | QS-22 | A manipulated agent updates a draft a bookkeeper prepared | Refused, saying only the agent user's drafts can be updated; zero writes reach ERPNext. The agent's key used directly is refused by ERPNext (write only if creator) | [REQ-001-PRS-F003](../specs/req-001-core.md#req-001-prs-f003-draft-update-operations), [REQ-002-PRS-NF013](../specs/req-002-service.md#req-002-prs-nf013-rights-listed-and-proven) |
-| QS-23 | A manipulated or looping agent creates drafts one after another | Where `ENTERICH_MAX_DRAFTS_PER_HOUR` is set, each create beyond it within an hour is refused, naming the limit; nothing is inserted | [REQ-001-PRS-F019](../specs/req-001-core.md#req-001-prs-f019-drafts-per-hour) |
+| QS-23 | A manipulated or looping agent creates drafts one after another | Where `ENTERICH_MAX_DRAFTS_PER_HOUR` is set, each create beyond it within an hour is refused, naming the limit; nothing is inserted. Across replicas, creates sent at once can pass it by one per replica besides the first | [REQ-001-PRS-F019](../specs/req-001-core.md#req-001-prs-f019-drafts-per-hour) |
 | QS-03 | The agent asks for another company's invoice by name | Answered as "doesn't exist or isn't permitted"; no field of the other company's document returned | [REQ-001-PRS-F007](../specs/req-001-core.md#req-001-prs-f007-the-assigned-company-from-configuration) |
 | QS-04 | The client calls every write operation without asking a person | The same limits apply; the integration suite passes with a client that never confirms | [REQ-001-PRS-F013](../specs/req-001-core.md#req-001-prs-f013-no-approval-in-the-loop) |
 | QS-05 | A name input is `X?run_method=discard` | It reaches ERPNext as one encoded path segment; no document method runs | [REQ-001-PRS-F010](../specs/req-001-core.md#req-001-prs-f010-name-inputs-stay-names) |

@@ -97,8 +97,9 @@ OPERATIONS: list[Operation[Any]] = [
         name="get_item",
         title="Get item",
         description=(
-            "Get one item by its exact item code, with the accounts and cost centres the "
-            "assigned company uses for it and its item tax templates."
+            "Get one item by its exact item code, with its item tax templates and its own "
+            "defaults for the assigned company (accounts and cost centres). An empty default "
+            "means the item sets none: ERPNext then takes the item group's or the company's."
         ),
         kind="read",
         inputs=GetItem,
