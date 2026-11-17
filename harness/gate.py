@@ -55,7 +55,7 @@ TYPES = "|".join(map(re.escape, project.strings(project.GATE, "commit_types")))
 COMMIT = re.compile(rf"^({TYPES})(\([\w-]+\))?!?: \S")
 # What a fix branch changes: tests, the code a test shows wrong, and the changelog line of
 # that fix. Anything else is outside it, whatever it is called
-ALLOWED = (TESTS, f"{project.SOURCES['code']}/", *project.strings(project.GATE, "allowed_besides"))
+ALLOWED = project.allowed()
 # ADR-008's Compliance list, and what the checks run and read
 FORBIDDEN = project.strings(project.GATE, "forbidden")
 # Files the checks and the agents read wherever they lie, such as a ruff.toml in tests/

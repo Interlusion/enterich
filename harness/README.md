@@ -2,7 +2,7 @@
 
 The scripts, schemas and rubrics of the improvement pipeline: agents between deterministic stages, on `auto/` branches only. Why and the rules: [ADR-008](../docs/arc42/adr/ADR-008-improvement-pipeline.md).
 
-This repository's values, where its specs, code, tests and documents are, and what the gate checks and lets through, are in `project.toml`, read by `project.py`; the scripts name none of them themselves (`tests/repo/test_harness_project.py`). The rest is the method ([analysis 003, §3.6](../docs/analysis/analysis-003-improvement-pipeline-after-three-lenses.md#36-parent-and-child-refreshed)).
+This repository's values, where its specs, code, tests and documents are, and what the gate checks and lets through, are in `project.toml`, read by `project.py`; the scripts name none of them themselves (`tests/repo/test_harness_project.py`). The rest is the method ([analysis 003, §3.6](../docs/analysis/analysis-003-improvement-pipeline-after-three-lenses.md#36-parent-and-child-refreshed)). What the workflows' prompts say about the repository, the product, its threat model, where its tests and fakes are and what only the operator changes, is the file's `[brief]`: every workflow takes `brief`, the output of `uv run python harness/project.py brief`, among its arguments, as a workflow can't read a file.
 
 ## The tests lens
 

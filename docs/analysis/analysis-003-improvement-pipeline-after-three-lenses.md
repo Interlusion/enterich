@@ -100,7 +100,7 @@ Two things a child needs that analysis 002 didn't name: the product description 
 In this order:
 
 1. **One configuration file for Enterich's values in the harness** (§3.6; analysis 002's recommendation 3): the paths, patterns, scope and the gate's lists, read by the scripts; the tests keep their place. The file becomes the child's hooks. Done with this analysis: `harness/project.toml`, and a test that no script names one of its values.
-2. **One file for what the prompts say about Enterich:** the product, its contract, its threat model's pointers, read by the workflows as an argument, so the prompts name no product.
+2. **One file for what the prompts say about Enterich:** the product, its contract, its threat model's pointers, read by the workflows as an argument, so the prompts name no product. Done after this analysis: the `[brief]` of `harness/project.toml`, passed by the session; the prompts it renders are those of before, word for word, but for naming the code's directory where they said `src/`.
 3. **A full run at a minor release or an ERPNext major version** for the security and docs lenses (§3.4); `--since` otherwise.
 4. **Fake against ERPNext** as the next step of the pipeline, then a one-off review of the specs and ADRs by the specifying-requirements skill's gates rather than a lens (§3.7).
 5. **The parent, when Haflinger adopts the method** (ADR-008's second trigger): start from the shared survey and verify engine of §3.2 and the generic lenses, and let the first child be Enterich's files from 1 and 2.
