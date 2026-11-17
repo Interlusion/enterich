@@ -339,7 +339,8 @@ class FakeErpnext:
     prices: dict[str, float] = field(default_factory=dict[str, float])
     # item code -> the rate a price pricing rule sets
     rules: dict[str, float] = field(default_factory=dict[str, float])
-    # item code -> the free item a product pricing rule adds
+    # item code -> the free item a product pricing rule adds; the paid row gets the price
+    # list's rate where `prices` has one, whatever rate was given
     free_items: dict[str, str] = field(default_factory=dict[str, str])
     # Item codes of stock items under perpetual inventory: their expense account on a
     # purchase invoice becomes Stock Received But Not Billed (set_expense_account)
@@ -511,16 +512,23 @@ class FakeErpnext:
         rows = [r for r in _rows(doc, "items") if not r.get("is_free_item")]
         for row in rows:
             code = row["item_code"]
-            rate = self.rules.get(code, row.get("rate") or self.prices.get(code, 0.0))
+            # A row a pricing rule applies to gets its rate anew, whatever was given
+            # (calculate_item_rate): a price rule's, or under a product rule the price list's
+            if code in self.rules:
+                rate = self.rules[code]
+            elif code in self.free_items and code in self.prices:
+                rate = self.prices[code]
+            else:
+                rate = row.get("rate") or self.prices.get(code, 0.0)
             # Rounded to the field's precision: the site's float precision, the currency's
             row.update(qty=float(round(row["qty"], 3)), rate=float(round(rate, 2)), is_free_item=0)
             row.pop("pricing_rules", None)
-            if code in self.rules:
+            if code in self.rules or code in self.free_items:
                 row["pricing_rules"] = '[\n "PRLE-0001"\n]'
         for code in [r["item_code"] for r in rows if r["item_code"] in self.free_items]:
-            rows.append(
-                {"item_code": self.free_items[code], "qty": 1.0, "rate": 0.0, "is_free_item": 1}
-            )
+            free = {"item_code": self.free_items[code], "qty": 1.0, "rate": 0.0, "is_free_item": 1}
+            # The free-item row names its rule bare, not as a list
+            rows.append({**free, "pricing_rules": "PRLE-0001"})
         for row in rows:
             row.update(doctype=f"{doctype} Item", amount=float(round(row["qty"] * row["rate"], 2)))
             row.setdefault("uom", "Nos")
@@ -930,6 +938,7 @@ class FakeErpnext:
     def _report(self, params: dict[str, str]) -> dict[str, Any]:
         name = params["report_name"]
         if name in self.prepared:
+            # No run yet for these filters: the desk asks for one, Enterich doesn't
             return {"prepared_report": True, "doc": None}
         rows = [dict(row) for row in self.reports.get(name, [])]
         if name in self.snapshots:

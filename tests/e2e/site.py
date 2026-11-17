@@ -1,6 +1,8 @@
 """The ERPNext site of tests/e2e/compose.yml, reached as Administrator to seed it."""
 
 import json
+import subprocess
+from pathlib import Path
 from typing import Any
 
 import httpx2
@@ -11,6 +13,31 @@ URL_VARIABLE = "E2E_ERPNEXT_URL"
 # password: both from compose.yml, for this throwaway site alone.
 HOST = "e2e.localhost"
 ADMIN_PASSWORD = "e2e-admin"
+COMPOSE = Path(__file__).with_name("compose.yml")
+
+
+# Seconds for one `bench execute`, Frappe's start included
+BENCH_TIMEOUT = 120.0
+
+
+class BenchError(Exception):
+    """`bench execute` failed; the message carries its output."""
+
+
+def bench(method: str, *args: object) -> None:
+    """`bench execute` on the site's backend, which commits: for what Frappe saves through
+    no request, such as a standard report's fields outside developer mode. The arguments
+    go as the configuration guide writes them, a Python list."""
+    command = ["bench", "--site", HOST, "execute", method, "--args", repr(list(args))]
+    done = subprocess.run(  # noqa: S603 - the tests' own arguments, no shell
+        ["docker", "compose", "-f", str(COMPOSE), "exec", "-T", "backend", *command],  # noqa: S607 - docker from PATH, as CI
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=BENCH_TIMEOUT,
+    )
+    if done.returncode:
+        raise BenchError(f"bench execute {method}: {done.stderr or done.stdout}")
 
 
 class SiteError(Exception):

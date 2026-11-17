@@ -472,6 +472,8 @@ ITEM_TAX_7 = f"7% - {ABBR}"
 EU_PURCHASE = f"Lieferung aus der EU - {ABBR}"
 CAPITAL = f"3100 - Capital Stock - {ABBR}"
 CASH = f"1110 - Cash - {ABBR}"
+# Where ERPNext books a stock item bought without updating stock
+STOCK_NOT_BILLED = f"2210 - Stock Received But Not Billed - {ABBR}"
 BANK_GROUP = f"1200 - Bank Accounts - {ABBR}"
 SALES_VAT = ("VAT 19 %", f"2320 - Umsatzsteuer 19 % - {ABBR}")
 # The account the setup wizard's German sales templates charge 7 % on

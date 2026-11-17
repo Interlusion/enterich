@@ -2,19 +2,24 @@
 test asserts against `tests/fakes/erpnext.py`, so where the fake answers otherwise than
 ERPNext does, those tests pass and prove nothing. The fake's records and the drafts it saves,
 the fields its lists take, its refusals as Enterich reports them, and the rows its reports
-serve are compared with the site's here, read as the agent user, so an ERPNext upgrade that
-the fake doesn't follow fails these tests instead of passing the integration tests."""
+serve are compared with the site's here, read as the agent user, and so is what it imitates
+of ERPNext's behaviour: pricing rules, the supplier's bill number checked for uniqueness,
+prepared and snapshot reports. An ERPNext upgrade that the fake doesn't follow fails these
+tests instead of passing the integration tests. A report's mode is set with `bench`, which
+needs the compose site's backend container."""
 
 import asyncio
-from collections.abc import Awaitable, Callable
+import time
+from collections.abc import Awaitable, Callable, Generator, Iterator
+from contextlib import contextmanager
 from typing import Any, cast
 
 import httpx2
 import pytest
 
 from enterich.erpnext import Erpnext, Refused
-from tests.e2e.seed import COMPANY, Seed, site_today
-from tests.e2e.site import HOST, Site
+from tests.e2e.seed import COMPANY, STOCK_NOT_BILLED, Seed, remove, site_today
+from tests.e2e.site import HOST, Site, bench
 from tests.fakes import erpnext as fake
 from tests.fakes.settings import settings
 
@@ -293,19 +298,29 @@ def _refusal(client: Erpnext, request: Request) -> tuple[int, str | None, str]:
     return asyncio.run(call())
 
 
+def _on_site(url: str, seeded: Seed) -> Erpnext:
+    """Enterich's client for the site, as the agent user."""
+    return Erpnext(
+        settings(
+            erpnext_url=url,
+            erpnext_host=HOST,
+            erpnext_api_key=seeded.api_key,
+            erpnext_api_secret=seeded.api_secret,
+            company=COMPANY,
+        )
+    )
+
+
+def _on_fake(erp: fake.FakeErpnext) -> Erpnext:
+    return Erpnext(settings(), erp.transport())
+
+
 @pytest.mark.parametrize("request_", list(REFUSED.values()), ids=list(REFUSED))
 def test_the_fake_refuses_as_erpnext_does(url: str, seeded: Seed, request_: Request) -> None:
     """The status, the exception's type and the text Enterich makes of them, ERPNext's message
     included (REQ-001-PRS-F008)."""
-    on_site = settings(
-        erpnext_url=url,
-        erpnext_host=HOST,
-        erpnext_api_key=seeded.api_key,
-        erpnext_api_secret=seeded.api_secret,
-        company=COMPANY,
-    )
-    real = _refusal(Erpnext(on_site), request_)
-    faked = _refusal(Erpnext(settings(), fake.FakeErpnext().transport()), request_)
+    real = _refusal(_on_site(url, seeded), request_)
+    faked = _refusal(_on_fake(fake.FakeErpnext()), request_)
     assert faked == real
 
 
@@ -412,3 +427,178 @@ def test_the_fakes_report_rows_are_erpnexts(site: Site, seeded: Seed) -> None:
         *(["a total row with is_group_account"] if "is_group_account" in balance[-1] else []),
     ]
     assert found == {report: [] for report in found}
+
+
+# What the fake imitates of ERPNext's behaviour, each set up on the site and on the fake
+# alike, with the same request sent to both through Enterich's client
+
+
+def _sent(client: Erpnext, request: Callable[[Erpnext], Awaitable[Record]]) -> Record:
+    async def call() -> Record:
+        try:
+            return await request(client)
+        finally:
+            await client.aclose()
+
+    return asyncio.run(call())
+
+
+# Each kind of pricing rule, for the seeded item at a rate that isn't its price
+RULES: dict[str, Record] = {
+    "price": {"price_or_product_discount": "Price", "rate_or_discount": "Rate", "rate": 45},
+    "product": {"price_or_product_discount": "Product", "same_item": 0, "free_qty": 1},
+}
+# A product rule on the item without a price, which keeps the rate given
+UNPRICED = "product, no price"
+
+
+def _priced(doc: Record) -> list[tuple[Any, ...]]:
+    """What Enterich reads of a saved draft's rows to warn of a replaced rate."""
+    return [
+        (r["item_code"], r["qty"], r["rate"], r["is_free_item"], bool(r.get("pricing_rules")))
+        for r in _rows_of(doc["items"])
+    ]
+
+
+@pytest.mark.parametrize("kind", [*sorted(RULES), UNPRICED])
+def test_a_pricing_rule_sets_the_rows_the_fake_sets(
+    url: str, site: Site, seeded: Seed, kind: str
+) -> None:
+    """A price rule sets its rate; a product rule adds the free-item row and sets the paid
+    row to the price list's rate, where the item has one. Both name the rule on the row."""
+    item, free = seeded.item, seeded.unpriced_item
+    if kind == UNPRICED:
+        item, free = free, item
+    prices = site.get_list(
+        "Item Price", {"item_code": item, "price_list": "Standard Selling"}, ["price_list_rate"]
+    )
+    rule_of = RULES["product" if kind == UNPRICED else kind]
+    product = {"free_item": free} if kind != "price" else {}
+    rule = site.insert(
+        {
+            "doctype": "Pricing Rule",
+            "title": f"E2E {kind} rule",
+            "apply_on": "Item Code",
+            "items": [{"item_code": item}],
+            "selling": 1,
+            "company": COMPANY,
+            **rule_of,
+            **product,
+        }
+    )["name"]
+    body = {"customer": seeded.customer, "items": [{"item_code": item, "qty": 2, "rate": 48}]}
+    try:
+        real = _sent(_on_site(url, seeded), lambda c: c.insert("Sales Invoice", body))
+        # The draft's table of applied rules links to the rule, so the draft goes first
+        remove(site, [("Sales Invoice", real["name"])])
+    finally:
+        site.delete("Pricing Rule", rule)
+    erp = fake.FakeErpnext()
+    erp.add("Customer", fake.customer(seeded.customer))
+    if prices:
+        erp.prices[item] = prices[0]["price_list_rate"]
+    if kind == "price":
+        erp.rules[item] = rule_of["rate"]
+    else:
+        erp.free_items[item] = free
+    faked = _sent(_on_fake(erp), lambda c: c.insert("Sales Invoice", body))
+    assert _priced(faked) == _priced(real)
+
+
+UNIQUENESS = ("Accounts Settings", "check_supplier_invoice_uniqueness")
+
+
+def test_erpnext_refuses_a_suppliers_bill_no_twice_as_the_fake_does(
+    url: str, site: Site, seeded: Seed
+) -> None:
+    """With Accounts Settings' supplier invoice uniqueness, a second draft of the supplier's
+    bill_no is refused, naming the first. The expense account is given, so the refusal is
+    ERPNext's only message."""
+    row = {"item_code": seeded.item, "qty": 1, "rate": 20, "expense_account": STOCK_NOT_BILLED}
+    body = {"supplier": seeded.supplier, "bill_no": "E2E-BILL-TWICE", "items": [row]}
+    doctype, field = UNIQUENESS
+    site.call("frappe.client.set_value", doctype=doctype, name=doctype, fieldname=field, value=1)
+    try:
+        first = _sent(_on_site(url, seeded), lambda c: c.insert("Purchase Invoice", body))
+        real = _refusal(_on_site(url, seeded), lambda c: c.insert("Purchase Invoice", body))
+    finally:
+        site.call(
+            "frappe.client.set_value", doctype=doctype, name=doctype, fieldname=field, value=0
+        )
+    remove(site, [("Purchase Invoice", first["name"])])
+    erp = fake.FakeErpnext(unique_bills=True)
+    erp.add("Supplier", fake.supplier(seeded.supplier))
+    faked_first = _sent(_on_fake(erp), lambda c: c.insert("Purchase Invoice", body))
+    faked = _refusal(_on_fake(erp), lambda c: c.insert("Purchase Invoice", body))
+    status, exc_type, text = real
+    assert faked == (status, exc_type, text.replace(first["name"], faked_first["name"]))
+
+
+REPORT = "General Ledger"
+LEDGER_FILTERS: Record = {"company": COMPANY, "from_date": "2026-01-01", "to_date": "2026-12-31"}
+SYNC_TIMEOUT = 60.0
+
+
+@contextmanager
+def _report_set(field: str) -> Generator[None]:
+    """The report's field set, then cleared, as the configuration guide's command does."""
+    bench("frappe.db.set_value", "Report", REPORT, field, 1)
+    try:
+        yield
+    finally:
+        bench("frappe.db.set_value", "Report", REPORT, field, 0)
+
+
+def _report_answers(url: str, seeded: Seed, erp: fake.FakeErpnext) -> tuple[Record, Record]:
+    def run(c: Erpnext) -> Awaitable[Record]:
+        return c.run_report(REPORT, LEDGER_FILTERS)
+
+    return _sent(_on_fake(erp), run), _sent(_on_site(url, seeded), run)
+
+
+def test_a_prepared_report_answers_as_the_fakes(url: str, seeded: Seed) -> None:
+    """Without a run for the filters, at once: Enterich refuses rather than waiting."""
+    erp = fake.FakeErpnext(prepared={REPORT})
+    with _report_set("prepared_report"):
+        faked, real = _report_answers(url, seeded, erp)
+    assert differences(faked, [real]) == []
+    assert {k: real[k] for k in faked} == faked
+
+
+@pytest.fixture
+def synced(site: Site) -> Iterator[None]:
+    """A DuckDB sync of the GL Entries, which the report then runs on; removed afterwards."""
+    sync = site.insert({"doctype": "DuckDB Sync", "doc_type": "GL Entry"})["name"]
+    site.call(
+        "frappe.client.submit", doc=site.call("frappe.client.get", doctype="DuckDB Sync", name=sync)
+    )
+    try:
+        deadline = time.monotonic() + SYNC_TIMEOUT
+        while site.exists("DuckDB Sync Item", {"parent": sync, "synced": 0}):
+            if time.monotonic() > deadline:
+                raise TimeoutError(f"Frappe's worker didn't sync {sync}.")
+            time.sleep(0.5)
+        # The report's table of DocTypes to sync, which no request can save on a standard
+        # report; a row an interrupted run left goes first
+        bench("frappe.db.delete", "Doctype To Sync", {"parent": REPORT})
+        bench(
+            "frappe.db.sql",
+            "insert into `tabDoctype To Sync` (name, parent, parenttype, parentfield, idx, "
+            "doc_type) values ('e2e-sync', %s, 'Report', 'doctype_to_sync', 1, 'GL Entry')",
+            [REPORT],
+        )
+        try:
+            yield
+        finally:
+            bench("frappe.db.delete", "Doctype To Sync", {"parent": REPORT})
+    finally:
+        site.call("frappe.client.cancel", doctype="DuckDB Sync", name=sync)
+        site.delete("DuckDB Sync", sync)
+
+
+def test_a_snapshot_report_answers_as_the_fakes(url: str, seeded: Seed, synced: None) -> None:
+    erp = fake.FakeErpnext(snapshots={REPORT})
+    with _report_set("snapshot_report"):
+        faked, real = _report_answers(url, seeded, erp)
+    assert differences(faked, [real]) == []
+    assert real["snapshot_report"] is faked["snapshot_report"] is True
