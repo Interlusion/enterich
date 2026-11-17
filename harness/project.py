@@ -51,6 +51,8 @@ def problems(values: dict[str, Any]) -> list[str]:
     if "tests" not in checks:
         found.append("gate.checks: no tests, the check whose results the gate compares with main's")
     found += [f"gate.checks.{n}: a list of strings" for n, c in checks.items() if not _strings(c)]
+    brief = cast("dict[str, Any]", values.get("brief", {}))
+    found += [f"brief.{k}: a phrase" for k, v in brief.items() if not (isinstance(v, str) and v)]
     missing = ORDERED - set(cast("list[str]", gate.get("commit_types") or []))
     if missing:
         found.append(f"gate.commit_types: without {', '.join(sorted(missing))}")
@@ -64,8 +66,38 @@ SOURCES = _values["sources"]
 SECURITY = _values["security"]
 DOCS = _values["docs"]
 GATE = _values["gate"]
+BRIEF = _values["brief"]
 
 
 def strings(section: dict[str, Any], key: str) -> tuple[str, ...]:
     """A list of the file, which problems() checked, as a tuple."""
     return tuple(cast("list[str]", section[key]))
+
+
+def allowed() -> tuple[str, ...]:
+    """What a fix branch may change: the tests, the code, and what the gate allows besides."""
+    besides = strings(GATE, "allowed_besides")
+    return (f"{SOURCES['tests']}/", f"{SOURCES['code']}/", *besides)
+
+
+def brief() -> dict[str, str]:
+    """What the workflows' prompts say about this repository: the file's [brief], with the
+    paths and lists the scripts read too, so the prompts and the gate name the same ones."""
+    *first, last = allowed()
+    return {
+        **cast("dict[str, str]", BRIEF),
+        "code": f"{SOURCES['code']}/",
+        "tests": f"{SOURCES['tests']}/",
+        "specs": f"{SOURCES['specs']}/",
+        "policy": SECURITY["policy"],
+        "may_change": f"{', '.join(first)} and {last}",
+    }
+
+
+if __name__ == "__main__":
+    import json
+    import sys
+
+    if sys.argv[1:] != ["brief"]:
+        sys.exit("usage: project.py brief")
+    print(json.dumps(brief(), ensure_ascii=False))

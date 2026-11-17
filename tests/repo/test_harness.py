@@ -20,6 +20,7 @@ from harness import (
     mutation,
     outcomes,
     plan,
+    project,
     record,
     surface,
     sweep,
@@ -785,11 +786,12 @@ def test_no_workflow_names_a_session_or_a_model() -> None:
 
 
 def test_the_fix_workflow_tells_its_agents_what_the_gate_lets_through() -> None:
-    """The prompt's list is written by hand; the gate's is the one that holds."""
+    """The prompt's list comes with the brief, from the list the gate holds."""
     script = (gate.ROOT / ".claude" / "workflows" / "improve-tests-fix.js").read_text()
-    [may] = re.findall(r"const MAY_CHANGE = '([^']*)'", script)
+    assert "const MAY_CHANGE = B.may_change" in script
+    may = project.brief()["may_change"]
     assert re.findall(r"[\w./]+", may.replace(" and ", " ")) == list(gate.ALLOWED)
-    assert "tests/snapshots/" in script
+    assert "tests/snapshots/" in project.brief()["never"]
     assert "FORBIDDEN =" not in script
 
 

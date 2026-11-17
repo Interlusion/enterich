@@ -5,7 +5,10 @@ wrong form stops the scripts instead of making a check read nothing."""
 
 import ast
 import copy
+import json
 import re
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -186,3 +189,44 @@ def test_a_lens_a_key_or_a_word_that_isnt_a_value_passes() -> None:
 def test_no_script_names_a_value_of_the_project_file(script: Path) -> None:
     found = offending(script.read_text(encoding="utf-8"))
     assert [f"{script.name}:{line}: {text!r}" for line, text in found] == []
+
+
+# The workflows' prompts take what they say about the repository from the brief
+
+WORKFLOWS = sorted((project.ROOT / ".claude" / "workflows").glob("*.js"))
+
+
+def _code(script: Path) -> str:
+    """A workflow without its comment lines."""
+    lines = script.read_text(encoding="utf-8").splitlines()
+    return "\n".join(line for line in lines if not line.lstrip().startswith("//"))
+
+
+def test_the_brief_is_what_the_workflows_read() -> None:
+    """Every phrase a prompt asks for is in the brief, and every phrase of it is asked for."""
+    used = {name for s in WORKFLOWS for name in re.findall(r"\bB\.(\w+)", _code(s))}
+    assert sorted(used) == sorted(project.brief())
+
+
+@pytest.mark.parametrize("script", WORKFLOWS, ids=lambda p: p.name)
+def test_no_workflow_names_what_the_brief_says(script: Path) -> None:
+    """A phrase of the brief written into a prompt would stay when the brief changes."""
+    code = _code(script)
+    found = [
+        f"{key}: {value!r}"
+        for key, value in project.brief().items()
+        if len(value) > 3 and re.search(rf"(?<![\w-]){re.escape(value)}(?![\w-])", code)
+    ]
+    assert found == []
+    assert "const B = args.brief" in code
+
+
+def test_the_brief_is_printed_for_the_session() -> None:
+    printed = subprocess.run(
+        [sys.executable, "harness/project.py", "brief"],
+        cwd=project.ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert json.loads(printed) == project.brief()

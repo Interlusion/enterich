@@ -102,3 +102,34 @@ types = ["uv", "run", "basedpyright"]
 markdown = ["uv", "run", "mdformat", "--check", "."]
 links = ["scripts/check-links.sh"]
 tests = ["uv", "run", "pytest", "-q", "-p", "no:cacheprovider", "-rp"]
+
+# What the workflows' prompts say about this repository, each a phrase a prompt puts in its
+# place. A workflow can't read a file: the session passes these, with the paths above, as
+# the argument "brief", the output of `uv run python harness/project.py brief`
+[brief]
+product = "Enterich"
+backend = "ERPNext"
+# The method the agents are told they serve
+method = "docs/arc42/adr/ADR-008-improvement-pipeline.md"
+about = "Enterich is an MCP server that gives an AI agent a fixed list of tools on ERPNext"
+threat = "the agent may be steered by text from outside (docs/analysis/analysis-001-excessive-agency-review.md is the threat model, SECURITY.md says what is in and out of scope)"
+attackers = "By a caller holding a valid token (the agent, steered by outside text), by a caller without one, by text an outside party wrote into ERPNext, by ERPNext's own answers, or by a deployer following the guides."
+by_design = "what analysis 001 marks as kept by design"
+# Where a request enters the code
+entry = "src/enterich/app.py, src/enterich/tools/"
+backlog = "docs/backlog/backlog.md"
+# Where the tests live, what they run against, and how to run them
+fakes = "tests/fakes/, the integration tests' client in tests/integration/"
+helpers = "tests/fakes/"
+e2e = "tests/e2e"
+test_homes = "under tests/unit/ or tests/integration/, or tests/e2e/ if only the end-to-end site shows it"
+run_tests = "uv run pytest ..."
+checks = "uv run pytest -q -p no:cacheprovider --ignore=tests/e2e; uv run ruff check; uv run ruff format --check; uv run basedpyright; uv run mdformat --check ."
+# What only the operator changes: a finding that needs it is a proposal
+contract = "docs/specs/, docs/arc42/adr/, AGENTS.md"
+never = "tests/snapshots/, or a file that configures a check or instructs an agent (such as a pytest.ini, ruff.toml, pyproject.toml, .mdformat.toml, AGENTS.md or CLAUDE.md) anywhere"
+# The docs lens: what CI already compares, the documents the pipeline may correct, and how a
+# finding names a tool's description
+docs_checked = "CI already compares, on every change: in tests/repo/, each catalogue's inputs and required inputs with the published schemas, every requirement ID a document cites with the specs, the configuration guide's variables and its Required and Default columns with the configuration, the README's tool list with the tools, and server.json with the package and the guide; in tests/e2e/, the guide's rights and site settings with what the site does; in scripts/check-links.sh, every link. Don't report what those checks would catch."
+docs_fixable = "a guide in docs/guides/, docs/arc42/README.md, README.md, a tool's description in src/enterich/tools/ that its spec doesn't word"
+tool_location = "src/enterich/tools/<module>.py:<tool name>"
