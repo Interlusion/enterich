@@ -1,13 +1,14 @@
 """The docs lens's deterministic stages (ADR-008): its inventory follows the documents in
-the repository."""
+the repository, and triage takes a drift only with what shows it."""
 
 import json
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from harness import documents
+from harness import documents, plan, triage
 
 
 def _tree(root: Path, *files: str) -> Path:
@@ -116,3 +117,84 @@ def test_a_vocabulary_that_isnt_kept_writes_nothing(
     monkeypatch.setattr(documents, "vocabulary", lambda: [GUIDE])
     assert documents.main(tmp_path / "run") == 1
     assert not (tmp_path / "run").exists()
+
+
+# The docs lens's findings in triage and the plan
+
+DRIFT: dict[str, Any] = {
+    "kind": "drift",
+    "promise": "configuration-guide",
+    "location": "docs/guides/configuration.md:ENTERICH_PORT",
+    "requirement": "REQ-002-PRS-NF005",
+    "mutants": [],
+    "claim": "The guide gives the port as 8001; Enterich listens on 8000",
+    "evidence": "configuration.md:40 says 8001; config.py:88 defaults to 8000",
+    "proposal": "Give the port as 8000",
+    "origin": "document:configuration-guide",
+    "verdict": {
+        "confirmed": True,
+        "class": "fix",
+        "pattern": None,
+        "test_files": [],
+        "reproduction": "configuration.md:40 `8001`; config.py:88 `port: int = 8000`",
+        "reason": "both lines read",
+    },
+}
+
+
+def test_a_docs_run_is_in_its_directorys_name() -> None:
+    assert triage.lens(Path("harness/runs/2026-11-17-docs")) == "docs"
+    assert triage.LENSES["docs"] == {"drift"}
+
+
+def test_a_drifts_key_names_its_document_and_place() -> None:
+    assert triage.key(DRIFT) == (
+        "drift:configuration-guide:docs/guides/configuration.md:ENTERICH_PORT"
+    )
+    assert triage.slug(DRIFT) == "configuration-guide-configuration-enterich-port"
+
+
+def test_a_complete_drift_can_be_triaged() -> None:
+    assert triage.check(DRIFT, promises={"configuration-guide"}) == []
+
+
+@pytest.mark.parametrize(
+    ("record", "problem"),
+    [
+        ({**DRIFT, "promise": None}, "promise None"),
+        ({**DRIFT, "promise": "token-check"}, "promise 'token-check'"),
+        # A drift is confirmed only with both sides shown
+        ({**DRIFT, "verdict": {**DRIFT["verdict"], "reproduction": None}}, "reproduction"),
+    ],
+)
+def test_a_drift_with_a_wrong_field_is_refused(record: dict[str, Any], problem: str) -> None:
+    assert any(problem in p for p in triage.check(record, promises={"configuration-guide"}))
+
+
+def test_each_lens_with_promises_reads_its_own_vocabulary() -> None:
+    assert triage.VOCABULARIES == {"security": triage.PROMISES, "docs": documents.DOCUMENTS}
+    assert triage.DOCUMENTS == documents.DOCUMENTS
+
+
+def test_triage_reports_a_docs_run_by_its_kind(tmp_path: Path) -> None:
+    run = tmp_path / "2026-11-17-docs"
+    run.mkdir()
+    vocabulary = tmp_path / "documents.jsonl"
+    vocabulary.write_text(json.dumps({"promise": "configuration-guide"}) + "\n")
+    (run / "findings.jsonl").write_text(json.dumps(DRIFT) + "\n")
+    empty = tmp_path / "empty.jsonl"
+    empty.write_text("")
+    done = triage.main(
+        run, suppressions=empty, backlog=tmp_path / "backlog", patterns=empty, promises=vocabulary
+    )
+    assert done == 0
+    report = (run / "report.md").read_text()
+    assert report.startswith("# Docs lens: 2026-11-17-docs\n")
+    assert "| drift | 1 | 1 |" in report
+
+
+def test_a_docs_runs_branches_are_named_after_its_lens() -> None:
+    fix = {**DRIFT, "key": triage.key(DRIFT), "slug": triage.slug(DRIFT), "ratchet": None}
+    [group] = plan.groups([fix], [], lens="docs")
+    # A fix of a document changes no test file: its branch is named after its survey
+    assert group["branch"] == "auto/docs-document-configuration-guide"

@@ -18,7 +18,7 @@ Three kinds of actor, each with one job:
 - **Scripts decide what counts.** They build the run's universe, check every record, and refuse a branch that breaks a rule.
 - **The operator decides what changes.** Only a person merges, and only a person changes the contract.
 
-A run takes one lens (a kind of finding; tests is the only one built) through fixed stages. It ends in `auto/` branches and proposals, never in `main`. Three things flow back so that the next run starts higher: the merged fixes, the operator's suppressions, and checks made from classes of finding (the ratchet).
+A run takes one lens (a kind of finding: tests, security and docs are built) through fixed stages. It ends in `auto/` branches and proposals, never in `main`. Three things flow back so that the next run starts higher: the merged fixes, the operator's suppressions, and checks made from classes of finding (the ratchet).
 
 ```mermaid
 flowchart TD
