@@ -13,4 +13,4 @@ Decisions about Enterich. The architecture they shape is in the [arc42 overview]
 | [ADR-007](ADR-007-specs-by-accounting-area.md) | Requirement specs by accounting area, with one core spec | Accepted |
 | [ADR-008](ADR-008-improvement-pipeline.md) | An improvement pipeline of agents between deterministic stages, committing only on `auto/` branches | Accepted |
 
-New ADRs take the highest number + 1 and start as Proposed. An ADR is Accepted when the maintainer accepts it, and is superseded by a new ADR rather than rewritten. Agent-drafted ADRs say so under Author.
+New ADRs take the highest number + 1 and start as Proposed. An ADR is Accepted when the maintainer accepts it. Until Enterich's 1.0.0, an accepted ADR is changed in place where the repository has moved on from it, and its commit says why; from 1.0.0, it is superseded by a new ADR rather than rewritten. Agent-drafted ADRs say so under Author.
