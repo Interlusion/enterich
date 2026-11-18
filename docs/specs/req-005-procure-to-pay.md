@@ -264,7 +264,7 @@ Enterich's comment on a draft, with its warnings, needs no further right (REQ-00
 Checked against ERPNext v16.52 source:
 
 - An invoice saved with `set_posting_time` 0 gets today, in the site's time zone (System Settings), as posting date at every save.
-- A given rate is kept unless a price pricing rule for buying matches the row; then the rule sets the rate anew at every save and its name goes into the row's `pricing_rules`. Product pricing rules append free-item rows (`is_free_item`).
+- A given rate is kept unless a pricing rule for buying matches the row; then its name goes into the row's `pricing_rules` and the rate is set anew at every save: a price rule's rate, or for a product rule the price list rate where the item has one. Product pricing rules append free-item rows (`is_free_item`).
 - The supplier's address, contact, payment terms, price list and accounts are filled in on save only where the draft has none; a supplier address of another supplier is refused.
 - Without a due date, ERPNext counts one from `bill_date` when given, else from the posting date, by the supplier's payment terms template, else its supplier group's, else the company's; it never sets one before the posting date. A due date before `bill_date` is refused, and so is one later than the payment terms counted from `bill_date` allow; for a bill older than its terms, the due date ERPNext counts itself (never before the posting date) is such a date, so the agent gives the due date from the bill (`validate_due_date_with_template`).
 - Under perpetual inventory, a stock item's `expense_account` is replaced on save by the company's Stock Received But Not Billed account unless the invoice updates stock (`set_expense_account`); the desk only shows a message.

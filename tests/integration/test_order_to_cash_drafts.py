@@ -517,6 +517,25 @@ def test_a_rate_a_pricing_rule_replaced_warns(mcp: Session, erp: FakeErpnext) ->
     assert len(erp.comments) == 1
 
 
+def test_a_rate_a_product_rule_replaced_warns(mcp: Session, erp: FakeErpnext) -> None:
+    # A product rule adds the free item and sets the paid row to the price list's rate
+    erp.free_items["SKU-1"] = "GIFT"
+    result = create(mcp, items=[{"item_code": "SKU-1", "qty": 2, "rate": 48}]).data
+    assert result["warnings"] == [
+        "Row 1 (SKU-1): rate 48 was given, but ERPNext saved 50; a pricing rule set it."
+    ]
+
+
+def test_a_product_rule_keeps_the_rate_given_for_an_item_without_a_price(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    # Without a price list rate, ERPNext has none to set: the rate given stays
+    erp.free_items["SKU-9"] = "GIFT"
+    result = create(mcp, items=[{"item_code": "SKU-9", "qty": 1, "rate": 30}]).data
+    assert [(r["item_code"], r["rate"]) for r in result["items"]] == [("SKU-9", 30), ("GIFT", 0)]
+    assert result["warnings"] == []
+
+
 def test_a_row_without_a_price_warns(mcp: Session) -> None:
     result = create(mcp, items=[*ONE_ITEM, {"item_code": "SKU-9", "qty": 1}]).data
     assert result["items"][1]["rate"] == 0
@@ -527,9 +546,10 @@ def test_a_row_without_a_price_warns(mcp: Session) -> None:
 
 def test_kept_rates_and_free_items_dont_warn(mcp: Session, erp: FakeErpnext) -> None:
     erp.free_items["SKU-1"] = "GIFT"
-    result = create(mcp, items=[{"item_code": "SKU-1", "qty": 2, "rate": 48}]).data
+    # The price list's rate: the one a product rule saves
+    result = create(mcp, items=[{"item_code": "SKU-1", "qty": 2, "rate": 50}]).data
     assert [(r["item_code"], r["rate"], r["is_free_item"]) for r in result["items"]] == [
-        ("SKU-1", 48, False),
+        ("SKU-1", 50, False),
         ("GIFT", 0, True),
     ]
     # ERPNext answers 0 and 1; the result has booleans (REQ-001-PRS-F014)
