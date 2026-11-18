@@ -525,8 +525,8 @@ def test_only_journal_entries_of_its_own_voucher_type_are_updated(
     )
     assert (refused.error, refused.text) == (
         True,
-        f"name: the journal entry {theirs['name']!r} doesn't exist, or the agent user isn't "
-        "permitted to read it.",
+        f"name: {theirs['name']} isn't a journal entry of voucher type Journal Entry, the only "
+        "kind Enterich changes; a person changes it in ERPNext.",
     )
 
 

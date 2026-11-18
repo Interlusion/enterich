@@ -470,16 +470,30 @@ def test_a_drafts_date_without_a_number_says_how_to_clear_it(
         {"voucher_type": "Bank Entry"},
         {"voucher_type": "Opening Entry"},
         {"voucher_type": "Bank Entry", "docstatus": 1},
-        {"company": "Other AG"},
-        {"company": "Other AG", "docstatus": 1},
     ],
 )
-def test_what_enterich_doesnt_change_answers_as_unknown(
+def test_another_voucher_type_is_refused_naming_the_one_enterich_changes(
     mcp: Session, erp: FakeErpnext, overrides: dict[str, Any]
 ) -> None:
+    # REQ-001-PRS-F003: the agent can read it, so it learns why it can't change it
     other = journal_entry("ACC-JV-2026-00012", **{"docstatus": 0, **overrides})
     erp.add("Journal Entry", other)
-    # Stale as well: the answer comes before the state and `modified` are checked.
+    # Stale as well: the refusal comes before the state and `modified` are checked.
+    result = update(mcp, "ACC-JV-2026-00012", "2026-01-01 00:00:00.000000", user_remark="X")
+    assert result.error
+    assert result.text == (
+        "name: ACC-JV-2026-00012 isn't a journal entry of voucher type Journal Entry, the only "
+        "kind Enterich changes; a person changes it in ERPNext."
+    )
+    assert erp.writes() == []
+
+
+@pytest.mark.parametrize("docstatus", [0, 1])
+def test_another_companys_journal_entry_answers_as_unknown(
+    mcp: Session, erp: FakeErpnext, docstatus: int
+) -> None:
+    other = journal_entry("ACC-JV-2026-00012", docstatus=docstatus, company="Other AG")
+    erp.add("Journal Entry", other)
     result = update(mcp, "ACC-JV-2026-00012", "2026-01-01 00:00:00.000000", user_remark="X")
     unknown = update(mcp, "ACC-JV-2026-09999", user_remark="X")
     assert result.error
