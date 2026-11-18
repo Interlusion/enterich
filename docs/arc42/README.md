@@ -235,7 +235,7 @@ Variables: [configuration guide](../guides/configuration.md).
 
 - **Limits** ([REQ-001-PRS-NF003](../specs/req-001-core.md#req-001-prs-nf003-result-limits), [REQ-002-PRS-NF011](../specs/req-002-service.md#req-002-prs-nf011-limits)) stay below what hosted clients enforce, so Enterich's own message arrives rather than a client's cut-off: Claude's hosted apps, for example, allowed about 150,000 characters per tool result and 240 s per tool call (October 2026).
 
-- **Testing:** unit tests per block; integration tests run Enterich against a fake JWKS and a fake ERPNext that records every request, so each test can assert exactly what ERPNext received. A snapshot of `tools/list` pins the public tool contract.
+- **Testing:** unit tests per block; integration tests run Enterich against a fake JWKS and a fake ERPNext that records every request, so each test can assert exactly what ERPNext received. End-to-end tests run Enterich against a real ERPNext site, and compare the fake ERPNext's answers with the site's. A snapshot of `tools/list` pins the public tool contract.
 
 ## 9. Architecture decisions
 

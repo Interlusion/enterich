@@ -48,7 +48,7 @@ The tests have three levels:
 
 - **Unit:** one module, its collaborators replaced where they reach outside.
 - **Integration:** Enterich as a whole, from the MCP request to its ERPNext calls, with its neighbours faked: the authorization server's keys (`FakeJwks`) and ERPNext (`FakeErpnext`).
-- **End-to-end:** from the MCP request to a real ERPNext site; only the token issuer is faked. They cover the reads and reports of every area, the drafts with the duplicate check against people's drafts, the ceiling of the agent user's key, the rights, and English answers on a site with another language. Where the site answers differently from `FakeErpnext`, the fake is corrected ([ITEM-004](../backlog/archive/item-004-real-erpnext-test.md)).
+- **End-to-end:** from the MCP request to a real ERPNext site; only the token issuer is faked. They cover the reads and reports of every area, the drafts with the duplicate check against people's drafts, the ceiling of the agent user's key, the rights, and English answers on a site with another language. They hold `FakeErpnext` to the site too: `tests/e2e/test_fake.py` compares the fields the fake's answers give and their types, not their values, and the behaviour it imitates that has a comparison there, with the site's, so a fake that drifts, or a newer ERPNext it doesn't follow, fails there and not silently in the integration tests. Where the site answers differently, the fake is corrected ([ITEM-004](../backlog/archive/item-004-real-erpnext-test.md)).
 
 Why this toolchain: [ADR-005](../arc42/adr/ADR-005-toolchain-and-dependencies.md).
 
@@ -72,6 +72,7 @@ The end-to-end tests need Docker and an ERPNext site, which takes about a minute
 ```sh
 scripts/erpnext-site.sh up                                    # or keeps the running one
 E2E_ERPNEXT_URL=http://127.0.0.1:8080 uv run pytest tests/e2e
+E2E_ERPNEXT_URL=http://127.0.0.1:8080 uv run pytest tests/e2e/test_fake.py  # the fake alone
 scripts/erpnext-site.sh down                                  # removes it with its data
 ```
 
@@ -89,6 +90,7 @@ The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The run
 
 - **Spec first.** A new operation, input or output field starts as a change to its area spec's catalogue ([specs index](../specs/README.md)), then tests, then code. Read REQ-001 too: its rules apply to every operation.
 - **Tests first** where a spec's Definition of Done describes the behaviour: the failing test is written from it, run red and committed before the code (`test:`, then `feat:` or `fix:`). Infrastructure (image, CI) and trying out a library's behaviour are exceptions; what they teach becomes a test afterwards. An operation's integration test asserts exactly what the fake ERPNext received.
+- **The fake against the site.** A change to what `FakeErpnext` answers is checked against the end-to-end site: run `tests/e2e/test_fake.py` on the site `scripts/erpnext-site.sh` starts (it uses `bench` in its backend container), and add a comparison there for behaviour it doesn't cover yet. The fast tests are only as right as the fake.
 - **The tool-list snapshot** changes only together with the area spec and a changelog line. Regenerate with `uv run pytest --snapshot-update` (syrupy) and review the diff; then write the README's tool list from it with `uv run python -m tests.readme`, which a test checks.
 - **No deployment facts:** hostnames, realms, client names, user IDs, company names, credentials or a site's tool selection never go into code, tests, docs or commit messages. Use `example.com`, `Example GmbH`, zero UUIDs.
 - **Never log** keys, secrets or tokens; tests check it.
