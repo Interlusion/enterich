@@ -11,7 +11,7 @@
 
 The operations of the buying side of the assigned company: suppliers, purchase invoices, purchase tax templates and open payables. The agent reads them and prepares drafts of purchase invoices, typically from an incoming supplier invoice, and of returns (debit notes) against them, which a person reviews and submits.
 
-Out of scope: purchase orders and receipts; stock (drafts never update stock); debit notes without returned items, such as a price reduction after the fact; returns not against an invoice, returns of invoices that updated stock, were paid on entry or are on hold, and returns of part of an invoice with a fixed discount or charge; payments, which belong to bank and cash (REQ-007).
+Out of scope: purchase orders and receipts; stock (drafts never update stock); debit notes without returned items, such as a price reduction after the fact; returns not against an invoice, returns of invoices that updated stock, were paid on entry or are on hold, and returns of part of an invoice with a fixed discount or charge; payments: payment entries belong to bank and cash (REQ-007), payments booked as journal entries to record to report (REQ-006).
 
 Read [REQ-001](req-001-core.md) first: it holds the personas, user stories and terms, and the rules every operation follows.
 
@@ -117,8 +117,8 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 **Description**: For REQ-001-PRS-F005, a purchase invoice create SHALL match:
 
-- when `bill_no` is given, a draft or submitted purchase invoice of the assigned company with the same supplier and `bill_no`;
-- otherwise, a draft with the same supplier, the same posting date (the given one, or today) and the same items (item codes and quantities, in any order, leaving out free-item rows a pricing rule added).
+- when `bill_no` is given, a draft or submitted purchase invoice of the assigned company with the same supplier and `bill_no`, returns included;
+- otherwise, a draft with the same supplier, the same posting date (the given one, or today) and the same item rows, matched as REQ-004-PRS-F006 matches them.
 
 An update that gives a `bill_no` SHOULD carry a warning, added to the draft, when another draft or submitted purchase invoice of the assigned company has the same supplier and `bill_no`.
 
@@ -134,7 +134,7 @@ An update that gives a `bill_no` SHOULD carry a warning, added to the draft, whe
 
 #### REQ-005-PRS-F007: Expense accounts ERPNext set
 
-**Description**: A purchase invoice create or update result SHOULD carry a warning for each item row whose given `expense_account` ERPNext saved as another (for a stock item under perpetual inventory, Stock Received But Not Billed). Accounts are compared without regard to case, as ERPNext saves a link in the case of the stored name. Rows are matched as REQ-001-PRS-F016 matches them, and count towards its 20 named rows.
+**Description**: A purchase invoice create or update result, other than a return's, SHOULD carry a warning for each item row whose given `expense_account` ERPNext saved as another (for a stock item under perpetual inventory, Stock Received But Not Billed). Accounts are compared without regard to case, as ERPNext saves a link in the case of the stored name. Rows are matched as REQ-001-PRS-F016 matches them, and count towards its 20 named rows.
 
 **Related URS**: REQ-005-URS-F002, REQ-001-URS-F009
 

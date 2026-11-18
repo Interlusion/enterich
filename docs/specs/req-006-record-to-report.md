@@ -70,7 +70,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-006-PRS-F003: General Ledger
 
-**Description**: Enterich SHALL offer `report_general_ledger` as the catalogue below defines it, for at most 366 days per call, both dates included. It SHALL check a given `account` (of the assigned company) and `party` as name inputs (REQ-001-PRS-F009) before the report. It SHALL take ERPNext's opening, total and closing rows by their position, not their label; `opening` and `closing` come from ERPNext's rows, `totals` are Enterich's sums over all entries (REQ-001's ERPNext calls). It SHALL return each row's `balance` only when `account` or `party` is given, the only case in which ERPNext counts the balance before `from_date`, and SHALL name in `currency` the currency of the amounts: the account's or party's when ERPNext shows the amounts in it, else the company's.
+**Description**: Enterich SHALL offer `report_general_ledger` as the catalogue below defines it, for at most 366 days per call, both dates included. It SHALL check a given `account` (of the assigned company) and `party` as name inputs (REQ-001-PRS-F009) before the report. It SHALL take ERPNext's opening, total and closing rows by their position, not their label; `opening` and `closing` come from ERPNext's rows, `totals` are Enterich's sums of the debit and credit of all entries, with `balance` their debit less their credit (REQ-001's ERPNext calls). It SHALL return each row's `balance` only when `account` or `party` is given, the only case in which ERPNext counts the balance before `from_date`, and SHALL name in `currency` the currency of the amounts: the account's or party's when ERPNext shows the amounts in it, else the company's.
 
 **Related URS**: REQ-006-URS-F001
 
@@ -78,6 +78,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - A range of 366 days, both dates included, is answered; one of 367 is refused before any ERPNext call.
 - With `account` or `party` given, the rows' `balance` is ERPNext's; without either, it is null, and `opening` holds the opening entries.
+- Entries of 0.1 and 0.2 debit and 0.4 credit, on an opening balance of 1,000, give `totals` of 0.3 debit, 0.4 credit and −0.1 `balance`.
 - An account in another currency than the company's returns its amounts with that `currency`; otherwise `currency` is the company's.
 - An unknown account, another company's account and an unknown party are refused naming the input, before the report.
 - An answer whose first row or last two rows aren't summary rows (with a posting date) is refused as a faulty answer.

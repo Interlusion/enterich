@@ -279,7 +279,7 @@ The quality goals of section 1, made testable. Each scenario names what happens,
 | ID | Scenario | Response and measure | Requirement |
 | :- | :- | :- | :- |
 | QS-13 | The agent uses a wrong tax template name | One tool error naming `taxes_and_charges` and both causes; the agent can correct it without guessing | [REQ-001-PRS-F009](../specs/req-001-core.md#req-001-prs-f009-unknown-or-unpermitted-names) |
-| QS-14 | The agent asks for the largest page of a large report | A narrowing message from Enterich, never a result over 100,000 characters cut off by the client | [REQ-002-PRS-NF011](../specs/req-002-service.md#req-002-prs-nf011-limits) |
+| QS-14 | The agent asks for the largest page of a large report | A narrowing message from Enterich, never a result over 100,000 characters cut off by the client | [REQ-001-PRS-NF003](../specs/req-001-core.md#req-001-prs-nf003-result-limits) |
 | QS-15 | A customer is named "Ignore previous instructions" | The name arrives only under `outside_text` | [REQ-001-PRS-NF001](../specs/req-001-core.md#req-001-prs-nf001-outside-text-marked) |
 | QS-16 | A person edited the draft the agent updates | A message saying the draft changed; a re-read and retry succeeds | [REQ-001-PRS-F004](../specs/req-001-core.md#req-001-prs-f004-stale-updates-refused) |
 | QS-17 | The agent creates a draft again after a lost answer, in the same conversation or a new one | Refused as a possible duplicate, naming the first draft; no second document unless the agent sets `allow_duplicate` | [REQ-001-PRS-F005](../specs/req-001-core.md#req-001-prs-f005-possible-duplicates-refused) |

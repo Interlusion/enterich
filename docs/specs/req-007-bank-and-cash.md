@@ -11,7 +11,7 @@
 
 The operations on the assigned company's bank accounts: the accounts themselves, the bank transactions imported from statements, and the payment entries that settle invoices. The agent finds unreconciled bank lines and the payments behind them, prepares payment entry drafts for payments received from customers and made to suppliers through the company's bank accounts, and uses the lines to prepare journal entries (REQ-006) or to answer questions.
 
-Out of scope: reconciliation, importing statements; bank accounts of parties; payment entries through cash accounts, internal transfers, refunds (a payment to a customer or from a supplier), payments between two currencies, deductions such as a discount or a bank fee, allocations to anything but invoices, allocations to an invoice's payment terms, invoices booked to another receivable or payable account than the party's, and payments to a supplier held for payments.
+Out of scope: reconciliation, importing statements; bank accounts of parties; payment entries through cash accounts, internal transfers, refunds (a payment to a customer or from a supplier), payments between two currencies, deductions such as a discount or a bank fee, allocations of a payment entry to anything but invoices, allocations to an invoice's payment terms, invoices booked to another receivable or payable account than the party's, and payments to a supplier held for payments.
 
 Read [REQ-001](req-001-core.md) first: it holds the personas, user stories and terms, and the rules every operation follows.
 
@@ -32,7 +32,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - **Reconciled**: a submitted bank transaction whose amount is fully allocated to vouchers (`unallocated_amount` 0 or less, as ERPNext sets its status).
 - **Pending**: a bank transaction still a draft, as a statement import leaves its lines unless it submits them; bank reconciliation doesn't offer it.
-- **Allocation**: the part of a payment set against one invoice; the part of the payment not allocated is an advance to or from the party.
+- **Allocation**: the part of a payment entry set against one invoice, or of a bank transaction set against one voucher; the part of a payment entry not allocated is an advance to or from the party.
 
 ## URS — Functional
 
@@ -44,9 +44,9 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-007-URS-F002: Prepare payments
 
-**Description**: The agent SHALL be able to create and change drafts of payment entries for payments received from customers and made to suppliers through the company's bank accounts, allocated to the party's invoices, and a payment already recorded SHALL NOT be recorded again unnoticed.
+**Description**: The agent SHALL be able to create and change drafts of payment entries for payments received from customers and made to suppliers through the company's bank accounts, allocated to the party's invoices, and a payment entry with the bank reference of one already recorded for the party SHALL NOT be recorded again unnoticed.
 
-**Related User Stories**: REQ-007-P3-1 | **Refines**: REQ-001-URS-F002, REQ-001-URS-F007 | **Rationale**: An invoice stays open until its payment is booked; the bank's reference number ties a payment to its statement line.
+**Related User Stories**: REQ-007-P3-1 | **Refines**: REQ-001-URS-F002, REQ-001-URS-F007 | **Rationale**: An invoice stays open until its payment is booked; the bank's reference number ties a payment to its statement line. A payment booked as a journal entry (REQ-006), with the bank's reference as `cheque_no`, isn't looked for.
 
 ## PRS — Functional
 
@@ -112,6 +112,8 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - each `allocated_amount` is at most its invoice's outstanding amount;
 - the allocations together are at most the paid amount: the given references, or when an update gives none, the draft's as saved; the given `paid_amount`, or the draft's.
 
+The rules on single references apply to the given references; ERPNext checks the saved ones itself.
+
 **Related URS**: REQ-007-URS-F002, REQ-001-URS-F006
 
 **Definition of Done**:
@@ -124,7 +126,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-007-PRS-F006: Duplicate match for payment entries
 
-**Description**: For REQ-001-PRS-F005, a payment entry create SHALL match a draft or submitted payment entry of the assigned company with the same party type, party and `reference_no`. An update that gives a `reference_no` SHOULD carry a warning, added to the draft, when another draft or submitted payment entry of the assigned company has the same party and `reference_no`.
+**Description**: For REQ-001-PRS-F005, a payment entry create SHALL match a draft or submitted payment entry of the assigned company with the same party type, party and `reference_no`. An update that gives a `reference_no` SHOULD carry a warning, added to the draft, when another draft or submitted payment entry of the assigned company has the same party type, party and `reference_no`.
 
 **Related URS**: REQ-007-URS-F002
 
@@ -200,7 +202,7 @@ A bank transaction's `party_type` and `party` are the party set on the line, by 
 | `list_bank_accounts` | Bank Account: read |
 | `list_bank_transactions`, `get_bank_transaction` | Bank Transaction: read |
 | `list_payment_entries`, `get_payment_entry` | Payment Entry: read |
-| `create_draft_payment_entry`, `update_draft_payment_entry` | Payment Entry: read, create, write only if creator; Account: select; Bank Account, Customer, Sales Invoice, Supplier, Purchase Invoice: read (Enterich and ERPNext read them while saving: Account for a new bank account, Customer and Sales Invoice for a customer's payment, Supplier and Purchase Invoice for a supplier's) |
+| `create_draft_payment_entry`, `update_draft_payment_entry` | Payment Entry: read, create, write only if creator; Account: select; Bank Account, Customer, Sales Invoice, Supplier, Purchase Invoice: read (Enterich and ERPNext read them while saving: Bank Account for the given one, Customer and Sales Invoice for a customer's payment, Supplier and Purchase Invoice for a supplier's) |
 
 ERPNext lists a payment's accounts with the user's permissions when it reads their currency and type (`get_account_details`), hence select on Account; the party's receivable or payable account and the invoices' accounts need nothing more.
 
