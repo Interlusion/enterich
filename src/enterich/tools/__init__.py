@@ -7,6 +7,7 @@ returns errors as results, so the agent gets Enterich's text unchanged.
 """
 
 import html
+import json
 import logging
 import secrets
 import time
@@ -43,6 +44,12 @@ OPERATION_TIMEOUT = 60.0
 MAX_LOGGED_STRING = 200
 MAX_LOGGED_ITEMS = 100
 UNEXPECTED = "Enterich failed unexpectedly; the operator finds the details in Enterich's log."
+# A draft result's lists that aren't its child tables
+KEPT_LISTS = frozenset({"warnings", "truncated"})
+# The fields every create or update result has (REQ-001's Results); all else can be left out
+DRAFT_RESULT_FIELDS = frozenset(
+    {"name", "modified", "status", "docstatus", "company", "url", "warnings", "truncated"}
+)
 # The keyword the SDK hands a tool its request under; the client's arguments come in one
 # dict beside it, so a client argument of that name stays an argument
 REQUEST = "enterich_request"
@@ -308,20 +315,52 @@ async def _attempt(
         return _refused(f"The operation took longer than {OPERATION_TIMEOUT:g} seconds.")
     except (Refusal, ErpnextError) as exc:
         return _refused(str(exc))
+    if op.kind == "read":
+        text = to_text(result)
+        if text is None:
+            return _refused(
+                "The result would exceed 100,000 characters: narrow a list or report (a search, "
+                "a filter or a smaller limit); a single document this large is too large to return."
+            )
+        return text, _outcome(op, result)
+    # The draft is written: it gets its comment, and the agent its number, whatever its size
+    origin = _origin(op, call, inputs)
+    result["warnings"] = await _comment(
+        context, op, str(result["name"]), origin, result["warnings"], deadline
+    )
+    return _write_text(result), _outcome(op, result)
+
+
+def _write_text(result: dict[str, Any]) -> str:
+    """A create or update result, without its child tables when it would be too large with
+    them, and without all but the fields every draft result has when it still would
+    (REQ-001-PRS-NF003); its warnings stay, the comment's among them."""
     text = to_text(result)
-    if text is None:
-        return _refused(
-            "The result would exceed 100,000 characters: narrow a list or report (a search, "
-            "a filter or a smaller limit); a single document this large is too large to return."
-        )
-    if op.kind != "read":
-        origin = _origin(op, call, inputs)
-        result["warnings"] = await _comment(
-            context, op, str(result["name"]), origin, result["warnings"], deadline
-        )
-        # A warning about the comment that takes the result over the limit is left out
-        text = to_text(result) or text
-    return text, _outcome(op, result)
+    if text is not None:
+        return text
+    tables = [k for k, v in result.items() if isinstance(v, list) and k not in KEPT_LISTS]
+    rest = [k for k in result if k not in DRAFT_RESULT_FIELDS]
+    slim = result
+    for left_out in (tables, rest):
+        if left_out:
+            slim = _without(result, left_out)
+            if (text := to_text(slim)) is not None:
+                return text
+    # What is left is short, and the warnings are few: no draft result gets here
+    return json.dumps(slim, ensure_ascii=False, default=str)
+
+
+def _without(result: dict[str, Any], left_out: list[str]) -> dict[str, Any]:
+    cut = cast("list[str]", result.get("truncated") or [])
+    note = (
+        f"This result leaves out the draft's {', '.join(left_out)}: with them it would exceed "
+        "100,000 characters. Read the draft to see them."
+    )
+    return {
+        **{k: v for k, v in result.items() if k not in left_out},
+        "truncated": [*(t for t in cut if t.split(".")[0] not in left_out), *left_out],
+        "warnings": [*result["warnings"], note],
+    }
 
 
 def _refused(text: str) -> tuple[str, dict[str, Any]]:
