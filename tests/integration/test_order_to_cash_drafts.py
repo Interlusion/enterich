@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from enterich import tools
+from enterich import shapes, tools
 from tests.conftest import Logs
 from tests.fakes.erpnext import (
     AGENT,
@@ -729,6 +729,28 @@ def test_a_failing_comment_without_warnings_still_says_so(mcp: Session, erp: Fak
     assert result["name"] in erp.docs["Sales Invoice"]
     [missing] = result["warnings"]
     assert "comment" in missing
+
+
+def test_a_result_too_large_with_its_rows_still_returns_the_draft(
+    mcp: Session, erp: FakeErpnext, logs: Logs, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-NF003, REQ-001-PRS-F015: the draft is written, so the agent learns its
+    # number and the draft gets its comment; only the tables are left out of the result
+    monkeypatch.setattr(shapes, "MAX_RESULT_CHARS", 2_000)
+    items = [{"item_code": "SKU-1", "qty": n} for n in range(1, 21)]
+    result = create(mcp, items=items, taxes_and_charges="VAT 19% - EX")
+    assert not result.error, result.text
+    data = result.data
+    assert data["name"] in erp.docs["Sales Invoice"]
+    assert data["modified"] == erp.docs["Sales Invoice"][data["name"]]["modified"]
+    assert {"items", "taxes", "tax_summary"}.isdisjoint(data)
+    assert sorted(data["truncated"]) == ["items", "tax_summary", "taxes"]
+    [left_out] = data["warnings"]
+    assert "items" in left_out
+    [comment] = erp.comments
+    assert comment["reference_name"] == data["name"]
+    [line] = logs.events("operation")
+    assert line["outcome"] == {"document": data["name"]}
 
 
 def test_the_comment_stays_within_the_operation_time(

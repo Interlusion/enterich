@@ -1,6 +1,7 @@
 """Running an operation: REQ-001-PRS-F008 (tool errors), REQ-002-PRS-NF008
 (operation and error lines), with operations made up for the test."""
 
+import json
 from typing import Any
 
 import pytest
@@ -12,7 +13,7 @@ from enterich.erpnext import Erpnext
 from enterich.shapes import Inputs
 from enterich.tools import Context, Kind, Operation
 from tests.conftest import Logs
-from tests.fakes.erpnext import FakeErpnext
+from tests.fakes.erpnext import COMMENT_METHOD, FakeErpnext, error
 from tests.fakes.settings import API_SECRET, settings
 
 pytestmark = pytest.mark.anyio
@@ -156,17 +157,47 @@ async def test_a_create_names_the_document(monkeypatch: pytest.MonkeyPatch, logs
     assert logs.events("operation")[0]["outcome"] == {"document": "SINV-0001"}
 
 
-async def test_a_write_whose_result_is_too_large_leaves_no_comment(
+async def test_a_write_too_large_without_its_tables_returns_its_number_and_comments(
     monkeypatch: pytest.MonkeyPatch, logs: Logs
 ) -> None:
+    # REQ-001-PRS-NF003: the draft is written, whatever field takes its result over the limit
     async def create(inputs: Nothing, context: Context) -> dict[str, Any]:
-        return {"name": "SINV-0001", "warnings": [], "remarks": "x" * 200_000}
+        return {
+            "name": "SINV-0001",
+            "modified": "2026-10-29 10:00:00.000000",
+            "status": "Draft",
+            "docstatus": 0,
+            "company": "Example GmbH",
+            "customer": "CUST-0001",
+            "url": "https://erp.example.com/desk/sales-invoice/SINV-0001",
+            "warnings": ["Possible duplicate of SINV-0000."],
+            "truncated": ["items.description"],
+            "outside_text": {"remarks": "x" * 200_000},
+            "items": [{"item_code": "SKU-1"}],
+        }
 
     erp = FakeErpnext()
-    error, text = await call(monkeypatch, create, kind="create", erp=erp)
-    assert error
-    assert "100,000" in text
-    assert erp.received == []
+    erp.fail(COMMENT_METHOD, 417, error(417, "ValidationError", "No comments"))
+    error_, text = await call(monkeypatch, create, kind="create", erp=erp)
+    assert not error_
+    result = json.loads(text)
+    # The fields every draft result has (REQ-001's Results), and the warnings, all of them
+    assert set(result) == {
+        "name",
+        "modified",
+        "status",
+        "docstatus",
+        "company",
+        "url",
+        "warnings",
+        "truncated",
+    }
+    assert result["truncated"] == ["customer", "outside_text", "items"]
+    duplicate, missing, note = result["warnings"]
+    assert duplicate == "Possible duplicate of SINV-0000."
+    assert "comment" in missing
+    assert "customer, outside_text, items" in note
+    assert logs.events("operation")[0]["outcome"] == {"document": "SINV-0001"}
 
 
 def test_each_write_names_the_doctype_it_comments_on() -> None:
