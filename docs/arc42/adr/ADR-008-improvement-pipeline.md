@@ -46,7 +46,7 @@ A run takes one **lens** (a kind of finding) through fixed stages. Deterministic
 1. **Tests:** Definition of Done items without a test and tests without a requirement, both ways; mutation survivors judged as noise, equivalent or a gap; weak tests, which would pass with the behaviour broken or repeat another test. A test is a candidate for removal only when it kills no mutant another test doesn't.
 2. **Security:** against the promises of `SECURITY.md`'s scope and `AGENTS.md`'s rules, with [analysis 001](../../analysis/analysis-001-excessive-agency-review.md)'s threat model behind them.
 3. **Docs:** specs, ADRs and guides against the code, such as a catalogue table against the published tool schemas.
-4. **Code:** quality within the ADRs' choices.
+4. **Code:** quality within the ADRs' choices: what a path loses, a wrong outcome after a side effect, a rule written twice, a pattern one place misses. A restructure that no failing test shows is a proposal, made by hand in its first runs.
 
 A lens is added after the previous one has run once and its retrospective is written.
 

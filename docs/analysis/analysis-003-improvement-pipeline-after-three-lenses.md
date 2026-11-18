@@ -88,6 +88,8 @@ Analysis 002's §3.8 still holds; three lenses sharpen it.
 
 Two things a child needs that analysis 002 didn't name: the product description for the prompts, and inventory code that knows the product's structure. Both are small for Enterich and will differ entirely for Haflinger.
 
+The fourth lens, the code lens, was built after this analysis (`harness/README.md`, The code lens), with the move in mind: its four concerns and their bars are generic, and so is its inventory but for the groups of modules (`harness/modules.jsonl`, child data) and its hints' limits (`[code]` in `harness/project.toml`). The move carries one decision still open: whether the gate gets a `refactor:` path for restructures no failing test shows, which its first runs leave to the operator by hand. Its survey and verify engine is the third copy of the one above.
+
 ### 3.7 What no lens looks at
 
 - **The contract's own soundness:** whether a spec is unambiguous and verifiable, whether two specs contradict each other (the docs run met one by chance, REQ-001 against REQ-006), whether an ADR's reasons still hold.
