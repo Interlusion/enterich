@@ -58,6 +58,8 @@ class Refused(ErpnextError):  # noqa: N818 - ERPNext's answer, not a fault of En
 class Meter:
     calls: int = 0
     seconds: float = 0.0
+    # The draft ERPNext answered a write with: once it is set, the operation wrote
+    written: dict[str, Any] | None = None
 
 
 _meter: ContextVar[Meter | None] = ContextVar("erpnext_meter", default=None)
@@ -72,6 +74,13 @@ def metered() -> Generator[Meter]:
         yield meter
     finally:
         _meter.reset(token)
+
+
+def _wrote(saved: dict[str, Any]) -> dict[str, Any]:
+    """Record the draft a write saved in the operation's meter (REQ-001-PRS-F015)."""
+    if (meter := _meter.get()) is not None:
+        meter.written = saved
+    return saved
 
 
 class Erpnext:
@@ -167,13 +176,13 @@ class Erpnext:
     async def insert(self, doctype: str, doc: dict[str, Any]) -> dict[str, Any]:
         """Insert a document; the answer is the document as saved."""
         answer = await self._call("POST", _resource(doctype), {}, doc)
-        return cast("dict[str, Any]", _expect(answer, "data", dict))
+        return _wrote(cast("dict[str, Any]", _expect(answer, "data", dict)))
 
     async def update(self, doctype: str, name: str, doc: dict[str, Any]) -> dict[str, Any]:
         """Save changes to a document; the answer is the document as saved."""
         path = f"{_resource(doctype)}/{quote(name, safe='')}"
         answer = await self._call("PUT", path, {}, doc)
-        return cast("dict[str, Any]", _expect(answer, "data", dict))
+        return _wrote(cast("dict[str, Any]", _expect(answer, "data", dict)))
 
     async def add_comment(self, doctype: str, name: str, content: str) -> None:
         # ERPNext takes the comment's author from the session; the two fields are ignored.

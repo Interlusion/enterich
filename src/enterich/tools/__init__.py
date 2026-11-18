@@ -290,7 +290,7 @@ async def _run(
     call = secrets.token_hex(6)  # REQ-002-PRS-NF008
     with erpnext.metered() as meter:
         try:
-            text, outcome = await _attempt(op, context, arguments, call)
+            text, outcome = await _attempt(op, context, arguments, call, meter)
         except Exception as exc:  # noqa: BLE001 - logged here with the operation
             log.failure(exc, context.settings.secrets, operation=op.name, call=call)
             text, outcome = UNEXPECTED, {"refusal": UNEXPECTED}
@@ -301,7 +301,11 @@ async def _run(
 
 
 async def _attempt(
-    op: Operation[Any], context: Context, arguments: dict[str, Any], call: str
+    op: Operation[Any],
+    context: Context,
+    arguments: dict[str, Any],
+    call: str,
+    meter: erpnext.Meter,
 ) -> tuple[str, dict[str, Any]]:
     try:
         inputs = op.inputs.model_validate(arguments)
@@ -311,10 +315,15 @@ async def _attempt(
     try:
         with anyio.fail_after(OPERATION_TIMEOUT):
             result = await op.run(inputs, context)
-    except TimeoutError:
-        return _refused(f"The operation took longer than {OPERATION_TIMEOUT:g} seconds.")
-    except (Refusal, ErpnextError) as exc:
-        return _refused(str(exc))
+    except Exception as exc:
+        if meter.written is None or op.kind == "read":
+            if isinstance(exc, TimeoutError):
+                return _refused(f"The operation took longer than {OPERATION_TIMEOUT:g} seconds.")
+            if isinstance(exc, Refusal | ErpnextError):
+                return _refused(str(exc))
+            raise
+        # ERPNext saved the draft: it is returned, never as refused (REQ-001-PRS-F015)
+        result = _written(context, op, meter.written, exc, call)
     if op.kind == "read":
         text = to_text(result)
         if text is None:
@@ -329,6 +338,30 @@ async def _attempt(
         context, op, str(result["name"]), origin, result["warnings"], deadline
     )
     return _write_text(result), _outcome(op, result)
+
+
+def _written(
+    context: Context, op: Operation[Any], saved: dict[str, Any], exc: Exception, call: str
+) -> dict[str, Any]:
+    """The fields every draft result has, of the draft ERPNext saved before `exc`."""
+    if isinstance(exc, TimeoutError):
+        failure = f"the operation took longer than {OPERATION_TIMEOUT:g} seconds"
+    elif isinstance(exc, Refusal | ErpnextError):
+        failure = str(exc)
+    else:
+        log.failure(exc, context.settings.secrets, operation=op.name, call=call)
+        failure = "Enterich failed unexpectedly; the operator finds the details in its log"
+    name = str(saved.get("name"))
+    fields = ("name", "modified", "status", "docstatus", "company")
+    return {
+        **{k: saved[k] for k in fields if k in saved},
+        "url": form_url(context.settings.erpnext_public_url, str(op.doctype), name),
+        "warnings": [
+            f"ERPNext saved the draft, but Enterich couldn't build the rest of this result "
+            f"({failure.rstrip('.')}). Read the draft to see it."
+        ],
+        "truncated": [],
+    }
 
 
 def _write_text(result: dict[str, Any]) -> str:
