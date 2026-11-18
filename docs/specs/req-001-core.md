@@ -403,7 +403,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - A create leaves one comment naming the operation and the call ID that its `operation` log line carries; an update giving `items` and `remarks` leaves one naming them too.
 - A create with `allow_duplicate: true` that matches an existing draft leaves one comment, which also names the match.
 - A draft with a tax template and zero tax gets the warning of REQ-001-PRS-F012 in its comment.
-- A refused create or update leaves no comment, and so does a create whose result Enterich refuses as too large.
+- A refused create or update leaves no comment; a create whose result comes without its tables (REQ-001-PRS-NF003) leaves one.
 - Markup in a warning reaches ERPNext escaped, as text.
 - A failing comment call yields a result with the draft and a warning that the comment is missing; so does a comment call that would end after the operation's 60 seconds, and the result comes within them.
 - Verification: test.
@@ -543,7 +543,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-NF003: Result limits
 
-**Description**: Every tool result SHALL stay under 100,000 characters. A get SHALL cut each child table to its first 100 rows and each text field of the record and its rows to 500 characters, and list what it cut in `truncated`; a list or report SHALL cut each text field of its records to 500 characters, and name the fields it cut in `truncated` as `records.<field>`; a create or update result SHALL cut each child table its area spec lists to its first 100 rows and name it in `truncated`; a list or report whose result would still be larger SHALL be refused with a message to narrow it, and a get with a message that the document is too large.
+**Description**: Every tool result SHALL stay under 100,000 characters. A get SHALL cut each child table to its first 100 rows and each text field of the record and its rows to 500 characters, and list what it cut in `truncated`; a list or report SHALL cut each text field of its records to 500 characters, and name the fields it cut in `truncated` as `records.<field>`; a create or update result SHALL cut each child table its area spec lists to its first 100 rows and name it in `truncated`; a list or report whose result would still be larger SHALL be refused with a message to narrow it, and a get with a message that the document is too large. A create or update result that would still be larger SHALL come without its child tables, and if it still would be, with only the fields every create or update result has ([Results](#results)), its warnings among them; it names what it leaves out in `truncated` and in a warning: the draft is written, and the agent learns its number.
 
 **Related URS**: REQ-001-URS-NF003
 
@@ -554,6 +554,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - A list of bank transactions, one of whose descriptions has 2,000 characters, returns it cut to 500, with `truncated: ["records.description"]`; a list with nothing cut has `truncated: []`.
 - An update of a draft with 500 rows returns 100 with `truncated: ["items"]`.
 - An oversized report result gives the narrowing message.
+- A create whose result would be too large with its rows returns the draft's number and `modified` without `items`, `taxes` and `tax_summary`, names them in `truncated` and warns; the draft carries its comment, and the log records the document.
 - Verification: test.
 - Evidence: Enterich's test suite.
 
