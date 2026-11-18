@@ -14,6 +14,7 @@ from enterich.shapes import (
     Flag,
     Inputs,
     Limit,
+    Money,
     Name,
     Offset,
     cut_rows,
@@ -127,9 +128,6 @@ PAYMENT_DRAFT_FIELDS = (
 DRAFT_REFERENCE_FIELDS = (*REFERENCE_FIELDS, "outstanding_amount")
 PAYMENT_MATCH = "party and bank reference (reference_no)"
 
-# An amount of a payment in cents: ERPNext keeps an amount as given but rounds the totals to
-# the currency's precision, so a third decimal place would leave a difference
-Money = Annotated[Decimal, Field(gt=0, le=1_000_000_000, decimal_places=2)]
 # The bank's reference for a payment, as on the statement: free text, not a name (ERPNext's
 # Data field); surrounding whitespace would defeat the duplicate check
 BankReference = Annotated[str, Field(min_length=1, max_length=140, pattern=r"^\S(.*\S)?$")]

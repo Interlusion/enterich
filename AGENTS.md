@@ -23,7 +23,7 @@ The repository is public: `Interlusion/enterich`.
 Start at `docs/README.md`. The specs in `docs/specs/` are the contract: a new operation or a changed input starts there, then tests, then code. The development guide's rules for changes (`docs/guides/development.md`) say each step in full; the rules here are the ones never to miss.
 
 - **Tests first** where a spec's Definition of Done describes the behaviour: write the failing test from it, run it red, then write the code. Commit the tests before the code (`test:` then `feat:`). Infrastructure (image, CI) and trying out a library's behaviour are exceptions; turn what you learn into a test afterwards.
-- For any operation, read REQ-001 (`docs/specs/req-001-core.md`) and the operation's area spec; REQ-001's Requirement Rules say how they relate. For access, configuration, logging or limits, read REQ-002 (`docs/specs/req-002-service.md`).
+- For any operation, read REQ-001 (`docs/specs/req-001-core.md`) and the operation's area spec; REQ-001's Requirement Rules say how they relate. For access, configuration, logging or limits, read REQ-002 (`docs/specs/req-002-service.md`); the operations offered, the drafts per hour and the limits on results are REQ-001's.
 - Which area an operation belongs to follows the rule and map in `docs/specs/README.md`, not judgement.
 - Write requirement IDs in full, as the specs index says (`REQ-004-PRS-F005`, not `PRS-F005`).
 - For a release, follow the releasing guide (`docs/guides/releasing.md`), its section for agents included.

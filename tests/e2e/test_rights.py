@@ -232,7 +232,8 @@ def arguments(
     )
     return {
         "list_items": {"search": "SKU"},
-        "get_item": {"item_code": seeded.item},
+        # An item with an Item Tax row, so that its template is read too
+        "get_item": {"item_code": seeded.item_taxed_19},
         "list_customers": {"search": "Example"},
         "get_customer": {"name": seeded.customer},
         "list_sales_invoices": {"customer": seeded.customer},

@@ -11,7 +11,7 @@
 
 The service around Enterich's operations: who may connect and how (an OAuth resource server for MCP over Streamable HTTP), the one ERPNext credential it holds, its configuration, its log, its limits on requests and on the wait for ERPNext, and its health endpoint.
 
-Out of scope: issuing tokens or signing users in, including second factors; several agent identities in one instance; browser-based clients calling Enterich directly (no CORS); network access control (source ranges, rate limits per client), which belongs to the deployment.
+Out of scope: as [REQ-001's Intended Use](req-001-core.md#intended-use) says, issuing tokens and signing users in, browser-based clients and network access control among it.
 
 [REQ-001](req-001-core.md) holds the personas, user stories and terms used here, and the rules for the operations.
 
@@ -43,7 +43,7 @@ Out of scope: issuing tokens or signing users in, including second factors; seve
 
 #### REQ-002-URS-NF004: Kill switches take effect
 
-**Description**: Enterich SHALL stop serving the agent on the next operation after the agent user is disabled in ERPNext, and once the current access token expires after the agent identity is disabled at the authorization server.
+**Description**: Enterich SHALL stop serving the agent on the next operation after the agent user is disabled in ERPNext, and once the current access token expires, give or take the configured clock leeway (REQ-002-PRS-NF001), after the agent identity is disabled at the authorization server.
 
 **Related User Stories**: REQ-001-P1-4 | **Rationale**: Clients hold refresh or offline tokens, so signing out ends nothing; disabling the users must.
 
@@ -103,7 +103,7 @@ Out of scope: issuing tokens or signing users in, including second factors; seve
 - marks itself as an access token: header `typ` `at+jwt` or `application/at+jwt` (compared case-insensitively), or claim `typ` `Bearer`;
 - is at most 8 KiB long.
 
-It SHALL answer a missing or refused token with 401, a token lacking a required scope with 403 `insufficient_scope`, and a token it can't check because no signing keys are available with 503 and `Retry-After: 30`.
+It SHALL answer a missing or refused token with 401, a token whose `scope` claim (space-separated) lacks a configured required scope with 403 `insufficient_scope`, and a token it can't check because no signing keys are available with 503 and `Retry-After: 30`.
 
 **Related URS**: REQ-002-URS-NF001, REQ-002-URS-NF004
 
@@ -133,7 +133,7 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 
 #### REQ-002-PRS-NF003: MCP endpoint
 
-**Description**: Enterich SHALL serve MCP over Streamable HTTP, stateless, with JSON responses, at exactly the path of its resource URL, for the protocol revisions its pinned SDK serves: POST only, any other method (including OPTIONS) answered with 405 and `Allow: POST` before the token check, no redirect from a trailing slash, no session state between requests.
+**Description**: Enterich SHALL serve MCP over Streamable HTTP, stateless, with JSON responses, at exactly the path of its resource URL, for the protocol revisions 2025-06-18, 2025-11-25 and 2026-07-28: POST only, any other method (including OPTIONS) answered with 405 and `Allow: POST` before the token check, no redirect from a trailing slash, no session state between requests.
 
 **Related URS**: REQ-002-URS-NF002, REQ-002-URS-NF007
 
@@ -262,7 +262,7 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 
 **Definition of Done**:
 
-- A 2 MiB POST gets 413 before token parsing; a fake ERPNext that doesn't answer produces a tool error after 30 s; a create whose calls together exceed 60 s ends with a tool error; a 20 MiB ERPNext response ends as a tool error.
+- A 2 MiB POST gets 413 before token parsing; a fake ERPNext that doesn't answer produces a tool error after 30 s; a create whose calls exceed 60 s before ERPNext answers its write ends with a tool error; once the draft is written, the comment gets what is left of the 60 s, and REQ-001-PRS-F015 says what the result carries; a 20 MiB ERPNext response ends as a tool error.
 - Verification: test.
 - Evidence: Enterich's test suite.
 
@@ -295,7 +295,7 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 
 #### REQ-002-PRS-NF014: Nothing of a deployment in the repository
 
-**Description**: The repository SHALL name no host or email address of a deployment. Each host in a URL SHALL be a reserved example or test name, an address that isn't public, or a public site on the repository's list of public hosts; each email address SHALL be at a reserved example domain. Each pushed commit SHALL pass a secret scan.
+**Description**: The repository SHALL name no host or email address of a deployment. Each host in a URL SHALL be a reserved example or test name, an address that isn't public, or a public site on the repository's list of public hosts; each email address SHALL be at a reserved example domain.
 
 **Related URS**: REQ-002-URS-NF008
 
@@ -303,9 +303,8 @@ It SHALL answer a missing or refused token with 401, a token lacking a required 
 
 - A check over every tracked file finds each host in a URL and each email address, and fails on one that isn't allowed, naming file, line and host; a company's host in a URL and an email address at its domain, planted in a file, each fail it.
 - A new public host passes only with an entry on the list.
-- CI scans each pushed commit for secrets, and the improvement pipeline's gate scans each branch before it pushes.
-- Verification: test and inspection.
-- Evidence: Enterich's test suite; the CI workflow.
+- Verification: test.
+- Evidence: Enterich's test suite.
 
 ## Acceptance Criteria Summary
 

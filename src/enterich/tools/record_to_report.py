@@ -111,8 +111,6 @@ BALANCE_VALUES = (
 MAX_FISCAL_YEAR_ROWS = 1000  # one per company a year is assigned to
 JOURNAL_DRAFT_FIELDS = ("posting_date", "total_debit", "total_credit")
 JOURNAL_MATCH = "posting date and rows"
-# The most rounding to a currency's precision (2 or 3 places) moves an amount.
-ROUNDING = Decimal("0.005")
 # The bank's reference: free text, not a name (ERPNext's Data field)
 ChequeNo = Annotated[str, Field(min_length=1, max_length=140)]
 
@@ -546,13 +544,9 @@ async def _journal_duplicates(
 def _same_rows(
     wanted: list[tuple[str, Decimal, Decimal]], stored: list[tuple[str, Decimal, Decimal]]
 ) -> bool:
-    """The given rows as ERPNext stores them: each amount rounded to the currency's
-    precision, which moves it by at most ROUNDING. Rounding keeps the order, so the rows
-    pair up sorted."""
-    return len(wanted) == len(stored) and all(
-        w[0] == s[0] and abs(w[1] - s[1]) <= ROUNDING and abs(w[2] - s[2]) <= ROUNDING
-        for w, s in zip(sorted(wanted), sorted(stored), strict=True)
-    )
+    """The same rows in any order; amounts of at most 2 decimal places are stored as given in
+    a currency of 2 or more (REQ-006-PRS-F007)."""
+    return sorted(wanted) == sorted(stored)
 
 
 def _rounding_warning(saved: dict[str, Any]) -> list[str]:
@@ -734,9 +728,10 @@ OPERATIONS: list[Operation[Any]] = [
         description=(
             "Create a draft journal entry (voucher type Journal Entry) of the assigned "
             "company; a person reviews and submits it in ERPNext. Give 2 to 20 `accounts` "
-            "rows, each with exactly one of `debit` and `credit`; debits and credits must be "
-            "equal. Accounts are in the company's currency. A receivable or payable account "
-            "needs `party_type` and `party`; ERPNext saves a party on another account but "
+            "rows, each with exactly one of `debit` and `credit`, of at most 2 decimal places; "
+            "debits and credits must be equal. Accounts are in the company's currency. A "
+            "receivable or payable account needs `party_type` and `party`; ERPNext saves a "
+            "party on another account but "
             "refuses it on submit. A row referencing an invoice carries its party and its "
             "receivable or payable account; `reference_type` and `reference_name` come "
             "together. `cheque_no` and `cheque_date` (the bank's reference and its date) come "

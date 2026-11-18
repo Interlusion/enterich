@@ -7,11 +7,19 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 ### Changed
 
 - **Tool descriptions:** `create_draft_sales_invoice` and `create_draft_purchase_invoice` say that a draft without `posting_date` has no fixed date: ERPNext gives it the day of each save, so an update on a later day moves it and the due date. Before, they said it defaulted to today. `get_item` says its accounts and cost centres are the item's own defaults, and an empty one means the item group's or the company's apply. `create_draft_payment_entry` says a payment without `references` is an advance without a warning.
+- **Inputs (breaking):** `create_draft_journal_entry` and `update_draft_journal_entry` take a row's `debit` and `credit` with at most 2 decimal places, not 3. ERPNext rounds each row to the currency's precision, so rows balanced to the third place were saved unbalanced, and every later update without rows was refused. A repeated create matches the amounts as given, no longer within 0.005 (REQ-006-PRS-F007, REQ-006-PRS-F008).
 
 ### Fixed
 
 - A refusal reaches the agent with the message ERPNext raised it with, the last of its messages, not a notice ERPNext sent before it. Before, a purchase draft of a stock item without an expense account was reported with "Expense Head changed…", and the agent never saw why ERPNext refused it, such as a supplier's `bill_no` given twice or a missing field. A message ERPNext sends as a list now reaches the agent with its items; before, the refusal came without a reason (REQ-001-PRS-F008).
+- A create or update whose result would exceed 100,000 characters returns the draft without its tables, naming them in `truncated` and in a warning, and the draft gets its "Enterich:" comment. Before, the draft was written but the agent was told the operation was refused, the draft had no comment, and the log recorded a refusal (REQ-001-PRS-NF003).
+- A create or update that fails after ERPNext saved the draft, while Enterich builds its result or once the operation's 60 seconds run out, returns the draft's name, `modified` and URL with a warning naming the failure, and the draft gets its comment. Before, the agent was told the operation was refused, though the draft existed (REQ-001-PRS-F015).
+- `get_item` returns only the item tax templates of the assigned company. Before, it returned every template an item names, other companies' too (REQ-003-PRS-F001).
 - **Configuration guide:** Disable Prepared Report Automation is set with `bench execute`. The guide named the System Console, which runs code only where server scripts are enabled, and they aren't by default.
+
+### Rights
+
+- **Item Tax Template:** read, for `get_item`, which reads the company of an item's templates. Without it, `get_item` of an item with item tax templates is refused (REQ-003).
 
 ## [0.6.0] - 2026-11-16
 

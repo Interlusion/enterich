@@ -461,22 +461,25 @@ def test_create_and_update_draft_journal_entry(mcp: Session, seeded: Seed, site:
     )
 
 
-def test_rows_erpnext_rounded_out_of_balance_are_a_warning(
-    mcp: Session, seeded: Seed, site: Site
-) -> None:
-    # Balanced as given; each half rounds to the cent, the whole doesn't move
+def test_rows_balanced_to_the_cent_stay_balanced(mcp: Session, seeded: Seed, site: Site) -> None:
+    # REQ-006's Acceptance Criteria: at most 2 decimal places, which a currency of 2 keeps;
+    # a third (13.005 twice against 26.01) is refused, as ERPNext would round it apart
     accounts = [
-        {"account": seeded.bank_ledger, "debit": "13.005"},
-        {"account": seeded.bank_ledger, "debit": "13.005"},
+        {"account": seeded.bank_ledger, "debit": "13.01"},
+        {"account": seeded.bank_ledger, "debit": "13.00"},
         {"account": CAPITAL, "credit": "26.01"},
     ]
-    draft = mcp.call("create_draft_journal_entry", {"accounts": accounts}).data
-    debit, credit = draft["total_debit"], draft["total_credit"]
-    assert (debit != credit, credit) == (True, 26.01)
-    [warning] = draft["warnings"]
-    assert "rounded the rows to the currency's precision" in warning
+    # A run before on the same day left the same draft: allowed, with only that warning
+    arguments = {"accounts": accounts, "allow_duplicate": True}
+    draft = mcp.call("create_draft_journal_entry", arguments).data
+    assert (draft["total_debit"], draft["total_credit"]) == (26.01, 26.01)
+    assert not [w for w in draft["warnings"] if "rounded" in w]
     [comment] = comments(site, "Journal Entry", draft["name"])
     assert comment["owner"] == AGENT
+    halves = [{**accounts[0], "debit": "13.005"}, {**accounts[0], "debit": "13.005"}, accounts[2]]
+    refused = mcp.call("create_draft_journal_entry", {"accounts": halves, "allow_duplicate": True})
+    assert refused.error
+    assert "accounts.0.debit" in refused.text
 
 
 def test_a_persons_journal_draft_is_a_duplicate(mcp: Session, seeded: Seed, site: Site) -> None:

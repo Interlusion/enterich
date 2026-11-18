@@ -4,7 +4,7 @@ REQ-001 holds the core: the personas, stories and terms, and what every operatio
 
 | Spec | Area | Status |
 | :- | :- | :- |
-| [REQ-001](req-001-core.md) | Core: personas, stories and terms, and the rules every operation follows | Baselined |
+| [REQ-001](req-001-core.md) | Core: personas, stories and terms, the rules every operation follows, and those operations of several areas share | Baselined |
 | [REQ-002](req-002-service.md) | Service: access and token check, protocol, configuration, logging, limits, health | Baselined |
 | [REQ-003](req-003-master-data.md) | Master data: items | Baselined |
 | [REQ-004](req-004-order-to-cash.md) | Order to cash: customers, sales invoices, receivables | Baselined |
@@ -17,9 +17,10 @@ Why the specs are cut this way: [ADR-007](../arc42/adr/ADR-007-specs-by-accounti
 ## Reading and writing
 
 - **For any operation, read REQ-001 and the operation's area spec.** [REQ-001's Requirement Rules](req-001-core.md#requirement-rules) say how the area specs relate to it.
-- **For access, configuration, logging or limits, read REQ-002,** with REQ-001's terms.
+- **For access, protocol, configuration, logging, health and the limits on requests and on the wait for ERPNext, read REQ-002,** with REQ-001's terms. What the operations' configuration chooses (the operations offered, the drafts per hour) and the limits on their results are REQ-001's.
+- **A rule that operations of more than one area share lives in REQ-001**, naming the operations it applies to (the invoice drafts of REQ-004 and REQ-005, say); an area spec holds only its own operations' rules.
 - **An operation belongs to the area of its main DocType or report**: the one it lists, reads, creates or updates. Records it only touches on the way (the addresses in `get_customer`) don't count.
-- **The map below decides.** For a DocType or report not yet in it: if one area uses it, that area; if several do, the area that maintains it, meaning the one in which people create and change those records; if no area maintains it, master data. Add the new entry to the map first.
+- **The map below decides.** For a DocType or report not yet in it: if one area uses it, that area; if several do, the area in whose work people create and change those records, when that is one area (Address, kept on customers and suppliers alike, is two); otherwise master data. Add the new entry to the map first.
 
 | Area | Main DocTypes and reports |
 | :- | :- |

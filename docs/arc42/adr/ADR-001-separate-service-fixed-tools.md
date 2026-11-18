@@ -13,7 +13,7 @@ An AI agent is to read an ERPNext company's books and prepare drafts, and must b
 - **MCP apps inside the Frappe bench.** Several exist. Most offer generic create, update and delete, method calls or document actions (submit, cancel), restricted by configuration; some add code or database query tools. In the bench they run with full database access, and they rely on Frappe's OAuth provider.
 - **Frappe's OAuth provider as the authorization server** doesn't fit remote MCP clients well: it has no resource indicators or audience binding, its protected resource metadata names the site's origin rather than an MCP URL with a path, and a request without a token to a whitelisted method gets 403, which clients don't take as a cue to sign in.
 - **Separate MCP servers for ERPNext** with an external authorization server exist too. They ship 100 and more tools, including submit, cancel and generic method calls, filtered by category or exclusion lists.
-- **Frappe's built-in MCP server** (on the v17 development branch, on by default) offers generic document and method tools.
+- **Frappe's built-in MCP server** (in v16 since a minor release, on by default, and turned on by the upgrade that brings it) offers generic document and method tools to any desk user.
 - **Generic MCP gateways** can turn REST calls into tools by configuration. The one that also acts as a resource server for an external authorization server needs an OpenAPI description, which Frappe v16 doesn't provide, and its policies only allow or deny a call. Amount limits, readable ERPNext errors, combining calls (a template's tax rows into an invoice) and refusing stale writes need code.
 
 No published server combined a separate process, an external authorization server, a short fixed tool list and draft-only writes.
@@ -43,7 +43,7 @@ Ideas taken from other projects: every update carries the document's `modified` 
 
 ### Alternative 4: Frappe's built-in MCP server
 
-**Rejected because**: generic tools, and not in v16. Sites on later versions should turn it off (configuration guide).
+**Rejected because**: generic tools, which take a DocType or method name and so go around a fixed tool list with the agent user's rights. Every site running Enterich turns it off (configuration guide).
 
 ## Consequences
 

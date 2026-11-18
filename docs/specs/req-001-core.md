@@ -61,7 +61,7 @@ This spec holds the product's personas, user stories and terms, and the rules ev
 - REQ-001-P1-4. As the operator, I need the agent's access to end as soon as I disable its user in ERPNext or in the authorization server.
 - REQ-001-P1-5. As the operator, I need to choose which operations my site offers, without changing Enterich's code.
 - REQ-001-P1-6. As the operator, I need to trace each change back to the connection and session that caused it.
-- REQ-001-P1-7. As the operator, I need to cap how many drafts the agent creates in an hour, so that a misled agent can't bury the people who review them in drafts.
+- REQ-001-P1-7. As the operator, I need to cap how many drafts of each type the agent creates in an hour, so that a misled agent can't bury the people who review them in drafts.
 - REQ-001-P2-1. As the auditor, I need every change made through Enterich recorded under the agent user, distinguishable from people's changes.
 - REQ-001-P3-1. As the bookkeeper, I need each draft the agent prepares to come with a link and to be recognisable as the agent's, so that I find and check it quickly.
 - REQ-001-P3-2. As the bookkeeper, I need to be warned of likely mistakes in a draft, such as a possible duplicate or a tax template without tax, so that I don't submit them unnoticed.
@@ -78,6 +78,7 @@ This spec holds the product's personas, user stories and terms, and the rules ev
 - SHALL = mandatory · SHOULD = recommended · MAY = optional
 - Every SHALL verifiable (test / benchmark / inspection / analysis)
 - One requirement = one idea
+- A warning a requirement SHOULD carry is built and tested as its Definition of Done says. SHOULD marks it as a hint to the reviewer, which may miss a case its Definition of Done doesn't name; a warning never refuses the operation
 - The area specs listed in the [index](README.md) hold the operations. Every requirement of this spec, and its [Operation Conventions](#operation-conventions), apply to every operation; an area spec may tighten them, never loosen them
 - A right this spec withholds (submitting, cancelling, amending, deleting, discarding), or a draft type it rules out, can only be granted here, by naming the exception and the area it applies to; the area spec then specifies it
 - Every area spec with a create operation defines its duplicate match (REQ-001-PRS-F005)
@@ -163,7 +164,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-URS-F010: Drafts per hour capped
 
-**Description**: The operator SHALL be able to cap, through configuration, how many drafts the agent creates in an hour.
+**Description**: The operator SHALL be able to cap, through configuration, how many drafts of each document type the agent creates in an hour.
 
 **Related User Stories**: REQ-001-P1-7 | **Rationale**: Drafts wait for a person, but a reviewer facing a hundred of them checks each less. An agent misled by outside text, or caught in a loop, creates drafts faster than anyone reviews them, and the duplicate check doesn't stop it: the agent can pass `allow_duplicate` itself.
 
@@ -294,7 +295,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-F008: Refusals reported
 
-**Description**: Enterich SHALL return an ERPNext refusal as a tool error carrying the HTTP status, ERPNext's `exc_type` and the message ERPNext raised the refusal with, labelled as ERPNext's message; it SHALL forward no other part of ERPNext's error body (`exc`, `exception`, `_debug_messages`, tracebacks), and no other message of `_server_messages`. That message is the last of `_server_messages`: ERPNext sends notices before it, and adds none after; a message sent as a list reaches the agent with its items. Enterich's own refusals SHALL be tool errors naming the input and the rule it broke. Every tool error SHALL reach the agent as plain text of at most 300 characters.
+**Description**: Enterich SHALL return an ERPNext refusal as a tool error carrying the HTTP status, ERPNext's `exc_type` and the message ERPNext raised the refusal with, labelled as ERPNext's message; it SHALL forward no other part of ERPNext's error body (`exc`, `exception`, `_debug_messages`, tracebacks), and no other message of `_server_messages`. That message is the last of `_server_messages`; a message sent as a list reaches the agent with its items. Enterich's own refusals SHALL be tool errors naming the input and the rule it broke. Every tool error SHALL reach the agent as plain text of at most 300 characters.
 
 **Related URS**: REQ-001-URS-F006, REQ-001-URS-NF002
 
@@ -393,7 +394,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-F015: Origin and warnings on the draft
 
-**Description**: After each create or update that ERPNext answered with the written draft, and whose result Enterich returns, Enterich SHALL add one comment to the draft through `frappe.desk.form.utils.add_comment`, as plain text starting with "Enterich:". It SHALL name the operation and its call ID, the ID of the operation's log line (REQ-002-PRS-NF008); for an update, the inputs given besides `name` and `modified`, after the word "given"; and the result's warnings, each on its own line. It SHALL hold no input values beyond these names and what the warnings name, no outside text, and nothing of the access token or its session. The comment SHALL be added within the operation's 60 seconds (REQ-002-PRS-NF011). If adding it fails or the time runs out, the result's warnings SHALL say so; the draft stays as written.
+**Description**: A create or update that ERPNext answered with the written draft SHALL return that draft, never a refusal: when Enterich fails to build the full result after the write, or the operation's 60 seconds run out after it, the result SHALL hold the fields every create or update result has ([Results](#results)) and a warning naming the failure. After each such create or update, Enterich SHALL add one comment to the draft through `frappe.desk.form.utils.add_comment`, as plain text starting with "Enterich:". It SHALL name the operation and its call ID, the ID of the operation's log line (REQ-002-PRS-NF008); for an update, the inputs given besides `name` and `modified`, after the word "given"; and the result's warnings, each on its own line. It SHALL hold no input values beyond these names and what the warnings name, no outside text, and nothing of the access token or its session. The comment SHALL be added within the operation's 60 seconds (REQ-002-PRS-NF011). If adding it fails or the time runs out, the result's warnings SHALL say so; the draft stays as written.
 
 **Related URS**: REQ-001-URS-F009, REQ-001-URS-F011
 
@@ -402,15 +403,16 @@ Only a fixed list of operations, without generic method calls, closes these door
 - A create leaves one comment naming the operation and the call ID that its `operation` log line carries; an update giving `items` and `remarks` leaves one naming them too.
 - A create with `allow_duplicate: true` that matches an existing draft leaves one comment, which also names the match.
 - A draft with a tax template and zero tax gets the warning of REQ-001-PRS-F012 in its comment.
-- A refused create or update leaves no comment, and so does a create whose result Enterich refuses as too large.
+- A refused create or update leaves no comment; a create whose result comes without its tables (REQ-001-PRS-NF003) leaves one.
 - Markup in a warning reaches ERPNext escaped, as text.
+- A create whose saved draft Enterich fails to read into its result (a tax detail that isn't a number) returns the draft's name and `modified` with a warning naming the failure, leaves its comment, and its log line records the document.
 - A failing comment call yields a result with the draft and a warning that the comment is missing; so does a comment call that would end after the operation's 60 seconds, and the result comes within them.
 - Verification: test.
 - Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
 
 #### REQ-001-PRS-F016: Rates ERPNext set
 
-**Description**: An invoice create or update result SHOULD carry a warning for each item row whose given rate ERPNext saved as another with a pricing rule applied (the row names it in `pricing_rules`), and for each row other than a free item that ERPNext saved at rate 0 (no price found). Rows are matched in the order given; free-item rows a pricing rule added are not matched. At most 20 rows are named; one more warning says how many further rows there are.
+**Description**: An invoice create or update result, other than a return's, SHOULD carry a warning for each item row whose given rate ERPNext saved as another with a pricing rule applied (the row names it in `pricing_rules`), and for each row other than a free item that ERPNext saved at rate 0 (no price found). Rows are matched in the order given; free-item rows a pricing rule added are not matched. At most 20 rows are named; one more warning says how many further rows there are.
 
 **Related URS**: REQ-001-URS-F002, REQ-001-URS-F009
 
@@ -425,7 +427,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-F017: Due dates of invoice drafts
 
-**Description**: Invoice drafts SHALL get the due date the agent gives, or else the one ERPNext counts from the payment terms and the current dates, as the form does. With a given `due_date`, a create or update SHALL send `payment_terms_template` "" with it, so that the date stands as the only payment term. An update SHALL send `payment_schedule` as an empty table, so that ERPNext rebuilds it, when it gives `due_date`, `posting_date` or `bill_date`, or when the draft's posting date is not fixed (`set_posting_time` 0) and not today; without a given `due_date` it SHALL then send `due_date` empty, so that ERPNext counts it again.
+**Description**: Invoice drafts other than returns SHALL get the due date the agent gives, or else the one ERPNext counts from the payment terms and the current dates, as the form does. With a given `due_date`, a create or update SHALL send `payment_terms_template` "" with it, so that the date stands as the only payment term. An update SHALL send `payment_schedule` as an empty table, so that ERPNext rebuilds it, when it gives `due_date`, `posting_date` or `bill_date`, or when the draft's posting date is not fixed (`set_posting_time` 0) and not today; without a given `due_date` it SHALL then send `due_date` empty, so that ERPNext counts it again.
 
 **Related URS**: REQ-001-URS-F002
 
@@ -542,7 +544,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-NF003: Result limits
 
-**Description**: Every tool result SHALL stay under 100,000 characters. A get SHALL cut each child table to its first 100 rows and each text field of the record and its rows to 500 characters, and list what it cut in `truncated`; a list or report SHALL cut each text field of its records to 500 characters, and name the fields it cut in `truncated` as `records.<field>`; a create or update result SHALL cut its child tables the same way; a list or report whose result would still be larger SHALL be refused with a message to narrow it, and a get with a message that the document is too large.
+**Description**: Every tool result SHALL stay under 100,000 characters. A get SHALL cut each child table to its first 100 rows and each text field of the record and its rows to 500 characters, and list what it cut in `truncated`; a list or report SHALL cut each text field of its records to 500 characters, and name the fields it cut in `truncated` as `records.<field>`; a create or update result SHALL cut each child table its area spec lists to its first 100 rows and name it in `truncated`; a list or report whose result would still be larger SHALL be refused with a message to narrow it, and a get with a message that the document is too large. A create or update result that would still be larger SHALL come without its child tables, and if it still would be, with only the fields every create or update result has ([Results](#results)), its warnings among them; it names what it leaves out in `truncated` and in a warning: the draft is written, and the agent learns its number.
 
 **Related URS**: REQ-001-URS-NF003
 
@@ -553,6 +555,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - A list of bank transactions, one of whose descriptions has 2,000 characters, returns it cut to 500, with `truncated: ["records.description"]`; a list with nothing cut has `truncated: []`.
 - An update of a draft with 500 rows returns 100 with `truncated: ["items"]`.
 - An oversized report result gives the narrowing message.
+- A create whose result would be too large with its rows returns the draft's number and `modified` without `items`, `taxes` and `tax_summary`, names them in `truncated` and warns; the draft carries its comment, and the log records the document.
 - Verification: test.
 - Evidence: Enterich's test suite.
 
@@ -576,7 +579,7 @@ What every operation of the area specs follows (REQ-001-PRS-F014). Each area spe
 | Quantities | number | > 0 and ≤ 10,000, at most 3 decimal places (ERPNext rounds quantities to 3 by default) |
 | Rates | number | > 0 and ≤ 1,000,000,000, at most 6 decimal places (ERPNext takes a rate of 0 as none given) |
 | `remarks`, `user_remark` | string | at most 1,000 characters |
-| Debit, credit | number | ≥ 0 and ≤ 1,000,000,000, at most 3 decimal places |
+| Debit, credit | number | ≥ 0 and ≤ 1,000,000,000, at most 2 decimal places (ERPNext rounds each row to the currency's precision, so a third place would leave balanced rows unbalanced) |
 
 Numbers are read as decimals, never as binary floating point. Every operation rejects inputs not in its schema, at every level. Row and quantity limits start low on purpose: raising them later is a minor change, lowering them a breaking one ([ADR-004](../arc42/adr/ADR-004-releases-and-image.md)).
 
@@ -590,7 +593,7 @@ Numbers are read as decimals, never as binary floating point. Every operation re
 - **`url`** is the document's form in ERPNext, built as ERPNext v16 builds it: the public URL, `/desk/`, the DocType in lower case with hyphens for spaces, and the name percent-encoded as one segment (`/desk/sales-invoice/SINV-2026-00001`).
 - **Tax rows** (`taxes`): `rate` is the rate saved on the row and `tax_amount` the row's tax. An item with an item tax template is taxed at that template's rate on the rows whose accounts the template lists, or not by such a row at all, so `rate` need not be the rate any item was taxed at. On a purchase invoice, a row with `add_deduct_tax` Deduct is subtracted from the total, and the tax of a row with `category` Valuation goes into the items' valuation, not into the total. The description of every operation whose result has tax rows says so.
 - **Tax summary** (`tax_summary`, REQ-001-PRS-F022): the tax per tax row and rate, from ERPNext's tax per item row and tax row, which comes with the invoice; no further call. Its amounts are after any discount, while a row's `tax_amount` is before a discount on the grand total. On the rarer charge types, `rate` and `taxable_amount` are ERPNext's: on On Item Quantity, an amount per unit on 0; on On Previous Row Amount or Total, the rate on the previous row's tax or total; an Actual charge is spread over the items by their net amounts. A row ERPNext added from item tax templates (REQ-001-PRS-F020) doesn't count an item without one. For an invoice stored before v16 the summary has what v16's migration made: nothing for a cancelled one or a draft not saved since. The descriptions of the operations whose result has it say that the amounts are after a discount.
-- **Creates and updates:** the draft's `name`, `modified`, `status` where its DocType has one, `docstatus`, `company`, the further fields its area spec lists, `url`, `warnings`, and `truncated`: its child tables are cut to 100 rows each, as in gets.
+- **Creates and updates:** the draft's `name`, `modified`, `status` where its DocType has one, `docstatus`, `company`, the further fields its area spec lists, `url`, `warnings`, and `truncated`: the child tables its area spec lists are cut to 100 rows each, as in gets.
 
 ### States
 
@@ -634,6 +637,7 @@ Checked against Frappe and ERPNext v16.52 source:
 - At every save, an invoice takes its due date from its payment schedule, the latest date in it, and builds the schedule only while it is empty: from the payment terms template, or as one term on the due date (`set_due_date`, `set_payment_schedule`). A REST update never empties it; the form does when a date changes. A due date later than the payment terms allow is refused unless the user is a credit controller (`validate_due_date_with_template`); with `payment_terms_template` empty there's no such check, and an empty template stays empty (`update_if_missing` fills only empty values). A save without `due_date` counts it from the payment terms of the invoice, else of the party, its group, or the company (`get_due_date`).
 - ERPNext rounds every number it saves to its field's precision: quantities to the site's float precision (3 unless System Settings say otherwise), rates and amounts to the currency's.
 - Saving a submitted document needs the submit right (`check_docstatus_transition`).
+- A refusal's `_server_messages` hold the notices ERPNext sent before it (`msgprint`), then the message it raised the refusal with, and nothing after it (`report_error`). A message sent `as_list` or `as_table` comes as a list.
 - A document's `owner` is the user who inserted it, and its `creation` the time of the insert in the site's time zone, without a zone (`set_user_and_timestamp`, `now_datetime`); no Enterich body carries either. Enterich counts the hour back from now in its configured time zone, which the configuration guide says to set to the site's; around a change of the clocks, the hour counted is an hour longer or shorter. `frappe.auth.get_logged_user` returns the user an API key belongs to.
 - A standard report set as a snapshot report runs on the last DuckDB sync of its data, and `frappe.desk.query_report.run` then answers with `snapshot_report` set.
 - ERPNext fills tax rows from a template on insert only when a site setting says so (`add_taxes_from_taxes_and_charges_template`); Enterich therefore fills them itself.

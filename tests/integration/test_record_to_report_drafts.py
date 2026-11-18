@@ -305,18 +305,26 @@ def test_a_create_differing_in_a_row_or_the_date_goes_through(
     assert result.data["warnings"] == []
 
 
-# 100.005 is saved as 100.0, exactly the 0.005 a given amount may differ by.
-@pytest.mark.parametrize("amount", [100.004, 100.005])
-def test_a_repeated_create_matches_the_amounts_erpnext_rounded(
-    mcp: Session, erp: FakeErpnext, amount: float
-) -> None:
-    rows = [{"account": RENT, "debit": amount}, {"account": BANK, "credit": amount}]
+def test_a_repeated_create_with_cents_matches(mcp: Session, erp: FakeErpnext) -> None:
+    rows = [{"account": RENT, "debit": 100.25}, {"account": BANK, "credit": 100.25}]
     first = create(mcp, accounts=rows).data
-    assert erp.docs["Journal Entry"][first["name"]]["total_debit"] == 100.0
     again = create(mcp, accounts=rows)
     assert again.error
     assert again.text == BY_ROWS.refusal(first["name"])
     assert len(erp.writes(PATH)) == 1
+
+
+@pytest.mark.parametrize("side", ["debit", "credit"])
+def test_an_amount_of_three_decimal_places_is_refused(
+    mcp: Session, erp: FakeErpnext, side: str
+) -> None:
+    # REQ-001's common inputs: ERPNext rounds each row, so 100.004 would save as 100.0
+    other = "credit" if side == "debit" else "debit"
+    rows = [{"account": RENT, side: 100.004}, {"account": BANK, other: 100.004}]
+    result = create(mcp, accounts=rows)
+    assert result.error
+    assert f"accounts.0.{side}" in result.text
+    assert erp.received == []
 
 
 def test_allow_duplicate_creates_and_says_so(mcp: Session, erp: FakeErpnext) -> None:
@@ -330,17 +338,21 @@ def test_allow_duplicate_creates_and_says_so(mcp: Session, erp: FakeErpnext) -> 
 # Rounding (REQ-006-PRS-F008)
 
 
+# In a currency without decimal places, as the yen, each row is rounded to whole units
+ROUNDED_APART = [
+    {"account": RENT, "debit": 10.4},
+    {"account": RENT, "debit": 5.4},
+    {"account": BANK, "credit": 15.8},
+]
+
+
 def test_totals_erpnext_rounded_apart_warn(mcp: Session, erp: FakeErpnext) -> None:
-    rows = [
-        {"account": RENT, "debit": 10.004},
-        {"account": RENT, "debit": 5.004},
-        {"account": BANK, "credit": 15.008},
-    ]
-    result = create(mcp, accounts=rows).data
-    assert (result["total_debit"], result["total_credit"]) == (15.0, 15.01)
+    erp.currency_precision = 0
+    result = create(mcp, accounts=ROUNDED_APART).data
+    assert (result["total_debit"], result["total_credit"]) == (15.0, 16.0)
     assert result["warnings"] == [
         "ERPNext rounded the rows to the currency's precision and saved a total debit of 15 "
-        "against a total credit of 15.01; adjust the rows so that they balance, or ERPNext "
+        "against a total credit of 16; adjust the rows so that they balance, or ERPNext "
         "refuses to submit the entry."
     ]
     assert len(erp.comments) == 1
@@ -514,14 +526,10 @@ def test_a_stale_update_changes_nothing(mcp: Session, erp: FakeErpnext) -> None:
 
 
 def test_an_update_warns_where_totals_were_rounded_apart(mcp: Session, erp: FakeErpnext) -> None:
-    rows = [
-        {"account": RENT, "debit": 10.004},
-        {"account": RENT, "debit": 5.004},
-        {"account": BANK, "credit": 15.008},
-    ]
-    result = update(mcp, accounts=rows).data
+    erp.currency_precision = 0
+    result = update(mcp, accounts=ROUNDED_APART).data
     [warning] = result["warnings"]
-    assert "total debit of 15 against a total credit of 15.01;" in warning
+    assert "total debit of 15 against a total credit of 16;" in warning
     [comment] = erp.comments
     assert comment["reference_name"] == DRAFT
 

@@ -31,7 +31,7 @@ The MCP SDK changes how Enterich talks to clients; an SDK update needs more care
   - `uv sync --locked --no-dev --no-install-project` first (a layer that only changes with the lock), then `uv sync --locked --no-dev --no-editable` with the code; `--locked` fails on a stale lock, and uv checks the lock's hashes;
   - bytecode compiled at build time (`UV_COMPILE_BYTECODE=1`);
   - the runtime stage copies the virtual environment, nothing else, and sets `PYTHONUNBUFFERED=1`. No resolution at build time.
-- **A `test` stage** on top of the runtime stage adds the dev dependencies (also from the lock) and the tests. CI runs the tests in it; the runtime image, which is what gets published, carries neither.
+- **A `test` stage** on top of the runtime stage adds the `test` dependency group (also from the lock) and the tests. CI runs the tests in it; the runtime image, which is what gets published, carries neither.
 - **Base images pinned by digest** (the Python `slim` image and the uv image, each as `name:tag@sha256:…`). The runtime image runs as a numeric non-root user, so Kubernetes' `runAsNonRoot` works, and writes nothing at runtime, so a read-only root filesystem works.
 - **GitHub Actions pinned by commit SHA**, with the version as a comment.
 

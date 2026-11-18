@@ -55,7 +55,12 @@ Flag = Annotated[bool, Field(strict=True)]
 # ERPNext rounds quantities to the site's float precision, 3 by default
 Quantity = Annotated[Decimal, Field(gt=0, le=10_000, decimal_places=3)]
 Rate = Annotated[Decimal, Field(gt=0, le=1_000_000_000, decimal_places=6)]
-Amount = Annotated[Decimal, Field(ge=0, le=1_000_000_000, decimal_places=3)]
+# An amount in cents: ERPNext rounds a journal entry's rows, and a payment's totals, to the
+# currency's precision, so a third decimal place would leave a difference (REQ-001's common
+# inputs, REQ-007); a debit or credit may be 0, a payment's amount not
+Cents = Annotated[Decimal, Field(le=1_000_000_000, decimal_places=2)]
+Amount = Annotated[Cents, Field(ge=0)]
+Money = Annotated[Cents, Field(gt=0)]
 Remarks = Annotated[str, Field(max_length=1000)]
 
 

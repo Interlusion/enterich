@@ -84,7 +84,7 @@ docker build --target test -t enterich:test .      # runtime plus tests
 docker run --rm enterich:test                      # runs the tests
 ```
 
-The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The runtime image carries neither tests nor dev dependencies; the `test` stage adds both on top of it, so the tests run against the same packages.
+The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The runtime image carries neither tests nor dev dependencies; the `test` stage adds the tests and the `test` dependency group on top of it, so the tests run against the same packages.
 
 ## Rules for changes
 
@@ -100,7 +100,7 @@ The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The run
 
 ## CI
 
-`ci.yml` runs on pull requests and pushes to `main`, without secrets: the lock, ruff, mdformat, the Markdown link check, basedpyright, pytest with branch coverage (the table in the run's summary and, for pull requests from this repository's branches, as one comment on the pull request that each push updates), a vulnerability audit of the lock, actionlint with shellcheck and zizmor (`scripts/check-workflows.sh`), gitleaks, and the image built for amd64 and arm64, each on a runner of its own architecture, with the tests run in its `test` stage. Nothing is published.
+`ci.yml` runs on pull requests and pushes to `main`, without secrets: the lock, ruff, mdformat, the Markdown link check, basedpyright, pytest with branch coverage (the table in the run's summary and, for pull requests from this repository's branches, as one comment on the pull request that each push updates), a vulnerability audit of the lock, actionlint with shellcheck and zizmor (`scripts/check-workflows.sh`), gitleaks over the pushed commits, for secrets, and the image built for amd64 and arm64, each on a runner of its own architecture, with the tests run in its `test` stage. Nothing is published.
 
 `e2e.yml` runs the end-to-end tests weekly and when started by hand (Actions, End-to-end, Run workflow), not on pull requests and not as a required check. Dependabot proposes each newer ERPNext for `tests/e2e/compose.yml` as a pull request of its own; start the workflow on its branch before merging. MariaDB and Valkey get only their patches there: they stay on the major versions frappe_docker runs.
 

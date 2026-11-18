@@ -11,7 +11,7 @@
 
 The operations of the selling side of the assigned company: customers, sales invoices, sales tax templates and open receivables. The agent reads them and prepares drafts of sales invoices, and of returns (credit notes) against them, which a person reviews and submits.
 
-Out of scope: quotations, sales orders and delivery notes; credit notes without returned items, such as a price reduction after the fact; returns not against an invoice, returns that update stock, returns of POS invoices, and returns of part of an invoice with a fixed discount or charge; payments, which belong to bank and cash (REQ-007).
+Out of scope: quotations, sales orders and delivery notes; credit notes without returned items, such as a price reduction after the fact; returns not against an invoice, returns that update stock, returns of POS invoices, and returns of part of an invoice with a fixed discount or charge; payments: payment entries belong to bank and cash (REQ-007), payments booked as journal entries to record to report (REQ-006).
 
 Read [REQ-001](req-001-core.md) first: it holds the personas, user stories and terms, and the rules every operation follows.
 
@@ -116,7 +116,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-004-PRS-F006: Duplicate match for sales invoices
 
-**Description**: For REQ-001-PRS-F005, a sales invoice create SHALL match a draft of the assigned company with the same customer, the same posting date (the given one, or today) and the same items (item codes and quantities, in any order, leaving out free-item rows a pricing rule added).
+**Description**: For REQ-001-PRS-F005, a sales invoice create SHALL match a draft of the assigned company with the same customer, the same posting date (the given one, or today) and the same item rows: each row's item code and quantity, in any order, each row counted on its own, so an item on two rows doesn't match the item on one, leaving out free-item rows a pricing rule added. Submitted invoices aren't matched: the duplicate this catches is a create repeated after a lost answer, or entered twice, before a person reviewed the first draft (REQ-001-URS-F007).
 
 **Related URS**: REQ-004-URS-F002, REQ-001-URS-F007
 
@@ -124,6 +124,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - A create matching an existing draft is refused naming it; one that differs in a quantity, an item or the date goes through.
 - A create matches a draft that has an added free-item row as well.
+- A create with an item on two rows of 1 matches a draft with those two rows, not one with a single row of 1.
 - Verification: test.
 - Evidence: Enterich's test suite.
 
@@ -185,7 +186,7 @@ Customer names are not in report rows; `get_customer` gives them.
 
 - Clearable on update: `remarks`, `taxes_and_charges` (with its rows).
 - The customer isn't changed by an update: ERPNext would keep the first customer's address, payment terms, price list and receivable account. A draft for another customer is a new draft.
-- A row without `rate` gets the rate ERPNext sets from the price list and its pricing rules, as in the form. Enterich never sends `ignore_pricing_rule`, so a site's pricing rules apply to every row; REQ-001-PRS-F016 warns where they replaced a given rate.
+- A row without `rate` gets the rate ERPNext sets from the price list and its pricing rules, as in the form. Enterich sends no `ignore_pricing_rule` with a sales invoice draft, so a site's pricing rules apply to every row (a return carries ERPNext's `ignore_pricing_rule` 1, so its rows keep the invoice's rates); REQ-001-PRS-F016 warns where they replaced a given rate.
 - Results add: `customer`, `posting_date`, `due_date`, `currency`, `net_total`, `total_taxes_and_charges`, `grand_total`, `taxes` \[`account_head`, `rate`, `tax_amount`\], `tax_summary` \[`account_head`, `rate`, `taxable_amount`, `tax_amount`\] ([REQ-001-PRS-F022](req-001-core.md#req-001-prs-f022-tax-summary)), `items` \[`item_code`, `qty`, `rate`, `amount`, `is_free_item`\].
 
 | Operation | Inputs | Sent to ERPNext |
@@ -231,7 +232,7 @@ Enterich's comment on a draft, with its warnings, needs no further right (REQ-00
 
 ## Acceptance Criteria Summary
 
-- Customers, sales invoices, sales tax templates and receivables are readable as catalogued, for the assigned company only.
+- Customers are readable as catalogued; sales invoices, sales tax templates and receivables too, of the assigned company only.
 - Sales invoice drafts are created and updated with exactly the catalogued fields; a posting date given is kept.
 - Credit notes are drafted from the invoice's own return, for all or some of its items, never above what is left to return, and never crediting a fixed discount or charge in full for part of an invoice.
 - A repeated sales invoice create is refused as a possible duplicate unless the agent allows it.

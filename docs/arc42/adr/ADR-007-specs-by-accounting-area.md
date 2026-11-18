@@ -72,7 +72,7 @@ Revisit this decision when:
 
 ## Compliance
 
-- Every operation SHALL be catalogued in exactly one area spec, the one its main DocType maps to.
+- Every operation SHALL be catalogued in exactly one area spec, the one its main DocType or report maps to.
 - An area spec SHALL NOT loosen a requirement of REQ-001.
 - Requirement, user story and persona IDs SHALL be written in full.
 
