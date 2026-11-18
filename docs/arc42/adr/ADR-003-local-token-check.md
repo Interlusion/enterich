@@ -71,7 +71,7 @@ Revisit this decision when:
 - Enterich SHALL verify every request's token itself and SHALL NOT cache an authorization decision.
 - The leeway SHALL NOT exceed 60 s.
 - Symmetric algorithms and `none` SHALL NOT be accepted.
-- Signing keys SHALL come only from the configured JWKS URL, over HTTPS.
+- Signing keys SHALL come only from the configured JWKS URL, over HTTPS (plain http only to a loopback host, REQ-002-PRS-NF005).
 
 ## References
 

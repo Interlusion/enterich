@@ -84,7 +84,7 @@ docker build --target test -t enterich:test .      # runtime plus tests
 docker run --rm enterich:test                      # runs the tests
 ```
 
-The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The runtime image carries neither tests nor dev dependencies; the `test` stage adds both on top of it, so the tests run against the same packages.
+The build installs from `uv.lock` with hashes, on amd64 and arm64 alike. The runtime image carries neither tests nor dev dependencies; the `test` stage adds the tests and the `test` dependency group on top of it, so the tests run against the same packages.
 
 ## Rules for changes
 
