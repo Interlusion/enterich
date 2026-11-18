@@ -130,21 +130,13 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-004-PRS-F007: Sales return drafts
 
-**Description**: Enterich SHALL offer `create_draft_sales_return` and `update_draft_sales_return` as the catalogue below defines them, building the draft's rows from ERPNext's return of the invoice. Before saving, it SHALL refuse a return against an invoice that isn't a submitted sales invoice of the assigned company, is itself a return, is a POS invoice or updated stock; an item that isn't on the invoice; a quantity above what is left to return of an item; an invoice with nothing left to return; and, for an invoice with a fixed discount or charge, any return but one of the whole invoice with nothing returned before. An update giving `items` or `posting_date` SHALL refuse the invoices a create refuses, and an update of a return draft without `return_against` SHALL be refused. A return dated the invoice's posting date SHALL carry the invoice's posting time. `update_draft_sales_invoice` SHALL refuse a return draft, naming `update_draft_sales_return`, and `update_draft_sales_return` a draft that isn't a return, naming `update_draft_sales_invoice`; both without a write.
+**Description**: Enterich SHALL offer `create_draft_sales_return` and `update_draft_sales_return` as the catalogue below defines them, following REQ-001-PRS-F023 to REQ-001-PRS-F026, and SHALL refuse, as an invoice of a kind REQ-001-PRS-F024 lets this spec rule out, a return against a POS invoice.
 
 **Related URS**: REQ-004-URS-F003
 
 **Definition of Done**:
 
-- A create without `items` sends every row ERPNext's return holds, at the quantity left to return, negative; one with `items` sends only the rows of the given items.
-- An item on two rows of the invoice, with 3 and 2 left to return, returned at 4, is sent as two rows at −3 and −1, each linked to its invoice row.
-- An item on a free-item row (`is_free_item`) before its paid row, returned at 1, is taken from the paid row.
-- An item invoiced at 0.3 with 0.1 returned is returned at 0.2.
-- Against an invoice with a fixed discount, or with a tax row of charge type Actual, a return of every item goes through; one of some items, and one after a submitted return against it, are refused, without a write.
-- A return dated the invoice's posting date is sent with the invoice's posting time; one dated later without a posting time.
-- A return against a draft, a cancelled, a return, a POS or a stock-updating sales invoice, or against one that doesn't exist for the assigned company, is refused naming `return_against`, without a write; an item not on the invoice, or one returned above what is left, is refused naming `items`, the item and the quantity left.
-- An update giving `items` replaces the draft's rows with those of ERPNext's return of the draft's invoice; one giving only `posting_date` or `remarks` sends no rows.
-- An update giving `items` or `posting_date` of a return whose invoice was cancelled since, or whose `return_against` a person changed to an invoice of another company, is refused naming `return_against`; an update of a return whose `return_against` a person cleared is refused naming `name`; all without a write.
+- A return against a POS invoice is refused naming `return_against`, without a write.
 - Verification: test.
 - Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
 
@@ -194,12 +186,8 @@ Customer names are not in report rows; `get_customer` gives them.
 | `create_draft_sales_return` | **`return_against`**; `items` (1–20) \[**`item_code`**, **`qty`**\]; `posting_date` (default today, sent either way); `remarks`; `allow_duplicate` | ERPNext's return of `return_against` (`make_sales_return`), without `name`, `owner` and the fields starting with `__`, in its rows too; with `items`, only the rows of the given items, at the given quantities; `posting_date`, `set_posting_time` 1, and the invoice's `posting_time` when `posting_date` is the invoice's; `remarks` when given; `company`; `docstatus` 0 |
 | `update_draft_sales_return` | **`name`**, **`modified`**; at least one of `items`, `posting_date`, `remarks` | `items` as for create, from ERPNext's return of the draft's `return_against`; `posting_date` with `set_posting_time` 1, and `posting_time` as for create; `remarks`; `modified` |
 
-- `qty` is the quantity returned, as a positive number; Enterich sends it negative, as a return holds it. An item on several rows of the invoice is taken from them in row order, its paid rows before its free-item rows, each up to what is left to return on it. What is left is the invoice's quantity less the submitted returns against it, rounded to 9 decimal places; draft returns don't count.
-- A fixed discount is a `discount_amount` without `additional_discount_percentage`; a fixed charge is a tax row of charge type Actual, such as shipping or tax withholding. ERPNext's return credits both in full, whatever is returned, so Enterich drafts only a return of the whole invoice for such an invoice; a person makes a partial one in ERPNext. A discount given as a percentage is counted anew from the return's total.
-- The customer, the rates, the accounts and the taxes come from the invoice. An update doesn't change `return_against`: a return against another invoice is a new draft. Clearable on update: `remarks`.
-- ERPNext keeps a credit note's outstanding amount on the credit note itself (`update_outstanding_for_self`), to be set against the invoice or paid back; a person can untick it before submitting, so that the invoice's outstanding amount is lowered instead.
-- A return is a sales invoice: it counts towards the limit of drafts per hour with the sales invoices, and lists show it among them with `is_return` true.
-- Results add what a sales invoice draft's do, and `return_against`.
+- REQ-001's [Returns](req-001-core.md#returns) conventions apply, and REQ-001-PRS-F023 to REQ-001-PRS-F026; ERPNext's return of a sales invoice is `make_sales_return`.
+- Clearable on update: `remarks`.
 
 ### ERPNext calls
 

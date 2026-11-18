@@ -93,6 +93,9 @@ This spec holds the product's personas, user stories and terms, and the rules ev
 - **Operation**: an MCP tool Enterich offers, with a fixed purpose and a fixed input schema; each area spec catalogues its operations, and this spec's [Operation Conventions](#operation-conventions) apply to all of them.
 - **Area spec**: a spec listed in the [index](README.md) that holds the operations of one accounting area.
 - **Draft**: an ERPNext document with `docstatus` 0.
+- **Return**: a sales or purchase invoice with `is_return` set, against a submitted invoice of its kind (`return_against`): a credit note on the selling side, a debit note on the buying side. The return operations are those of REQ-004 and REQ-005 that create and update them.
+- **Left to return**: of an item on an invoice row, the row's quantity less what submitted returns against the invoice took back of it, rounded to 9 decimal places; draft returns don't count.
+- **Fixed discount or charge**: on an invoice, a `discount_amount` without `additional_discount_percentage`, or a tax row of charge type Actual, such as shipping or tax withholding.
 - **Outside-text field**: a field whose content may have been written by someone outside the company: party names, tax IDs and addresses, item names and descriptions, remarks and terms, supplier references, bank transaction texts, ledger counter-parties. The area catalogues mark each such field.
 - **Name input**: an operation input that names an ERPNext record (a document number, a customer, an item, an account).
 - **Rejection**: an answer with HTTP 401 or 403 to a request to the MCP endpoint because of its token.
@@ -516,6 +519,66 @@ Only a fixed list of operations, without generic method calls, closes these door
 - Verification: test.
 - Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
 
+#### REQ-001-PRS-F023: Return rows
+
+**Description**: A return operation SHALL build the draft's rows from ERPNext's return of the invoice: without `items`, every row with something left to return, at what is left; with `items`, the rows of the given items, each item taken from its rows in row order, its paid rows before its free-item rows, each up to what is left on it. It SHALL take a quantity as the quantity returned, a positive number, and send it negative, as a return holds it.
+
+**Related URS**: REQ-004-URS-F003, REQ-005-URS-F003
+
+**Definition of Done**:
+
+- A create without `items` sends every row ERPNext's return holds, at the quantity left to return, negative; one with `items` sends only the rows of the given items.
+- An item on two rows of the invoice, with 3 and 2 left to return, returned at 4, is sent as two rows at −3 and −1, each linked to its invoice row.
+- An item on a free-item row (`is_free_item`) before its paid row, returned at 1, is taken from the paid row.
+- An item invoiced at 0.3 with 0.1 returned is returned at 0.2.
+- Verification: test.
+- Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
+
+#### REQ-001-PRS-F024: Returns refused
+
+**Description**: Before saving, a return operation SHALL refuse, without a write:
+
+- naming `return_against`: an invoice that isn't a submitted invoice of its kind of the assigned company, is itself a return, updated stock, or is of a kind its area spec rules out; for a create without `items`, an invoice with nothing left to return; an invoice with a fixed discount or charge that submitted returns took part of;
+- naming `items`: an item given twice; an item that isn't on the invoice; a quantity above what is left to return of an item, naming what is left; for an invoice with a fixed discount or charge, items that don't return all of it.
+
+**Related URS**: REQ-004-URS-F003, REQ-005-URS-F003, REQ-001-URS-F006
+
+**Definition of Done**:
+
+- A return against a draft, a cancelled, a return or a stock-updating invoice, or against one that doesn't exist for the assigned company, is refused naming `return_against`; so is one against an invoice whose items submitted returns took back in full.
+- An item given twice, an item not on the invoice, and one returned above what is left are refused naming `items`, the item, and for the last what is left.
+- Against an invoice with a fixed discount, or with a tax row of charge type Actual, a return of every item goes through; one of some items, and one after a submitted return against it, are refused. A discount given as a percentage doesn't count.
+- No refused return reaches a write; one refused for its invoice's state, company, kind or stock doesn't reach ERPNext's return method either.
+- Verification: test.
+- Evidence: Enterich's test suite.
+
+#### REQ-001-PRS-F025: Return updates
+
+**Description**: A return update SHALL change only a return draft against an invoice, and an invoice update only a draft that isn't a return: each SHALL refuse the other's draft naming the operation that changes it, and a return update SHALL refuse a return whose `return_against` is empty, naming `name`; all without a write. A return update giving `items` SHALL replace the draft's rows with those REQ-001-PRS-F023 builds from ERPNext's return of the draft's `return_against`, with the refusals of REQ-001-PRS-F024; one giving `posting_date` without `items` SHALL refuse what REQ-001-PRS-F024 refuses of the invoice itself (its state, company, kind and stock), and sends no rows; one giving neither checks no invoice and sends no rows. No update changes `return_against`.
+
+**Related URS**: REQ-004-URS-F003, REQ-005-URS-F003
+
+**Definition of Done**:
+
+- An update giving `items` replaces the draft's rows with those of ERPNext's return of the draft's invoice; one giving only `posting_date` or `remarks` sends no rows.
+- An update giving `items` or `posting_date` of a return whose invoice was cancelled since, or whose `return_against` a person changed to an invoice of another company, is refused naming `return_against`; an update giving `items` beyond what is left is refused naming `items`.
+- An update of a return whose `return_against` a person cleared is refused naming `name`.
+- The sales and purchase invoice updates refuse a return draft, naming the return update, and the return updates a draft that isn't a return, naming the invoice update.
+- Verification: test.
+- Evidence: Enterich's test suite.
+
+#### REQ-001-PRS-F026: A return's posting time
+
+**Description**: A return dated the invoice's posting date SHALL carry the invoice's posting time; a return dated later SHALL keep the time ERPNext's return gives it.
+
+**Related URS**: REQ-004-URS-F003, REQ-005-URS-F003
+
+**Definition of Done**:
+
+- A return created or updated with the invoice's posting date is sent with the invoice's `posting_time`; one dated later without a posting time.
+- Verification: test.
+- Evidence: Enterich's test suite.
+
 ## PRS — Non-Functional
 
 #### REQ-001-PRS-NF001: Outside text marked
@@ -617,6 +680,16 @@ Lists use `/api/resource/<DocType>` with the fields of their area catalogue; get
 - Before a create, the duplicate check of REQ-001-PRS-F005 runs, with the match its area spec defines, and then the count of REQ-001-PRS-F019 when the limit is set. Each create operation's description tells the agent, after an error or a timeout, to list the drafts (`state: draft`) before creating again.
 - On update, an empty string clears a field only if its area spec names it as clearable (a cleared tax template takes its rows with it, though ERPNext may add rows from the items' item tax templates, REQ-001-PRS-F020); no other field can be cleared.
 - The create descriptions of sales and purchase invoice drafts say to give `taxes_and_charges`, and which tool shows the default template: through its API, unlike its desk, ERPNext adds no tax rows to a draft from a default template or a Tax Rule.
+
+### Returns
+
+What the return operations of REQ-004 and REQ-005 share, besides REQ-001-PRS-F023 to REQ-001-PRS-F026:
+
+- The party, the rates, the accounts and the taxes come from the invoice, through ERPNext's return of it; the area specs name the method. A return against another invoice is a new draft.
+- ERPNext's return credits a fixed discount or charge in full, whatever is returned, so Enterich drafts only a return of the whole invoice for such an invoice; a person makes a partial one in ERPNext. A discount given as a percentage is counted anew from the return's total.
+- ERPNext keeps a return's outstanding amount on the return itself (`update_outstanding_for_self`), to be set against the invoice or paid back; a person can untick it before submitting, so that the invoice's outstanding amount is lowered instead.
+- A return is an invoice of its kind: it counts towards the limit of drafts per hour with those invoices, and lists show it among them with `is_return` true.
+- Results add what an invoice draft's of its kind do, and `return_against`.
 
 ## Acceptance Criteria Summary
 
