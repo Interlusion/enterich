@@ -18,6 +18,8 @@ A trial on `shapes.py` showed mutation testing works here: mutmut 3 made 257 mut
 
 `AGENTS.md` allows a commit or push only when the operator asks, which rules out unattended work.
 
+The pipeline is a trial of the method in this repository: it is to move out of Enterich as a skill of its own (Reconsideration Triggers). This ADR holds its rules; the [improvement pipeline guide](../../guides/improvement-pipeline.md) and `harness/README.md` hold how it works now, and change with it.
+
 ## Decision
 
 ### Stages
@@ -28,21 +30,21 @@ A run takes one **lens** (a kind of finding) through fixed stages. Deterministic
 2. **Survey** (agents, read-only): candidates from the inventory, each a finding with location, claim, evidence and a tag from the lens's fixed vocabulary.
 3. **Verify** (agents, read-only): one agent per finding tries to refute it against the code, the specs and, where the finding is about ERPNext, its source or the end-to-end site. Its verdict sorts a confirmed finding into **fix** (within the specs and ADRs), **proposal** (needs a spec, ADR or `AGENTS.md` change, or a new dependency) or **drop** (real, but not worth a change). Only confirmed findings go on; the rest are counted.
 4. **Triage** (script): checks every record, sets aside the confirmed findings the operator's suppressions list (as tracked while the backlog item a suppression names is open), and writes the report and the fix stage's input.
-5. **Fix** (agents, one per finding, each in its own worktree): the development guide's steps, a failing `test:` commit, then the `fix:`, `feat:` or `refactor:`, on an `auto/` branch that holds a group of fixes one after another (so far a survey's). Another agent redoes the red check and reviews each fix. A script, the fix stage's gate, then checks each branch against the rules under Compliance and runs every gate, the end-to-end tests included, before the branch is pushed.
-6. **Ratchet**: where a confirmed class of finding can be checked by a script, the run proposes that check for CI, so the next run starts higher. Who runs it, and whether before Fix, is open.
+5. **Fix** (agents, one per finding, each in its own worktree): the development guide's steps, a failing `test:` commit, then the `fix:`, `feat:` or `refactor:`, on an `auto/` branch that holds a group of fixes one after another, grouped by the test files they change (`harness/plan.py`). Another agent redoes the red check and reviews each fix. A script, the fix stage's gate, then checks each branch against the rules under Compliance and runs every gate, the end-to-end tests included, before the branch is pushed.
+6. **Ratchet**: where a confirmed class of finding can be checked by a test, an agent writes that generic test on the fix branch, before the fixes it covers, so the next run starts higher; a check outside the tests is a proposal in the report.
 7. **Report**: the run's counts, its fix branches, its proposals; the operator merges, decides proposals and curates suppressions.
 
 ### Files
 
 - `harness/`: the scripts, with their checks of the records, and the operator's `suppressions.jsonl`. The image takes neither `harness/` nor its tools (the Dockerfile copies `src` and `tests`).
-- `harness/runs/<date>-<lens>/`: a run's inventory, findings, verdicts and report, as JSON Lines and Markdown, committed on the run's branch, so a run can resume after an interruption and runs can be compared.
+- `harness/runs/<date>-<lens>/`: a run's inventory, findings, verdicts and report, as JSON Lines and Markdown, so a run can resume after an interruption and runs can be compared. The session commits them at the operator's request, on a branch outside `auto/`, past the gate; `harness/record.py` scans the agents' results for secrets before it writes any record.
 - `.claude/workflows/`: the engine, Workflow scripts per lens, which so far also hold the agents' schemas and what the agents judge by. The stages and records are the method; the engine is to change without them once the method moves to the skills repository (Reconsideration Triggers).
 - Tools only the pipeline needs, mutmut first, go into a dependency group of their own (`harness`), outside the `test` group the image's `test` stage installs and the `dev` group CI installs.
 
 ### Lenses, in this order
 
 1. **Tests:** Definition of Done items without a test and tests without a requirement, both ways; mutation survivors judged as noise, equivalent or a gap; weak tests, which would pass with the behaviour broken or repeat another test. A test is a candidate for removal only when it kills no mutant another test doesn't.
-2. **Security:** against [analysis 001](../../analysis/analysis-001-excessive-agency-review.md)'s threat model and `AGENTS.md`'s rules.
+2. **Security:** against the promises of `SECURITY.md`'s scope and `AGENTS.md`'s rules, with [analysis 001](../../analysis/analysis-001-excessive-agency-review.md)'s threat model behind them.
 3. **Docs:** specs, ADRs and guides against the code, such as a catalogue table against the published tool schemas.
 4. **Code:** quality within the ADRs' choices.
 
@@ -51,7 +53,7 @@ A lens is added after the previous one has run once and its retrospective is wri
 ### Stopping
 
 - **A run** stops at the first of: its universe done, its budget of agents spent, or saturation, when further survey batches bring no new confirmed class of finding.
-- **A lens** rests when its runs stop paying: a measure of confidence per lens, from its runs' confirmed findings, their precision as the operator judges them, and what the deterministic checks still find, says when another run isn't worth its cost. The measure and its threshold are open; the first lens's retrospective proposes them.
+- **A lens** is skipped while nothing it reads has changed since its last run (`harness/README.md`, per lens), and rests for good when its runs stop paying. That measure is still open (the pipeline guide's open points).
 
 ## Alternatives Considered
 
@@ -98,13 +100,13 @@ One procedure per turn, the agent rating and recording items itself.
 Revisit this decision when:
 
 1. A lens's retrospective finds the verify stage confirming findings the operator rejects, more than one in five.
-2. A second repository adopts the pipeline: move the method to the skills repository, with a per-repository configuration.
+2. A second repository adopts the pipeline, or the trial has shown the flow: move the method to the skills repository, with a per-repository configuration (`harness/project.toml` is its first form).
 3. Runs have been made often enough to know their cost and value: then consider scheduled runs.
 
 ## Compliance
 
-- The pipeline SHALL commit and push only on branches whose names start with `auto/`; it SHALL NOT push to `main`, create or push a tag, start a release, or merge.
-- The pipeline SHALL NOT change `docs/specs/`, `docs/arc42/adr/`, `AGENTS.md`, `CLAUDE.md`, `.github/`, the `Dockerfile`, `server.json`, `pyproject.toml` and `uv.lock`, the tool-list snapshot (which changes only with its spec), or its own `harness/` and `.claude/`; a finding that needs such a change SHALL be a proposal in the report. The fix stage's gate (`harness/gate.py`) refuses a branch that does, and pushes only a branch that passed.
+- The pipeline SHALL commit and push only on branches whose names start with `auto/`; it SHALL NOT push to `main`, create or push a tag, start a release, or merge. A run's records are the session's to commit, at the operator's request (Files).
+- The pipeline SHALL NOT change `docs/specs/`, `docs/arc42/adr/`, `AGENTS.md`, `CLAUDE.md`, `.github/`, the `Dockerfile`, `server.json`, `pyproject.toml` and `uv.lock`, the tool-list snapshot (which changes only with its spec), or its own `harness/` and `.claude/`, nor the further paths `harness/project.toml` forbids; a finding that needs such a change SHALL be a proposal in the report. The fix stage's gate (`harness/gate.py`) refuses a branch that does, and pushes only a branch that passed.
 - Every fix SHALL follow the development guide: a failing test committed before the change, and every gate green, the end-to-end tests included.
 - No finding SHALL reach triage without a verdict from an agent other than the one that made it.
 - Every record SHALL pass its schema check before a later stage reads it.

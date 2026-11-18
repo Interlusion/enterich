@@ -30,7 +30,7 @@ The repository moved to its organisation before the first release: container pac
 - Removing or renaming any of these, tightening an input, or needing more ERPNext rights is breaking. A new tool, a new optional input or output field, a widened input limit or a new optional variable is a minor change. Fixes are patches.
 - **A new tool is offered at once only where `ENTERICH_TOOLS` is unset.** A deployment that lists its operations gets new ones only by adding them, so a minor update never widens what its agent can do.
 - **Tags are immutable:** never moved, deleted or reused, enforced by a tag ruleset.
-- **One source for the version:** `version` in `pyproject.toml`, set with `uv version`; the release workflow refuses a tag that differs.
+- **One source for the version:** `version` in `pyproject.toml`, set with `uv version`; the release workflow refuses a tag that differs. `server.json` repeats it for the MCP Registry, in its version and its image tag, and a repository test fails until they agree.
 - **Security fixes for the latest minor version only,** released as a patch as soon as they are ready.
 
 ### Changelog
@@ -43,7 +43,7 @@ The repository moved to its organisation before the first release: container pac
 
 - **`ghcr.io/interlusion/enterich:X.Y.Z`** (no `v`). No `latest`, no floating `X.Y` or `X` tags: deployments pin an exact version, preferably by digest.
 - **Built once per tag** by CI from the tagged commit, for `linux/amd64` and `linux/arm64`, as one multi-arch index. A published version is never rebuilt; a fix is a new patch version.
-- **Labels:** `org.opencontainers.image.version`, `.revision`, `.source`, `.licenses`.
+- **Labels:** `org.opencontainers.image.version`, `.revision`, `.source`, `.licenses`, and `io.modelcontextprotocol.server.name`, which the MCP Registry checks against the entry's name.
 - **Provenance and SBOM:** build provenance attestation and an SBOM, attached to the image.
 - **Pull requests and `main`** build and test the image for both architectures without pushing.
 - **A dry run** of the release workflow, started by hand, does everything but publish; it runs before the first release and after every change the [releasing guide](../../guides/releasing.md#dry-run) names.
@@ -53,6 +53,7 @@ The repository moved to its organisation before the first release: container pac
 - The Git tag and a GitHub release whose notes are the changelog section and the image digest.
 - The image as above.
 - The tool list in the README matching the tool-list snapshot of that commit.
+- **The MCP Registry entry:** `server.json`, published as `dev.interlusion/enterich` by the release's last job, signed in with a key only that job reads, from a GitHub environment of its own. The registry lists the version and points to the image; deployments find Enterich there, and the entry names its variables. A failed publish is re-run alone; the image and the release stand.
 - **The tool contract as a release asset:** `enterich-X.Y.Z-tools.json`, the tool-list snapshot of the tagged commit (every tool's name, description, input schema and annotations), which the release's tests have just matched against the running code. Deployments and reviewers diff it between versions to see what an update changes for the agent.
 
 ## Alternatives Considered
