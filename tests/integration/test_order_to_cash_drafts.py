@@ -13,6 +13,8 @@ from typing import Any
 import pytest
 
 from enterich import shapes, tools
+from enterich.erpnext import ErpnextError
+from enterich.tools import invoicing
 from tests.conftest import Logs
 from tests.fakes.erpnext import (
     AGENT,
@@ -751,6 +753,27 @@ def test_a_result_too_large_with_its_rows_still_returns_the_draft(
     assert comment["reference_name"] == data["name"]
     [line] = logs.events("operation")
     assert line["outcome"] == {"document": data["name"]}
+
+
+def test_a_written_draft_whose_result_fails_is_still_returned(
+    mcp: Session, erp: FakeErpnext, logs: Logs, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-F015: ERPNext saved the draft, so it isn't reported as refused
+    def unreadable(saved: dict[str, Any]) -> Any:
+        raise ErpnextError("ERPNext's tax detail isn't a number.")
+
+    monkeypatch.setattr(invoicing, "tax_summary", unreadable)
+    result = create(mcp)
+    assert not result.error, result.text
+    data = result.data
+    name = data["name"]
+    assert data["modified"] == erp.docs["Sales Invoice"][name]["modified"]
+    [failure] = data["warnings"]
+    assert "tax detail isn't a number" in failure
+    [comment] = erp.comments
+    assert comment["reference_name"] == name
+    [line] = logs.events("operation")
+    assert line["outcome"] == {"document": name}
 
 
 def test_the_comment_stays_within_the_operation_time(
