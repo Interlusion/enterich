@@ -143,6 +143,7 @@ RECORDS: dict[str, Callable[[], Record]] = {
     "Address": lambda: fake.address("CUST-0001-Billing", "Customer", "CUST-0001"),
     "Sales Invoice": fake.sales_invoice,
     "Sales Taxes and Charges Template": fake.tax_template,
+    "Item Tax Template": fake.item_tax_template,
     "Supplier": fake.supplier,
     "Purchase Invoice": fake.purchase_invoice,
     "Purchase Taxes and Charges Template": fake.purchase_tax_template,

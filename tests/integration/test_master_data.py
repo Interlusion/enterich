@@ -10,7 +10,7 @@ import pytest
 from enterich import erpnext as erpnext_module
 from enterich import tools
 from tests.conftest import Logs
-from tests.fakes.erpnext import FakeErpnext, error, item
+from tests.fakes.erpnext import COMPANY, FakeErpnext, error, item, item_tax_template
 from tests.fakes.jwks import FakeJwks, Signer, token
 from tests.fakes.settings import SUBJECT, settings
 from tests.integration.mcp import Session, client
@@ -22,6 +22,8 @@ LIST_FIELDS = ["item_code", "item_name", "item_group", "stock_uom", "is_stock_it
 def erp(erpnext: FakeErpnext) -> FakeErpnext:
     for code in ("SKU-1", "SKU-2", "SKU-3"):
         erpnext.add("Item", item(code))
+    erpnext.add("Item Tax Template", item_tax_template("VAT 7% - EX"))
+    erpnext.add("Item Tax Template", item_tax_template("VAT 7% - OT", company="Other AG"))
     return erpnext
 
 
@@ -140,11 +142,34 @@ def test_an_erpnext_refusal_reaches_the_agent(mcp: Session, erp: FakeErpnext) ->
 # get_item
 
 
-def test_get_item_sends_exactly_the_catalogued_call(mcp: Session, erp: FakeErpnext) -> None:
+def test_get_item_sends_exactly_the_catalogued_calls(mcp: Session, erp: FakeErpnext) -> None:
     mcp.call("get_item", {"item_code": "SKU-1"})
-    [call] = erp.received
-    assert (call.method, call.path) == ("GET", "/api/method/frappe.client.get")
-    assert call.params == {"doctype": "Item", "name": "SKU-1"}
+    got, templates = erp.received
+    assert (got.method, got.path) == ("GET", "/api/method/frappe.client.get")
+    assert got.params == {"doctype": "Item", "name": "SKU-1"}
+    assert (templates.method, templates.path) == ("GET", "/api/resource/Item Tax Template")
+    assert templates.param("fields") == ["name", "company"]
+    assert templates.param("filters") == [["company", "=", COMPANY]]
+    assert templates.param("order_by") == "name asc"
+    assert (templates.param("limit_start"), templates.param("limit_page_length")) == ("0", "1000")
+
+
+def test_an_item_without_item_tax_rows_makes_one_call(mcp: Session, erp: FakeErpnext) -> None:
+    erp.add("Item", item("PLAIN", taxes=[]))
+    result = mcp.call("get_item", {"item_code": "PLAIN"}).data
+    assert result["item_tax_templates"] == []
+    assert len(erp.received) == 1
+
+
+def test_get_item_returns_the_assigned_companys_item_tax_templates_only(
+    mcp: Session, erp: FakeErpnext
+) -> None:
+    # REQ-003-PRS-F001: an item's Item Tax rows may name templates of several companies
+    row = item()["taxes"][0]
+    rows = [{**row, "item_tax_template": "VAT 7% - OT"}, row]
+    erp.add("Item", item("BOTH", taxes=rows))
+    result = mcp.call("get_item", {"item_code": "BOTH"}).data
+    assert [t["item_tax_template"] for t in result["item_tax_templates"]] == ["VAT 7% - EX"]
 
 
 def test_get_item_returns_the_assigned_companys_defaults_only(mcp: Session) -> None:
@@ -210,6 +235,8 @@ def test_child_tables_are_cut_to_100_rows(mcp: Session, erp: FakeErpnext) -> Non
         {"item_tax_template": f"T{i}", "tax_category": "", "valid_from": None} for i in range(150)
     ]
     erp.add("Item", item("MANY", taxes=rows))
+    for i in range(150):
+        erp.add("Item Tax Template", item_tax_template(f"T{i}"))
     result = mcp.call("get_item", {"item_code": "MANY"}).data
     assert len(result["item_tax_templates"]) == 100
     assert result["truncated"] == ["item_tax_templates"]
@@ -373,7 +400,10 @@ def test_a_key_erpnext_stops_accepting_fails_the_next_operation(
     result = mcp.call("get_item", {"item_code": "SKU-1"})
     assert result.error
     assert "AuthenticationError" in result.text
-    assert [c.path for c in erp.received] == ["/api/method/frappe.client.get"] * 2
+    gets = [c.path for c in erp.received if c.path == "/api/method/frappe.client.get"]
+    assert gets == ["/api/method/frappe.client.get"] * 2
+    # The first answer's item tax templates, then nothing more after the refused key
+    assert erp.received[-1].path == "/api/method/frappe.client.get"
 
 
 def test_an_operation_ends_after_the_operation_timeout(

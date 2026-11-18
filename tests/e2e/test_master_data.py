@@ -1,7 +1,7 @@
 """Master data against the seeded site (REQ-003-PRS-F001); also that Enterich reaches the
 site at all: the configured Host selects it, and the agent's key opens its records."""
 
-from tests.e2e.seed import Seed
+from tests.e2e.seed import ITEM_TAX_19, Seed
 from tests.integration.mcp import Session
 
 
@@ -20,3 +20,9 @@ def test_get_item(mcp: Session, seeded: Seed) -> None:
         False,
     )
     assert item["url"].endswith(f"/desk/item/{seeded.item}")
+
+
+def test_get_item_returns_its_item_tax_template_of_the_company(mcp: Session, seeded: Seed) -> None:
+    # REQ-003-PRS-F001: the template is read for its company, with Item Tax Template: read
+    item = mcp.call("get_item", {"item_code": seeded.item_taxed_19}).data
+    assert [t["item_tax_template"] for t in item["item_tax_templates"]] == [ITEM_TAX_19]

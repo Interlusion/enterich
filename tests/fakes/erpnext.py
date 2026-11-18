@@ -85,6 +85,7 @@ FIELDS: dict[str, set[str]] = {
         "disabled",
         "company",
     },
+    "Item Tax Template": {"title", "company", "disabled"},
     "Supplier": {
         "supplier_name",
         "supplier_type",
@@ -1331,6 +1332,20 @@ def sales_invoice(name: str = "ACC-SINV-2026-00001", **overrides: Any) -> dict[s
     }
     doc.update(overrides)
     return set_item_wise_tax(doc) if "item_wise_tax_details" not in overrides else doc
+
+
+def item_tax_template(name: str = "VAT 7% - EX", **overrides: Any) -> dict[str, Any]:
+    """An Item Tax Template, without its rows: Enterich reads only its company."""
+    doc: dict[str, Any] = {
+        "doctype": "Item Tax Template",
+        "name": name,
+        "title": name.rsplit(" - ", 1)[0],
+        "company": COMPANY,
+        "disabled": 0,
+        "modified": "2026-10-20 10:00:00.000000",
+    }
+    doc.update(overrides)
+    return doc
 
 
 def tax_template(name: str = "VAT 19% - EX", **overrides: Any) -> dict[str, Any]:
