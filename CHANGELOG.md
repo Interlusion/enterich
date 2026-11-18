@@ -7,6 +7,7 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 ### Changed
 
 - **Tool descriptions:** `create_draft_sales_invoice` and `create_draft_purchase_invoice` say that a draft without `posting_date` has no fixed date: ERPNext gives it the day of each save, so an update on a later day moves it and the due date. Before, they said it defaulted to today. `get_item` says its accounts and cost centres are the item's own defaults, and an empty one means the item group's or the company's apply. `create_draft_payment_entry` says a payment without `references` is an advance without a warning.
+- **Inputs (breaking):** `create_draft_journal_entry` and `update_draft_journal_entry` take a row's `debit` and `credit` with at most 2 decimal places, not 3. ERPNext rounds each row to the currency's precision, so rows balanced to the third place were saved unbalanced, and every later update without rows was refused. A repeated create matches the amounts as given, no longer within 0.005 (REQ-006-PRS-F007, REQ-006-PRS-F008).
 
 ### Fixed
 
