@@ -39,13 +39,14 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-003-PRS-F001: Item operations
 
-**Description**: Enterich SHALL offer `list_items` and `get_item` as the catalogue below defines them, and `get_item` SHALL return only the assigned company's Item Default row.
+**Description**: Enterich SHALL offer `list_items` and `get_item` as the catalogue below defines them, and `get_item` SHALL return only the assigned company's Item Default row, and only the Item Tax rows whose item tax template is the assigned company's.
 
 **Related URS**: REQ-003-URS-F001
 
 **Definition of Done**:
 
 - An item with Item Default rows for two companies returns only the assigned company's accounts and cost centres.
+- An item with Item Tax rows for templates of two companies returns only those of the assigned company's templates.
 - Verification: test.
 - Evidence: Enterich's test suite.
 
@@ -56,24 +57,26 @@ REQ-001's [Operation Conventions](req-001-core.md#operation-conventions) apply.
 | Operation | Inputs | Returns per record |
 | :- | :- | :- |
 | `list_items` | `search` (item code, item name), `include_disabled`, `limit`, `offset` | `item_code`, *`item_name`*, `item_group`, `stock_uom`, `is_stock_item`, `disabled` |
-| `get_item` | **`item_code`** | as above, plus *`description`*, `item_tax_templates` \[`item_tax_template`, `tax_category`, `valid_from`\], and for the assigned company `income_account`, `expense_account`, `selling_cost_center`, `buying_cost_center` |
+| `get_item` | **`item_code`** | as above, plus *`description`*, and for the assigned company `item_tax_templates` \[`item_tax_template`, `tax_category`, `valid_from`\], `income_account`, `expense_account`, `selling_cost_center`, `buying_cost_center` |
 
 ### ERPNext calls
 
 | Operations | DocType | Fixed filters | Order |
 | :- | :- | :- | :- |
 | `list_items`, `get_item` | Item, with its Item Default row for the assigned company and its Item Tax rows | — | `name` |
+| `get_item`, for an item with Item Tax rows | Item Tax Template, with `name` and `company`, at most 1,000 | `company` | `name` |
 
 ### Rights
 
 | Operations | ERPNext rights of the agent user |
 | :- | :- |
-| `list_items`, `get_item` | Item: read |
+| `list_items` | Item: read |
+| `get_item` | Item, Item Tax Template: read |
 
 ## Acceptance Criteria Summary
 
 - `list_items` and `get_item` work against a fake ERPNext as catalogued.
-- An item's defaults are those of the assigned company only.
+- An item's defaults and item tax templates are those of the assigned company only.
 - Item names and descriptions arrive only under `outside_text`.
 
 ## Assumptions
@@ -81,6 +84,7 @@ REQ-001's [Operation Conventions](req-001-core.md#operation-conventions) apply.
 Checked against ERPNext v16.52 source:
 
 - Item Default rows hold an item's defaults per company (`company`, `income_account`, `expense_account`, `selling_cost_center`, `buying_cost_center`).
+- An Item Tax Template belongs to one company (`company`). An item's Item Tax rows may name templates of several companies; on a draft's row ERPNext sets only one of the draft's company (`_get_item_tax_template`).
 
 Checked on a real ERPNext v16 site by the end-to-end test:
 

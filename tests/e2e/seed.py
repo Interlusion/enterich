@@ -44,7 +44,8 @@ OWN_WRITE = "write only if creator"
 # The area specs' Rights sections, row by row (REQ-002-PRS-NF013). "select" alone means
 # select without read.
 RIGHTS = (
-    Rights(("list_items", "get_item"), {"Item": ("read",)}),
+    Rights(("list_items",), {"Item": ("read",)}),
+    Rights(("get_item",), {"Item": ("read",), "Item Tax Template": ("read",)}),
     Rights(("list_customers", "get_customer"), {"Customer": ("read",), "Address": ("read",)}),
     Rights(("list_sales_invoices", "get_sales_invoice"), {"Sales Invoice": ("read",)}),
     Rights(("list_sales_tax_templates",), {"Sales Taxes and Charges Template": ("read",)}),
