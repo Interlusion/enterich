@@ -11,7 +11,7 @@
 
 The operations on the assigned company's bank accounts: the accounts themselves, the bank transactions imported from statements, and the payment entries that settle invoices. The agent finds unreconciled bank lines and the payments behind them, prepares payment entry drafts for payments received from customers and made to suppliers through the company's bank accounts, and uses the lines to prepare journal entries (REQ-006) or to answer questions.
 
-Out of scope: reconciliation, importing statements; bank accounts of parties; payment entries through cash accounts, internal transfers, refunds (a payment to a customer or from a supplier), payments between two currencies, deductions such as a discount or a bank fee, allocations of a payment entry to anything but invoices, allocations to an invoice's payment terms, invoices booked to another receivable or payable account than the party's, and payments to a supplier held for payments.
+Out of scope: reconciliation, importing statements; bank accounts of parties; payment entries through cash accounts, internal transfers, refunds (a payment to a customer or from a supplier), payments between two currencies, amounts with a third decimal place (as currencies of 3 places, such as KWD, book them), deductions such as a discount or a bank fee, allocations of a payment entry to anything but invoices, allocations to an invoice's payment terms, invoices booked to another receivable or payable account than the party's, and payments to a supplier held for payments.
 
 Read [REQ-001](req-001-core.md) first: it holds the personas, user stories and terms, and the rules every operation follows.
 

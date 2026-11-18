@@ -578,7 +578,7 @@ What every operation of the area specs follows (REQ-001-PRS-F014). Each area spe
 | Quantities | number | > 0 and ≤ 10,000, at most 3 decimal places (ERPNext rounds quantities to 3 by default) |
 | Rates | number | > 0 and ≤ 1,000,000,000, at most 6 decimal places (ERPNext takes a rate of 0 as none given) |
 | `remarks`, `user_remark` | string | at most 1,000 characters |
-| Debit, credit | number | ≥ 0 and ≤ 1,000,000,000, at most 3 decimal places |
+| Debit, credit | number | ≥ 0 and ≤ 1,000,000,000, at most 2 decimal places (ERPNext rounds each row to the currency's precision, so a third place would leave balanced rows unbalanced) |
 
 Numbers are read as decimals, never as binary floating point. Every operation rejects inputs not in its schema, at every level. Row and quantity limits start low on purpose: raising them later is a minor change, lowering them a breaking one ([ADR-004](../arc42/adr/ADR-004-releases-and-image.md)).
 

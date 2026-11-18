@@ -11,7 +11,7 @@
 
 The operations of the general ledger of the assigned company: the chart of accounts, cost centres, journal entries, the General Ledger and the Trial Balance. The agent reads them and prepares drafts of journal entries (accruals, corrections, reclassifications, bookings from a bank line), which a person reviews and submits.
 
-Out of scope: drafts of journal entries of any voucher type other than Journal Entry; period closing; changing the chart of accounts or cost centres.
+Out of scope: drafts of journal entries of any voucher type other than Journal Entry; amounts with a third decimal place, as currencies of 3 places (such as KWD) book them; period closing; changing the chart of accounts or cost centres.
 
 Read [REQ-001](req-001-core.md) first: it holds the personas, user stories and terms, and the rules every operation follows.
 
@@ -141,26 +141,26 @@ The rules on single rows apply to the given rows; ERPNext checks the saved ones 
 
 #### REQ-006-PRS-F007: Duplicate match for journal entries
 
-**Description**: For REQ-001-PRS-F005, a journal entry create SHALL match a draft of the assigned company with the same posting date (the given one, or today) and the same rows (account, debit, credit, in any order), comparing amounts as ERPNext stores them: a given amount matches a stored one that differs by at most 0.005, the most that rounding to the currency's precision moves it.
+**Description**: For REQ-001-PRS-F005, a journal entry create SHALL match a draft of the assigned company with the same posting date (the given one, or today) and the same rows (account, debit, credit, in any order). In a currency with fewer than 2 decimal places, ERPNext saves rounded amounts, which a repeated create given with decimals doesn't match.
 
 **Related URS**: REQ-006-URS-F002, REQ-001-URS-F007
 
 **Definition of Done**:
 
 - A create matching an existing draft is refused naming it; one that differs in a row or the date goes through.
-- A create repeated with amounts of three decimal places, which ERPNext saved rounded to two, is refused naming the first draft.
+- A create repeated with amounts of two decimal places is refused naming the first draft; one of three decimal places is refused as input, naming the row's `debit` or `credit`.
 - Verification: test.
 - Evidence: Enterich's test suite.
 
 #### REQ-006-PRS-F008: Totals ERPNext rounded
 
-**Description**: A journal entry create or update result SHOULD carry a warning, added to the draft (REQ-001-PRS-F015), when ERPNext saved total debit and total credit that differ: it rounds each row to the currency's precision and checks the balance only on submit.
+**Description**: A journal entry create or update result SHOULD carry a warning, added to the draft (REQ-001-PRS-F015), when ERPNext saved total debit and total credit that differ: it rounds each row to the currency's precision, which in some currencies has fewer than the 2 decimal places a row may have, and checks the balance only on submit.
 
 **Related URS**: REQ-006-URS-F002, REQ-001-URS-F009
 
 **Definition of Done**:
 
-- Rows of 10.004 and 5.004 against 15.008, balanced as exact decimals, saved by ERPNext as 15.00 against 15.01 (each row rounded to two places), return a warning naming both totals as 15 and 15.01.
+- In a currency without decimal places, rows of 10.4 and 5.4 against 15.8, balanced as given, saved by ERPNext as 15 against 16 (each row rounded to whole units), return a warning naming both totals.
 - A draft saved with equal totals returns no warning.
 - Verification: test.
 - Evidence: Enterich's test suite.
@@ -226,7 +226,7 @@ Enterich's comment on a draft, with its warnings, needs no further right (REQ-00
 ## Acceptance Criteria Summary
 
 - Accounts, cost centres, journal entries, the General Ledger and the Trial Balance are readable as catalogued, for the assigned company only.
-- Journal entry drafts are balanced, of type Journal Entry, and carry exactly the catalogued fields; drafts of other types are never changed.
+- Journal entry drafts are balanced as given, with at most 2 decimal places, of type Journal Entry, and carry exactly the catalogued fields; one that ERPNext's rounding to a currency with fewer decimal places leaves unbalanced carries a warning; drafts of other types are never changed.
 - A repeated journal entry create is refused as a possible duplicate unless the agent allows it.
 
 ## Assumptions
