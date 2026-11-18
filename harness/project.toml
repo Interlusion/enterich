@@ -40,6 +40,14 @@ scope = [
   "docs/arc42/adr/*.md",
 ]
 
+[code]
+# The code lens's hints (harness/modules.py): functions above this complexity, a stricter
+# limit than CI's, and literals of at least this many characters, or numbers of at least
+# this size, that two modules share
+complexity = 8
+literal_length = 20
+number_size = 100
+
 [gate]
 base = "origin/main"
 # Where the gate pushes the branches that passed
