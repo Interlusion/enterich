@@ -13,7 +13,12 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 - A refusal reaches the agent with the message ERPNext raised it with, the last of its messages, not a notice ERPNext sent before it. Before, a purchase draft of a stock item without an expense account was reported with "Expense Head changed…", and the agent never saw why ERPNext refused it, such as a supplier's `bill_no` given twice or a missing field. A message ERPNext sends as a list now reaches the agent with its items; before, the refusal came without a reason (REQ-001-PRS-F008).
 - A create or update whose result would exceed 100,000 characters returns the draft without its tables, naming them in `truncated` and in a warning, and the draft gets its "Enterich:" comment. Before, the draft was written but the agent was told the operation was refused, the draft had no comment, and the log recorded a refusal (REQ-001-PRS-NF003).
+- `get_item` returns only the item tax templates of the assigned company. Before, it returned every template an item names, other companies' too (REQ-003-PRS-F001).
 - **Configuration guide:** Disable Prepared Report Automation is set with `bench execute`. The guide named the System Console, which runs code only where server scripts are enabled, and they aren't by default.
+
+### Rights
+
+- **Item Tax Template:** read, for `get_item`, which reads the company of an item's templates. Without it, `get_item` of an item with item tax templates is refused (REQ-003).
 
 ## [0.6.0] - 2026-11-16
 
