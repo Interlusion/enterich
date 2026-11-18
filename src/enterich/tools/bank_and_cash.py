@@ -534,6 +534,7 @@ async def update_draft_payment_entry(
             {"payment_type": side.payment_type, "party_type": party_type}
             for party_type, side in SIDES.items()
         ],
+        kind="a payment received from a customer or made to a supplier",
     )
     party_type, party = str(stored.get("party_type")), str(stored.get("party"))
     side = SIDES[party_type]
