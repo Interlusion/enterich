@@ -111,9 +111,9 @@ def test_modified_has_erpnexts_format(value: str) -> None:
 def test_rates_and_amounts_have_their_limits() -> None:
     rates, amounts = TypeAdapter(Rate), TypeAdapter(Amount)
     assert rates.validate_python("0.000001") == Decimal("0.000001")
-    assert amounts.validate_python("0.125") == Decimal("0.125")
-    # ERPNext takes a rate of 0 as none given
-    for adapter, bad in ((rates, "1000000000.01"), (rates, 0), (amounts, "0.1234")):
+    assert amounts.validate_python("0.12") == Decimal("0.12")
+    # ERPNext takes a rate of 0 as none given, and rounds a debit or credit to the currency's
+    for adapter, bad in ((rates, "1000000000.01"), (rates, 0), (amounts, "0.125")):
         with pytest.raises(ValidationError):
             adapter.validate_python(bad)
 

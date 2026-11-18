@@ -313,6 +313,8 @@ class FakeErpnext:
     # path -> (status, JSON body): the next request to that path gets it
     failures: dict[str, tuple[int, Any]] = field(default_factory=dict[str, tuple[int, Any]])
     delay: float = 0.0
+    # The company currency's decimal places, which a journal entry's rows are rounded to
+    currency_precision: int = 2
     # path -> seconds: every request to that path waits that long
     slow: dict[str, float] = field(default_factory=dict[str, float])
     set_cookie: bool = False
@@ -793,8 +795,9 @@ class FakeErpnext:
                 )
                 return _refused(417, "ValidationError", message)
             # Rounded to the currency's precision before the totals are summed
-            debit = float(round(row.get("debit_in_account_currency") or 0.0, 2))
-            credit = float(round(row.get("credit_in_account_currency") or 0.0, 2))
+            places = self.currency_precision
+            debit = float(round(row.get("debit_in_account_currency") or 0.0, places))
+            credit = float(round(row.get("credit_in_account_currency") or 0.0, places))
             if not debit and not credit:
                 message = f"Row {number}: Both Debit and Credit values cannot be zero"
                 return _refused(417, "ValidationError", message)
