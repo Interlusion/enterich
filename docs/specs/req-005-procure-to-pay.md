@@ -147,22 +147,16 @@ An update that gives a `bill_no` SHOULD carry a warning, added to the draft, whe
 
 #### REQ-005-PRS-F008: Purchase return drafts
 
-**Description**: Enterich SHALL offer `create_draft_purchase_return` and `update_draft_purchase_return` as the catalogue below defines them, building the draft's rows from ERPNext's return of the invoice. Before saving, it SHALL refuse a return against an invoice that isn't a submitted purchase invoice of the assigned company, is itself a return, updated stock, was paid on entry or is on hold; an item that isn't on the invoice; a quantity above what is left to return of an item; an invoice with nothing left to return; and, for an invoice with a fixed discount or charge, any return but one of the whole invoice with nothing returned before. An update giving `items` or `posting_date` SHALL refuse the invoices a create refuses, and an update of a return draft without `return_against` SHALL be refused. A return dated the invoice's posting date SHALL carry the invoice's posting time. Each row SHALL be sent with its received quantity equal to its quantity and no rejected quantity. `update_draft_purchase_invoice` SHALL refuse a return draft, naming `update_draft_purchase_return`, and `update_draft_purchase_return` a draft that isn't a return, naming `update_draft_purchase_invoice`; both without a write.
+**Description**: Enterich SHALL offer `create_draft_purchase_return` and `update_draft_purchase_return` as the catalogue below defines them, following REQ-001-PRS-F023 to REQ-001-PRS-F026. It SHALL refuse, as invoices of a kind REQ-001-PRS-F024 lets this spec rule out, a return against an invoice paid on entry or on hold, and SHALL send each row with its received quantity equal to its quantity and no rejected quantity.
 
 **Related URS**: REQ-005-URS-F003
 
 **Definition of Done**:
 
-- A create without `items` sends every row ERPNext's return holds, at the quantity left to return, negative; one with `items` sends only the rows of the given items.
-- An item on two rows of the invoice, with 3 and 2 left to return, returned at 4, is sent as two rows at −3 and −1, each linked to its invoice row.
+- A return against a paid-on-entry or an on-hold purchase invoice is refused naming `return_against`, without a write.
 - An item invoiced at 2 and returned at 1 is sent with `qty`, `received_qty` and `stock_qty` −1 and `rejected_qty` 0.
-- An item invoiced at 0.3 with 0.1 returned is returned at 0.2.
-- Against an invoice with a fixed discount, or with a tax row of charge type Actual, a return of every item goes through; one of some items, and one after a submitted return against it, are refused, without a write.
-- A return dated the invoice's posting date is sent with the invoice's posting time; one dated later without a posting time.
-- A return against a draft, a cancelled, a return, a stock-updating, a paid-on-entry or an on-hold purchase invoice, or against one that doesn't exist for the assigned company, is refused naming `return_against`, without a write; an item not on the invoice, or one returned above what is left, is refused naming `items`, the item and the quantity left.
 - A create with `bill_no` sends it instead of the invoice's; one without keeps the invoice's, as ERPNext's return copies it.
-- An update giving `items` replaces the draft's rows with those of ERPNext's return of the draft's invoice; one giving only `posting_date`, `bill_no`, `bill_date` or `remarks` sends no rows; an empty `bill_no` clears it.
-- An update giving `items` or `posting_date` of a return whose invoice was cancelled since, or whose `return_against` a person changed to an invoice of another company, is refused naming `return_against`; an update of a return whose `return_against` a person cleared is refused naming `name`; all without a write.
+- An update giving only `bill_no`, `bill_date` or `remarks` sends no rows; an empty `bill_no` clears it.
 - Verification: test.
 - Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
 
@@ -213,13 +207,10 @@ Supplier names are not in report rows; `get_supplier` gives them. `bill_no` and 
 | `create_draft_purchase_return` | **`return_against`**; `items` (1–20) \[**`item_code`**, **`qty`**\]; `bill_no`, `bill_date`; `posting_date` (default today, sent either way); `remarks`; `allow_duplicate` | ERPNext's return of `return_against` (`make_debit_note`), without `name`, `owner` and the fields starting with `__`, in its rows too; with `items`, only the rows of the given items, at the given quantities; in each row `received_qty` equal to `qty` and `rejected_qty` 0; `bill_no`, `bill_date` and `remarks` when given; `posting_date`, `set_posting_time` 1, and the invoice's `posting_time` when `posting_date` is the invoice's; `company`; `docstatus` 0 |
 | `update_draft_purchase_return` | **`name`**, **`modified`**; at least one of `items`, `bill_no`, `bill_date`, `posting_date`, `remarks` | `items` as for create, from ERPNext's return of the draft's `return_against`; `bill_no`, `bill_date`, `remarks`; `posting_date` with `set_posting_time` 1, and `posting_time` as for create; `modified` |
 
-- `qty` is the quantity returned, as a positive number; Enterich sends it negative, as a return holds it. An item on several rows of the invoice is taken from them in row order, its paid rows before its free-item rows, each up to what is left to return on it. What is left is the invoice's quantity less the submitted returns against it, rounded to 9 decimal places; draft returns don't count.
-- A fixed discount or charge is as REQ-004's catalogue says; Enterich drafts only a return of the whole invoice for an invoice with one.
+- REQ-001's [Returns](req-001-core.md#returns) conventions apply, and REQ-001-PRS-F023 to REQ-001-PRS-F026; ERPNext's return of a purchase invoice is `make_debit_note`. A tax withholding row is of charge type Actual, a fixed charge, so an invoice with one is returned only whole.
 - `bill_no` and `bill_date` are the number and date of the supplier's credit note, as for a purchase invoice. ERPNext's return copies the invoice's `bill_no`, which then names the invoice, not the credit note; give the credit note's.
-- The supplier, the rates, the accounts and the taxes come from the invoice. An update doesn't change `return_against`: a return against another invoice is a new draft. Clearable on update: `remarks`, `bill_no`.
-- ERPNext keeps a debit note's outstanding amount on the debit note itself (`update_outstanding_for_self`), to be set against the invoice or refunded; a person can untick it before submitting, so that the invoice's outstanding amount is lowered instead.
-- A return is a purchase invoice: it counts towards the limit of drafts per hour with the purchase invoices, and lists show it among them with `is_return` true.
-- Results add what a purchase invoice draft's do, and *`bill_no`*, `bill_date` and `return_against`.
+- Clearable on update: `remarks`, `bill_no`.
+- Results add, besides what REQ-001's Returns say, *`bill_no`* and `bill_date`.
 
 ### ERPNext calls
 

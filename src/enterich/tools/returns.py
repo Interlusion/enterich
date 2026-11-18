@@ -66,7 +66,7 @@ def _plain(value: Any) -> Any:
 
 async def invoice_of(side: Side, context: Context, name: str) -> dict[str, Any]:
     """A submitted invoice of the assigned company that takes a return; the others refused
-    before ERPNext maps them (REQ-004-PRS-F007, REQ-005-PRS-F008)."""
+    before ERPNext maps them (REQ-001-PRS-F024)."""
     doc = await get_named(
         context, side.invoice, name, field="return_against", what=side.what, company=True
     )

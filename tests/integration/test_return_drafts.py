@@ -1,6 +1,7 @@
 """Return drafts: credit notes against sales invoices and debit notes against purchase
-invoices, built from ERPNext's return of the invoice (REQ-004-PRS-F007,
-REQ-004-PRS-F008, REQ-005-PRS-F008, REQ-005-PRS-F009)."""
+invoices, built from ERPNext's return of the invoice (REQ-001-PRS-F023 to
+REQ-001-PRS-F026, REQ-004-PRS-F007, REQ-004-PRS-F008, REQ-005-PRS-F008,
+REQ-005-PRS-F009)."""
 
 from typing import Any, cast
 
@@ -716,7 +717,7 @@ def test_a_return_another_user_created_isnt_updated(mcp: Session, erp: FakeErpne
     assert erp.docs["Sales Invoice"][SALES_DRAFT]["owner"] != AGENT
 
 
-# What is left, and from which rows (REQ-004-PRS-F007, REQ-005-PRS-F008)
+# What is left, and from which rows (REQ-001-PRS-F023, REQ-001-PRS-F024)
 
 
 def test_a_free_item_row_is_taken_after_the_paid_one(mcp: Session, erp: FakeErpnext) -> None:
