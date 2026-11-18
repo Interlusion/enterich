@@ -89,7 +89,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-007-PRS-F004: Payment entry drafts
 
-**Description**: Enterich SHALL offer `create_draft_payment_entry` and `update_draft_payment_entry` as the catalogue below defines them. It SHALL take the payment type and the invoices' DocType from the party type, and the bank's ledger account from `bank_account`, which SHALL be an enabled bank account of the assigned company's own (as `list_bank_accounts` returns them). It SHALL refuse an update of a draft that isn't a payment received from a customer or made to a supplier as for another company's document, before its state and `modified` are checked.
+**Description**: Enterich SHALL offer `create_draft_payment_entry` and `update_draft_payment_entry` as the catalogue below defines them. It SHALL take the payment type and the invoices' DocType from the party type, and the bank's ledger account from `bank_account`, which SHALL be an enabled bank account of the assigned company's own (as `list_bank_accounts` returns them). It SHALL refuse an update of a draft that isn't a payment received from a customer or made to a supplier, as REQ-001-PRS-F003 refuses a kind its area spec rules out.
 
 **Related URS**: REQ-007-URS-F002
 
@@ -98,7 +98,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - A create for a customer sends `payment_type` Receive, the bank account's ledger account as `paid_to`, `received_amount` equal to `paid_amount`, and its references as Sales Invoice; one for a supplier sends Pay, the ledger account as `paid_from`, and its references as Purchase Invoice.
 - A create without `posting_date` sends today in the configured time zone, and without `reference_date` the posting date.
 - A bank account of another company, a party's bank account and a disabled one are each refused naming `bank_account`, without a write.
-- An update of an internal transfer, or of a payment made to a customer, is refused without a write, with the answer for a name that doesn't exist or isn't permitted (REQ-001-PRS-F009), also when it is submitted or its `modified` is stale.
+- An update of an internal transfer, or of a payment made to a customer, is refused naming `name` and the payments Enterich changes, also when it is submitted or its `modified` is stale; one of another company's payment entry answers as for a name that doesn't exist (REQ-001-PRS-F009); both without a write.
 - An update giving `bank_account` sends its ledger account in the field of the draft's payment type, with that side's account currency and type empty; one giving `paid_amount` sends it as `received_amount` too; one giving `references` sends the party side's account, its currency and its type empty, and as an empty list leaves the draft without references.
 - At a company that books advances in a separate party account, a draft created without references gets the advance account, and an update giving references to invoices gets the party's receivable or payable account.
 - Verification: test.

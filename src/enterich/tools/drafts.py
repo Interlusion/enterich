@@ -21,7 +21,7 @@ from enterich.shapes import (
     rows_of,
     shape,
 )
-from enterich.tools import Context, Refusal, get_named, invoicing, unknown_name
+from enterich.tools import Context, Refusal, get_named, invoicing
 
 MAX_DUPLICATE_ROWS = 1000
 MAX_NAMED = 5
@@ -145,14 +145,18 @@ async def editable(
     modified: str,
     what: str,
     only: Sequence[Mapping[str, Any]] = (),
+    kind: str = "",
 ) -> dict[str, Any]:
     """The company's draft the agent user created, as last read; refuse an update of
     anything else (REQ-001-PRS-F003, REQ-001-PRS-F004). With `only`, a document that has
-    the values of none of its mappings answers as an unknown one, before its state is
-    told."""
+    the values of none of its mappings is refused as not of `kind`, before its state is
+    told: the agent can read it, so it learns why it can't change it."""
     stored = await get_named(context, doctype, name, field="name", what=what, company=True)
-    if only and not any(all(stored.get(f) == v for f, v in kind.items()) for kind in only):
-        raise unknown_name("name", what, name)
+    if only and not any(all(stored.get(f) == v for f, v in m.items()) for m in only):
+        raise Refusal(
+            f"name: {name} isn't {kind}, the only kind Enterich changes; a person changes it "
+            "in ERPNext."
+        )
     state = DOCSTATUS.get(stored.get("docstatus", 0))
     if state is not None:
         raise Refusal(f"name: {name} is {state}; only drafts can be updated.")

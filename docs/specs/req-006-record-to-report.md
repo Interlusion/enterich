@@ -103,7 +103,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 #### REQ-006-PRS-F005: Journal entry drafts
 
-**Description**: Enterich SHALL offer `create_draft_journal_entry` and `update_draft_journal_entry` as the catalogue below defines them, sending each row's `debit` and `credit` as `debit_in_account_currency` and `credit_in_account_currency`, sending `posting_date` on every create (ERPNext sets none itself), and refusing an update of a draft whose voucher type isn't Journal Entry as for another company's document, before its state and `modified` are checked. It SHALL refuse an update of a draft with `multi_currency` set: Enterich changes only journal entries in the company's currency.
+**Description**: Enterich SHALL offer `create_draft_journal_entry` and `update_draft_journal_entry` as the catalogue below defines them, sending each row's `debit` and `credit` as `debit_in_account_currency` and `credit_in_account_currency`, sending `posting_date` on every create (ERPNext sets none itself), and refusing an update of a draft whose voucher type isn't Journal Entry, as REQ-001-PRS-F003 refuses a kind its area spec rules out. It SHALL refuse an update of a draft with `multi_currency` set: Enterich changes only journal entries in the company's currency.
 
 **Related URS**: REQ-006-URS-F002
 
@@ -111,7 +111,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 
 - Rows arrive with the account-currency fields, and never with `debit` or `credit`.
 - A create without `posting_date` sends today in the configured time zone.
-- An update of a Bank Entry or Opening Entry draft, or of another company's journal entry, is refused without a write, with the answer for a name that doesn't exist or isn't permitted (REQ-001-PRS-F009), also when it is submitted or its `modified` is stale.
+- An update of a Bank Entry or Opening Entry draft is refused naming `name` and the voucher type Journal Entry, also when it is submitted or its `modified` is stale; one of another company's journal entry answers as for a name that doesn't exist (REQ-001-PRS-F009); both without a write.
 - An update of a draft with `multi_currency` set is refused naming `name`, without a write.
 - Verification: test.
 - Evidence: Enterich's test suite.

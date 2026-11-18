@@ -602,6 +602,7 @@ async def update_draft_journal_entry(
         inputs.modified,
         "the journal entry",
         only=({"voucher_type": "Journal Entry"},),
+        kind="a journal entry of voucher type Journal Entry",
     )
     if stored.get("multi_currency"):
         raise Refusal(

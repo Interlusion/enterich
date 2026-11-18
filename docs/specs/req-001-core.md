@@ -229,7 +229,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-F003: Draft update operations
 
-**Description**: The update operations SHALL change only drafts of the assigned company that the agent user created, SHALL send ERPNext exactly the "Sent to ERPNext" fields of their area catalogue for the given inputs, and SHALL replace a draft's rows as a whole when rows are given.
+**Description**: The update operations SHALL change only drafts of the assigned company that the agent user created, SHALL send ERPNext exactly the "Sent to ERPNext" fields of their area catalogue for the given inputs, and SHALL replace a draft's rows as a whole when rows are given. An update of a draft of a kind its area spec rules out (another voucher type or payment type) SHALL be refused naming `name` and the kind the operation changes, before the draft's state and `modified` are checked.
 
 **Related URS**: REQ-001-URS-F002, REQ-001-URS-F003, REQ-001-URS-F005
 
@@ -239,6 +239,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - An update of a draft another user created (`owner`) is refused without a write to ERPNext, with a message saying that the agent changes only the agent user's drafts; a draft the agent user created and a person then edited can be updated with its new `modified`.
 - The body ERPNext receives equals the "Sent to ERPNext" column for the given inputs.
 - Rows given in an update replace all existing rows: a draft with three rows updated with one row has exactly that row.
+- An update of a draft of a kind the area spec rules out is refused naming `name` and the kind the operation changes, also when the draft is submitted or its `modified` is stale; another company's document still answers as one that doesn't exist (REQ-001-PRS-F007).
 - Verification: test.
 - Evidence: Enterich's test suite.
 

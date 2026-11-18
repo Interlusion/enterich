@@ -735,15 +735,27 @@ def test_an_update_refuses_what_it_doesnt_take(
         {"payment_type": "Receive", "party_type": "Supplier", "party": "SUPP-0001"},
         {"payment_type": "Receive", "party_type": "Employee", "party": "E-1"},
         {"payment_type": "Pay", "docstatus": 1},
-        {"company": "Other AG"},
     ],
 )
-def test_what_enterich_doesnt_change_answers_as_unknown(
+def test_another_kind_of_payment_is_refused_naming_the_ones_enterich_changes(
     mcp: Session, erp: FakeErpnext, overrides: dict[str, Any]
 ) -> None:
+    # REQ-001-PRS-F003: the agent can read it, so it learns why it can't change it
     other = payment_entry("ACC-PAY-2026-00012", **{"docstatus": 0, "owner": AGENT, **overrides})
     erp.add("Payment Entry", other)
-    # Stale as well: the answer comes before the state and `modified` are checked.
+    # Stale as well: the refusal comes before the state and `modified` are checked.
+    result = update(mcp, "ACC-PAY-2026-00012", "2026-01-01 00:00:00.000000", reference_no="X")
+    assert result.error
+    assert result.text == (
+        "name: ACC-PAY-2026-00012 isn't a payment received from a customer or made to a "
+        "supplier, the only kind Enterich changes; a person changes it in ERPNext."
+    )
+    assert erp.writes() == []
+
+
+def test_another_companys_payment_entry_answers_as_unknown(mcp: Session, erp: FakeErpnext) -> None:
+    other = payment_entry("ACC-PAY-2026-00012", docstatus=0, owner=AGENT, company="Other AG")
+    erp.add("Payment Entry", other)
     result = update(mcp, "ACC-PAY-2026-00012", "2026-01-01 00:00:00.000000", reference_no="X")
     unknown = update(mcp, "ACC-PAY-2026-09999", reference_no="X")
     assert result.error
