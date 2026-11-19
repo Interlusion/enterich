@@ -399,8 +399,10 @@ def test_a_purchase_invoice_on_hold_is_refused(mcp: Session, erp: FakeErpnext) -
     assert erp.writes() == []
 
 
-def test_an_invoice_given_twice_is_refused(mcp: Session, erp: FakeErpnext) -> None:
-    twice = [{"reference_name": INVOICE, "allocated_amount": 10}] * 2
+@pytest.mark.parametrize("again", [INVOICE, INVOICE.lower()])
+def test_an_invoice_given_twice_is_refused(mcp: Session, erp: FakeErpnext, again: str) -> None:
+    # ERPNext finds names case-insensitively, so one invoice in two cases is given twice.
+    twice = [{"reference_name": n, "allocated_amount": 10} for n in (INVOICE, again)]
     result = create(mcp, paid_amount=20, references=twice)
     assert result.error
     assert result.text.startswith("references: ")
