@@ -354,8 +354,8 @@ async def create_draft_purchase_invoice(
         )
     if matches and not inputs.allow_duplicate:
         raise drafts.refuse_duplicates(matches, match, kind)
-    saved = await drafts.insert(context, "Purchase Invoice", doc)
     warnings = [drafts.duplicate_warning(matches, match, kind)] if matches else []
+    saved = await drafts.insert(context, "Purchase Invoice", doc, warnings)
     warnings += drafts.tax_warning(saved, inputs.taxes_and_charges)
     warnings += drafts.row_warnings(saved, doc["items"], account="expense_account")
     return drafts.result(
@@ -385,11 +385,11 @@ async def update_draft_purchase_invoice(
     if inputs.bill_no:
         supplier = str(stored.get("supplier"))
         matches = await _same_bill(context, supplier, inputs.bill_no, draft=inputs.name)
-    saved = await drafts.save_update(
-        context, "Purchase Invoice", inputs.name, {**doc, "modified": inputs.modified}
-    )
     warnings = (
         [drafts.duplicate_warning(matches, BILL_MATCH, "purchase invoice")] if matches else []
+    )
+    saved = await drafts.save_update(
+        context, "Purchase Invoice", inputs.name, {**doc, "modified": inputs.modified}, warnings
     )
     warnings += drafts.tax_warning(saved, inputs.taxes_and_charges)
     warnings += drafts.row_warnings(saved, doc.get("items"), account="expense_account")
@@ -464,11 +464,11 @@ async def update_draft_purchase_return(
     if inputs.bill_no:
         supplier = str(stored.get("supplier"))
         matches = await _same_bill(context, supplier, inputs.bill_no, draft=inputs.name)
-    saved = await drafts.save_update(
-        context, "Purchase Invoice", inputs.name, {**doc, "modified": inputs.modified}
-    )
     warnings = (
         [drafts.duplicate_warning(matches, BILL_MATCH, "purchase invoice")] if matches else []
+    )
+    saved = await drafts.save_update(
+        context, "Purchase Invoice", inputs.name, {**doc, "modified": inputs.modified}, warnings
     )
     return drafts.result(
         context,

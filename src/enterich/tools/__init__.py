@@ -323,7 +323,7 @@ async def _attempt(
                 return _refused(str(exc))
             raise
         # ERPNext saved the draft: it is returned, never as refused (REQ-001-PRS-F015)
-        result = _written(context, op, meter.written, exc, call)
+        result = _written(context, op, meter, exc, call)
     if op.kind == "read":
         text = to_text(result)
         if text is None:
@@ -341,9 +341,11 @@ async def _attempt(
 
 
 def _written(
-    context: Context, op: Operation[Any], saved: dict[str, Any], exc: Exception, call: str
+    context: Context, op: Operation[Any], meter: erpnext.Meter, exc: Exception, call: str
 ) -> dict[str, Any]:
-    """The fields every draft result has, of the draft ERPNext saved before `exc`."""
+    """The fields every draft result has, of the draft ERPNext saved before `exc`, with the
+    warnings the operation knew before its write."""
+    saved = meter.written or {}
     if isinstance(exc, TimeoutError):
         failure = f"the operation took longer than {OPERATION_TIMEOUT:g} seconds"
     elif isinstance(exc, Refusal | ErpnextError):
@@ -357,8 +359,9 @@ def _written(
         **{k: saved[k] for k in fields if k in saved},
         "url": form_url(context.settings.erpnext_public_url, str(op.doctype), name),
         "warnings": [
+            *meter.warned,
             f"ERPNext saved the draft, but Enterich couldn't build the rest of this result "
-            f"({failure.rstrip('.')}). Read the draft to see it."
+            f"({failure.rstrip('.')}). Read the draft to see it.",
         ],
         "truncated": [],
     }

@@ -227,8 +227,8 @@ async def create(
     if found and not allow_duplicate:
         raise drafts.refuse_duplicates(*found[0])
     doc = {**mapped, "items": lines, **timed(invoice, fields)}
-    saved = await drafts.insert(context, side.invoice, doc)
-    return saved, [drafts.duplicate_warning(*m) for m in found]
+    warnings = [drafts.duplicate_warning(*m) for m in found]
+    return await drafts.insert(context, side.invoice, doc, warnings), warnings
 
 
 async def editable(side: Side, context: Context, name: str, modified: str) -> dict[str, Any]:
