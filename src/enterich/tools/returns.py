@@ -147,13 +147,20 @@ def rows(
                 "back all of it."
             )
         return taken
-    codes = [i.item_code for i in items]
-    if twice := sorted({c for c in codes if codes.count(c) > 1}):
+    # Item codes compare as ERPNext compares them (REQ-001-PRS-F027)
+    codes = [drafts.folded(i.item_code) for i in items]
+    if twice := sorted(
+        {i.item_code for i, c in zip(items, codes, strict=True) if codes.count(c) > 1}
+    ):
         raise Refusal(f"items: give each item once; {', '.join(twice)} is given twice.")
     taken: list[dict[str, Any]] = []
     returned = Decimal(0)
     for item in items:
-        found = [r for r in mapped_rows if r.get("item_code") == item.item_code]
+        found = [
+            r
+            for r in mapped_rows
+            if drafts.folded(r.get("item_code")) == drafts.folded(item.item_code)
+        ]
         if not found:
             raise Refusal(f"items: {item.item_code} isn't on {name}.")
         left = sum((_left(r) for r in found), Decimal(0))

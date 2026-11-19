@@ -22,7 +22,7 @@ from tests.fakes.erpnext import (
 )
 from tests.fakes.settings import DRAFTS_PER_HOUR
 from tests.integration.clock import TODAY
-from tests.integration.duplicates import Duplicate
+from tests.integration.duplicates import FAILED_RESULT, Duplicate, failing_after_the_write
 from tests.integration.mcp import Result, Session
 
 PATH = "/api/resource/Payment Entry"
@@ -352,7 +352,6 @@ def test_names_in_another_case_take_a_payment(
     mcp: Session, erp: FakeErpnext, party: str, invoice: str
 ) -> None:
     # ERPNext finds names case-insensitively; the allocation carries the stored name.
-    erp.docs["Customer"]["cust-0001"] = erp.docs["Customer"]["CUST-0001"]
     paid = [{"reference_name": invoice, "allocated_amount": 119}]
     result = create(mcp, party=party, references=paid)
     assert not result.error, result.text
@@ -360,6 +359,29 @@ def test_names_in_another_case_take_a_payment(
     assert post.body["references"] == [
         {"reference_doctype": "Sales Invoice", "reference_name": INVOICE, "allocated_amount": 119}
     ]
+
+
+def test_a_party_without_its_accents_takes_a_payment(mcp: Session, erp: FakeErpnext) -> None:
+    # REQ-001-PRS-F027: ERPNext compares names without regard to accents too
+    erp.docs["Customer"]["Müller GmbH"] = {
+        **erp.docs["Customer"]["CUST-0001"],
+        "name": "Müller GmbH",
+    }
+    erp.docs["Sales Invoice"][INVOICE]["customer"] = "Müller GmbH"
+    paid = [{"reference_name": INVOICE, "allocated_amount": 119}]
+    result = create(mcp, party="Muller GmbH", references=paid)
+    assert not result.error, result.text
+    [post] = erp.writes(PATH)
+    assert [r["reference_name"] for r in post.body["references"]] == [INVOICE]
+
+
+def test_an_update_sends_the_references_stored_names(mcp: Session, erp: FakeErpnext) -> None:
+    # REQ-001-PRS-F027: an update's references go out as stored, as a create's do
+    references = [{"reference_name": INVOICE.lower(), "allocated_amount": 50}]
+    result = update(mcp, references=references)
+    assert not result.error, result.text
+    [put] = erp.writes(PATH)
+    assert [r["reference_name"] for r in put.body["references"]] == [INVOICE]
 
 
 def test_the_invoices_are_checked_in_one_catalogued_call(mcp: Session, erp: FakeErpnext) -> None:
@@ -405,8 +427,8 @@ def test_an_invoice_given_twice_is_refused(mcp: Session, erp: FakeErpnext, again
     twice = [{"reference_name": n, "allocated_amount": 10} for n in (INVOICE, again)]
     result = create(mcp, paid_amount=20, references=twice)
     assert result.error
-    assert result.text.startswith("references: ")
-    assert INVOICE in result.text
+    given = ", ".join(sorted({INVOICE, again}))
+    assert result.text == f"references: give each invoice once; {given} is given twice."
     assert erp.writes() == []
 
 
@@ -796,6 +818,19 @@ def test_a_stale_update_changes_nothing(mcp: Session, erp: FakeErpnext) -> None:
     assert result.error
     assert "changed" in result.text
     assert erp.writes() == []
+
+
+@pytest.mark.parametrize("kind", ["create", "update"])
+def test_a_written_payment_whose_result_fails_keeps_its_duplicate_warning(
+    mcp: Session, monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    # REQ-001-PRS-F015: the match, known before the write, still reaches the agent
+    failing_after_the_write(monkeypatch)
+    if kind == "create":
+        result = create(mcp, reference_no="TX-4711", allow_duplicate=True)
+    else:
+        result = update(mcp, reference_no="TX-4711")
+    assert result.data["warnings"] == [BY_REFERENCE.warning("ACC-PAY-2026-00001"), FAILED_RESULT]
 
 
 def test_an_update_to_a_recorded_bank_reference_warns(mcp: Session, erp: FakeErpnext) -> None:

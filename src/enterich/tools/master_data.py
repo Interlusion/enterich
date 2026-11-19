@@ -92,7 +92,8 @@ async def get_item(inputs: GetItem, context: Context) -> dict[str, Any]:
             **{field: defaults and defaults.get(field) for field in DEFAULT_FIELDS},
             "item_tax_templates": [shape(row, TAX_FIELDS) for row in taxes],
             "modified": doc.get("modified"),
-            # ERPNext finds names case-insensitively; the link carries the stored one.
+            # ERPNext finds names without regard to case or accents (REQ-001-PRS-F027);
+            # the link carries the stored one.
             "url": form_url(
                 context.settings.erpnext_public_url, "Item", str(doc.get("name", inputs.item_code))
             ),

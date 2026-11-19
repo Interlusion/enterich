@@ -532,6 +532,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 - An item on two rows of the invoice, with 3 and 2 left to return, returned at 4, is sent as two rows at −3 and −1, each linked to its invoice row.
 - An item on a free-item row (`is_free_item`) before its paid row, returned at 1, is taken from the paid row.
 - An item invoiced at 0.3 with 0.1 returned is returned at 0.2.
+- An item in `items` given in another letter case is taken from the invoice's rows of the stored item (REQ-001-PRS-F027).
 - Verification: test.
 - Evidence: Enterich's test suite; the end-to-end test against a real ERPNext v16 site.
 
@@ -547,7 +548,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 **Definition of Done**:
 
 - A return against a draft, a cancelled, a return or a stock-updating invoice, or against one that doesn't exist for the assigned company, is refused naming `return_against`; so is one against an invoice whose items submitted returns took back in full.
-- An item given twice, an item not on the invoice, and one returned above what is left are refused naming `items`, the item, and for the last what is left.
+- An item given twice, also in two letter cases, an item not on the invoice, and one returned above what is left are refused naming `items`, the item, and for the last what is left.
 - Against an invoice with a fixed discount, or with a tax row of charge type Actual, a return of every item goes through; one of some items, and one after a submitted return against it, are refused. A discount given as a percentage doesn't count.
 - No refused return reaches a write; one refused for its invoice's state, company, kind or stock doesn't reach ERPNext's return method either.
 - Verification: test.
@@ -580,15 +581,15 @@ Only a fixed list of operations, without generic method calls, closes these door
 - Verification: test.
 - Evidence: Enterich's test suite.
 
-#### REQ-001-PRS-F027: Names in another letter case
+#### REQ-001-PRS-F027: Names as ERPNext compares them
 
-**Description**: ERPNext finds a name in any letter case and saves a link in the case of the stored name. Where an operation compares a given name with stored ones, Enterich SHALL compare them without regard to case; where it sends a name it looked up, it SHALL send the stored one.
+**Description**: ERPNext finds a name without regard to letter case or accents, so `muller` finds `Müller`, and saves a link as the name is stored. Where an operation compares a given name with stored ones, Enterich SHALL compare them as ERPNext does; where it sends a name it looked up, it SHALL send the stored one.
 
 **Related URS**: REQ-001-URS-F006, REQ-001-URS-F007
 
 **Definition of Done**:
 
-- For each comparison of a given name with stored ones that an area spec names, a name given in another letter case matches as the stored one.
+- For each comparison of a given name with stored ones that an area spec names, a name given in another letter case, or with accents left out or added, matches as the stored one.
 - Verification: test.
 - Evidence: Enterich's test suite.
 

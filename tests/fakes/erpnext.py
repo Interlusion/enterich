@@ -3,6 +3,7 @@
 import copy
 import json
 import re
+import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -373,6 +374,13 @@ class FakeErpnext:
     def fail(self, path: str, status: int, body: Any) -> None:
         self.failures[path] = (status, body)
 
+    def named(self, doctype: str, name: str) -> dict[str, Any] | None:
+        """The document ERPNext finds for `name`, which it compares as its collation does."""
+        docs = self.docs.get(doctype, {})
+        if name in docs:
+            return docs[name]
+        return next((d for n, d in docs.items() if _folded(n) == _folded(name)), None)
+
     def writes(self, path: str = "") -> list[Received]:
         """The POST and PUT requests received, those to `path` and below when given."""
         return [r for r in self.received if r.method in ("POST", "PUT") and r.path.startswith(path)]
@@ -438,7 +446,7 @@ class FakeErpnext:
         if request.url.path == LOGGED_USER_METHOD and request.method == "GET":
             return httpx2.Response(200, json={"message": self.agent_user}, headers=headers)
         if request.url.path == "/api/method/frappe.client.get":
-            doc = self.docs.get(params.get("doctype", ""), {}).get(params.get("name", ""))
+            doc = self.named(params.get("doctype", ""), params.get("name", ""))
             if doc is None:
                 return _missing(params.get("doctype", ""), params.get("name", ""))
             return httpx2.Response(200, json={"message": doc}, headers=headers)
@@ -502,7 +510,7 @@ class FakeErpnext:
             return self._save_return(doctype, doc)
         party_type, _ = INVOICES[doctype]
         party_field = party_type.lower()
-        party = self.docs.get(party_type, {}).get(doc.get(party_field, ""))
+        party = self.named(party_type, doc.get(party_field, ""))
         if party is None:
             message = f"Could not find {party_type}: {doc.get(party_field)}"
             return httpx2.Response(417, json=error(417, "LinkValidationError", message))
@@ -592,7 +600,7 @@ class FakeErpnext:
     def _return_of(self, doctype: str, name: str) -> httpx2.Response:
         """make_sales_return or make_debit_note: the unsaved return of a submitted invoice,
         each row at what is left to return, negative, linked to its invoice row."""
-        invoice = self.docs.get(doctype, {}).get(name)
+        invoice = self.named(doctype, name)
         if invoice is None:  # make_return_doc reads the company of a missing invoice
             message = "TypeError: cannot unpack non-iterable NoneType object"
             return httpx2.Response(500, json={"exc_type": "TypeError", "exception": message})
@@ -700,7 +708,7 @@ class FakeErpnext:
         totals, negative, a charge of type Actual as given, and no payment schedule."""
         party_type, _ = INVOICES[doctype]
         party_field = party_type.lower()
-        invoice = self.docs.get(doctype, {}).get(doc.get("return_against", ""))
+        invoice = self.named(doctype, doc.get("return_against", ""))
         if invoice is None:
             return _refused(
                 417, "ValidationError", f"Invalid Return Against: {doc.get('return_against')}"
@@ -836,7 +844,7 @@ class FakeErpnext:
         customer or made to a supplier: the amounts first, then the party's account, the
         references and the totals."""
         party_type = str(doc.get("party_type"))
-        party = self.docs.get(party_type, {}).get(doc.get("party", ""))
+        party = self.named(party_type, doc.get("party", ""))
         if party is None:
             message = f"{party_type} {doc.get('party')} does not exist"
             return _refused(417, "ValidationError", message)
@@ -859,7 +867,7 @@ class FakeErpnext:
             doc[f"{side}_account_currency"] = known.get("account_currency", "EUR")
         references = _rows(doc, "references")
         for number, row in enumerate(references, start=1):
-            invoice = self.docs.get(invoice_type, {}).get(row.get("reference_name", ""))
+            invoice = self.named(invoice_type, row.get("reference_name", ""))
             if invoice is None:
                 message = f"{invoice_type} {row.get('reference_name')} does not exist"
                 return _refused(417, "ValidationError", message)
@@ -1157,8 +1165,13 @@ def _matches(doc: dict[str, Any], condition: list[Any]) -> bool:
 
 
 def _folded(value: Any) -> Any:
-    """Text compared without regard to letter case, as MariaDB's collation does it."""
-    return value.casefold() if isinstance(value, str) else value
+    """Text compared as MariaDB's utf8mb4_unicode_ci compares it, which ERPNext's tables use:
+    without regard to letter case, accents or trailing spaces, so 'Muller' = 'Müller' and
+    'strasse' = 'straße'."""
+    if not isinstance(value, str):
+        return value
+    marks = unicodedata.normalize("NFKD", value.rstrip(" "))
+    return "".join(c for c in marks if not unicodedata.combining(c)).casefold()
 
 
 def _like(pattern: str) -> re.Pattern[str]:
