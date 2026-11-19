@@ -367,8 +367,38 @@ async def test_each_jwks_fetch_logs_its_outcome_and_keys(
     ]
     assert lines == [
         {"level": "info", "outcome": "fetched", "keys": 1},
-        {"level": "warning", "outcome": "failed", "reason": "_JwksError", "keys": 0},
+        {"level": "warning", "outcome": "failed", "reason": "status 503", "keys": 0},
     ]
+
+
+@pytest.mark.parametrize(
+    ("response", "reason"),
+    [
+        (httpx2.Response(404), "status 404"),
+        (httpx2.Response(200, content=b" " * (MAX_JWKS_BYTES + 1)), "too large"),
+        (httpx2.Response(200, json={"jwks": []}), "no keys"),
+        (
+            httpx2.Response(
+                200, json={"keys": [{"kty": "RSA", "kid": "b", "n": "x", "e": "AQAB"}]}
+            ),
+            "no usable signing keys",
+        ),
+    ],
+)
+async def test_a_failed_jwks_fetch_logs_why(
+    signer: Signer, logs: Logs, response: httpx2.Response, reason: str
+) -> None:
+    """The `jwks` line of REQ-002-PRS-NF008 tells a wrong URL from keys Enterich can't use."""
+
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        return response
+
+    client = httpx2.AsyncClient(transport=httpx2.MockTransport(handle))
+    v = Verifier(settings(), JwksCache(JWKS_URL, client))
+    with pytest.raises(KeysUnavailable):
+        await v.verify_token(token(signer))
+    [line] = logs.events("jwks")
+    assert (line["outcome"], line["reason"]) == ("failed", reason)
 
 
 @pytest.mark.parametrize("keys", [[], [{"kty": "RSA", "kid": "broken", "n": "x", "e": "AQAB"}]])
