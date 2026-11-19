@@ -134,14 +134,14 @@ An update that gives a `bill_no` SHOULD carry a warning, added to the draft, whe
 
 #### REQ-005-PRS-F007: Expense accounts ERPNext set
 
-**Description**: A purchase invoice create or update result, other than a return's, SHOULD carry a warning for each item row whose given `expense_account` ERPNext saved as another (for a stock item under perpetual inventory, Stock Received But Not Billed). Accounts are compared without regard to case, as ERPNext saves a link in the case of the stored name. Rows are matched as REQ-001-PRS-F016 matches them, and count towards its 20 named rows.
+**Description**: A purchase invoice create or update result, other than a return's, SHOULD carry a warning for each item row whose given `expense_account` ERPNext saved as another (for a stock item under perpetual inventory, Stock Received But Not Billed). Accounts are compared as REQ-001-PRS-F027 says. Rows are matched as REQ-001-PRS-F016 matches them, and count towards its 20 named rows.
 
 **Related URS**: REQ-005-URS-F002, REQ-001-URS-F009
 
 **Definition of Done**:
 
 - A row given an expense account that ERPNext replaces returns a warning naming the row, the item and both accounts, and the warning is added to the draft.
-- A row without an expense account, and one whose account ERPNext keeps, also in another case, return no warning.
+- A row without an expense account, and one whose account ERPNext keeps, also in another case (REQ-001-PRS-F027), return no warning.
 - Verification: test.
 - Evidence: Enterich's test suite.
 

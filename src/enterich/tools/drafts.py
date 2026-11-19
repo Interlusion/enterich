@@ -255,7 +255,7 @@ def row_warnings(
 
 
 def folded(value: Any) -> str:
-    """A name as ERPNext compares it: without regard to letter case."""
+    """A name as ERPNext compares it: without regard to letter case (REQ-001-PRS-F027)."""
     return str(value or "").casefold()
 
 
