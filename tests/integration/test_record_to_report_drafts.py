@@ -276,6 +276,15 @@ def test_a_create_with_the_drafts_rows_is_refused_naming_it(mcp: Session, erp: F
     assert erp.writes() == []
 
 
+def test_an_account_in_another_case_still_matches(mcp: Session, erp: FakeErpnext) -> None:
+    # REQ-001-PRS-F027: the draft's rows hold the accounts as stored
+    rows = [{"account": RENT.lower(), "debit": 500}, {"account": BANK.upper(), "credit": 500}]
+    result = create(mcp, accounts=rows)
+    assert result.error
+    assert result.text == BY_ROWS.refusal(DRAFT)
+    assert erp.writes() == []
+
+
 @pytest.mark.parametrize(
     "arguments",
     [
