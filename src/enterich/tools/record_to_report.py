@@ -536,8 +536,11 @@ async def _journal_duplicates(
         if row.get("account") is not None:
             debit = decimal(row.get("debit_in_account_currency"))
             credit = decimal(row.get("credit_in_account_currency"))
-            stored.append((str(row["account"]), debit, credit))
-    wanted = [(r.account, r.debit or Decimal(0), r.credit or Decimal(0)) for r in rows]
+            stored.append((drafts.folded(row["account"]), debit, credit))
+    # Accounts compare as ERPNext compares them (REQ-001-PRS-F027)
+    wanted = [
+        (drafts.folded(r.account), r.debit or Decimal(0), r.credit or Decimal(0)) for r in rows
+    ]
     return sorted(name for name, stored in entries.items() if _same_rows(wanted, stored))
 
 
