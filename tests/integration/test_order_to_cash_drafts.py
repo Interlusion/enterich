@@ -391,6 +391,16 @@ def test_a_draft_with_an_added_free_item_still_matches(mcp: Session, erp: FakeEr
     assert first["name"] in again.text
 
 
+def test_an_item_code_in_another_case_still_matches(mcp: Session, erp: FakeErpnext) -> None:
+    # ERPNext saves a link in the stored name's case: the draft holds SKU-1, the retry
+    # gives sku-1
+    items = [{"item_code": code, "qty": 1} for code in ("sku-1", "Sku-2", "SKU-3")]
+    again = create(mcp, items=items)
+    assert again.error
+    assert again.text == BY_ITEMS.refusal(DRAFT)
+    assert erp.writes(PATH) == []
+
+
 def test_a_duplicate_check_without_the_item_fields_is_refused(
     mcp: Session, erp: FakeErpnext
 ) -> None:
