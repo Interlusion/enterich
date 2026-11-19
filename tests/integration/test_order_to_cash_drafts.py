@@ -776,6 +776,26 @@ def test_a_written_draft_whose_result_fails_is_still_returned(
     assert line["outcome"] == {"document": name}
 
 
+def test_a_written_draft_whose_result_fails_keeps_its_duplicate_warning(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-F015, REQ-004-PRS-F006: the match, known before the write, still reaches
+    # the agent and the draft's comment
+    first = create(mcp).data
+
+    def unreadable(saved: dict[str, Any]) -> Any:
+        raise ErpnextError("ERPNext's tax detail isn't a number.")
+
+    monkeypatch.setattr(invoicing, "tax_summary", unreadable)
+    second = create(mcp, allow_duplicate=True).data
+    duplicate, failure = second["warnings"]
+    assert duplicate == BY_ITEMS.warning(first["name"])
+    assert "tax detail isn't a number" in failure
+    _, comment = erp.comments
+    assert comment["reference_name"] == second["name"]
+    assert comment["content"].endswith(f"<br>{duplicate}<br>{failure}")
+
+
 def test_the_comment_stays_within_the_operation_time(
     mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
 ) -> None:
