@@ -345,6 +345,23 @@ def test_only_the_partys_open_invoices_take_a_payment(
     assert erp.writes() == []
 
 
+@pytest.mark.parametrize(
+    ("party", "invoice"), [("CUST-0001", INVOICE.lower()), ("cust-0001", INVOICE)]
+)
+def test_names_in_another_case_take_a_payment(
+    mcp: Session, erp: FakeErpnext, party: str, invoice: str
+) -> None:
+    # ERPNext finds names case-insensitively; the allocation carries the stored name.
+    erp.docs["Customer"]["cust-0001"] = erp.docs["Customer"]["CUST-0001"]
+    paid = [{"reference_name": invoice, "allocated_amount": 119}]
+    result = create(mcp, party=party, references=paid)
+    assert not result.error, result.text
+    [post] = erp.writes(PATH)
+    assert post.body["references"] == [
+        {"reference_doctype": "Sales Invoice", "reference_name": INVOICE, "allocated_amount": 119}
+    ]
+
+
 def test_the_invoices_are_checked_in_one_catalogued_call(mcp: Session, erp: FakeErpnext) -> None:
     second = {"reference_name": "ACC-SINV-2026-00002", "allocated_amount": 50}
     result = create(mcp, paid_amount=169, references=[*PAID, second])

@@ -840,6 +840,7 @@ class FakeErpnext:
         if party is None:
             message = f"{party_type} {doc.get('party')} does not exist"
             return _refused(417, "ValidationError", message)
+        doc["party"] = party["name"]  # a link is saved in the stored name's case
         mandatory = (("paid_amount", "Paid Amount"), ("received_amount", "Received Amount"))
         for amount, label in mandatory:
             if not doc.get(amount):  # validate_mandatory, before set_amounts
@@ -1136,11 +1137,11 @@ def _matches(doc: dict[str, Any], condition: list[Any]) -> bool:
     actual = doc.get(name)
     match op:
         case "=":
-            return actual == value
+            return _folded(actual) == _folded(value)
         case "!=":
-            return actual != value
+            return _folded(actual) != _folded(value)
         case "in":
-            return actual in value
+            return _folded(actual) in [_folded(v) for v in value]
         case "like":
             return _like(str(value)).fullmatch(str(actual or "")) is not None
         case ">":
@@ -1153,6 +1154,11 @@ def _matches(doc: dict[str, Any], condition: list[Any]) -> bool:
             return actual is not None and actual < value
         case _:
             raise AssertionError(f"filter operator the fake doesn't know: {op}")
+
+
+def _folded(value: Any) -> Any:
+    """Text compared without regard to letter case, as MariaDB's collation does it."""
+    return value.casefold() if isinstance(value, str) else value
 
 
 def _like(pattern: str) -> re.Pattern[str]:
