@@ -119,6 +119,7 @@ The rules on single references apply to the given references; ERPNext checks the
 **Definition of Done**:
 
 - A reference to a draft, a cancelled, a paid or a return invoice, to a purchase invoice on hold, to another party's invoice or to one that doesn't exist for the assigned company is refused naming `references` and the invoice, without a write; so is an invoice given twice.
+- An invoice in `references` or a `party` given in another letter case is taken as the stored one, and the reference is sent with the invoice's stored name; one invoice given twice, in two cases, is refused as given twice (REQ-001-PRS-F027).
 - An `allocated_amount` above the invoice's outstanding amount is refused naming the invoice and its outstanding amount.
 - Allocations above `paid_amount` are refused naming both sums; so is an update lowering `paid_amount` below the draft's saved allocations.
 - Verification: test.

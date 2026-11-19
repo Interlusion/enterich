@@ -580,6 +580,18 @@ Only a fixed list of operations, without generic method calls, closes these door
 - Verification: test.
 - Evidence: Enterich's test suite.
 
+#### REQ-001-PRS-F027: Names in another letter case
+
+**Description**: ERPNext finds a name in any letter case and saves a link in the case of the stored name. Where an operation compares a given name with stored ones, Enterich SHALL compare them without regard to case; where it sends a name it looked up, it SHALL send the stored one.
+
+**Related URS**: REQ-001-URS-F006, REQ-001-URS-F007
+
+**Definition of Done**:
+
+- For each comparison of a given name with stored ones that an area spec names, a name given in another letter case matches as the stored one.
+- Verification: test.
+- Evidence: Enterich's test suite.
+
 ## PRS — Non-Functional
 
 #### REQ-001-PRS-NF001: Outside text marked

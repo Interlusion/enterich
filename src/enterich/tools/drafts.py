@@ -239,7 +239,7 @@ def row_warnings(
             )
         wanted = sent.get(account) if account else None
         # ERPNext saves a link in the stored name's case.
-        if account and wanted is not None and _folded(row.get(account)) != _folded(wanted):
+        if account and wanted is not None and folded(row.get(account)) != folded(wanted):
             label = account.replace("_", " ")
             warnings.append(
                 f"Row {number} ({code}): {label} {wanted} was given, but ERPNext saved "
@@ -254,7 +254,8 @@ def row_warnings(
     return shown
 
 
-def _folded(value: Any) -> str:
+def folded(value: Any) -> str:
+    """A name as ERPNext compares it: without regard to letter case (REQ-001-PRS-F027)."""
     return str(value or "").casefold()
 
 

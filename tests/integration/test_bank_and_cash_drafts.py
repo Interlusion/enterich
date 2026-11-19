@@ -345,6 +345,23 @@ def test_only_the_partys_open_invoices_take_a_payment(
     assert erp.writes() == []
 
 
+@pytest.mark.parametrize(
+    ("party", "invoice"), [("CUST-0001", INVOICE.lower()), ("cust-0001", INVOICE)]
+)
+def test_names_in_another_case_take_a_payment(
+    mcp: Session, erp: FakeErpnext, party: str, invoice: str
+) -> None:
+    # ERPNext finds names case-insensitively; the allocation carries the stored name.
+    erp.docs["Customer"]["cust-0001"] = erp.docs["Customer"]["CUST-0001"]
+    paid = [{"reference_name": invoice, "allocated_amount": 119}]
+    result = create(mcp, party=party, references=paid)
+    assert not result.error, result.text
+    [post] = erp.writes(PATH)
+    assert post.body["references"] == [
+        {"reference_doctype": "Sales Invoice", "reference_name": INVOICE, "allocated_amount": 119}
+    ]
+
+
 def test_the_invoices_are_checked_in_one_catalogued_call(mcp: Session, erp: FakeErpnext) -> None:
     second = {"reference_name": "ACC-SINV-2026-00002", "allocated_amount": 50}
     result = create(mcp, paid_amount=169, references=[*PAID, second])
@@ -382,8 +399,10 @@ def test_a_purchase_invoice_on_hold_is_refused(mcp: Session, erp: FakeErpnext) -
     assert erp.writes() == []
 
 
-def test_an_invoice_given_twice_is_refused(mcp: Session, erp: FakeErpnext) -> None:
-    twice = [{"reference_name": INVOICE, "allocated_amount": 10}] * 2
+@pytest.mark.parametrize("again", [INVOICE, INVOICE.lower()])
+def test_an_invoice_given_twice_is_refused(mcp: Session, erp: FakeErpnext, again: str) -> None:
+    # ERPNext finds names case-insensitively, so one invoice in two cases is given twice.
+    twice = [{"reference_name": n, "allocated_amount": 10} for n in (INVOICE, again)]
     result = create(mcp, paid_amount=20, references=twice)
     assert result.error
     assert result.text.startswith("references: ")
