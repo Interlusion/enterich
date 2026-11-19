@@ -1,0 +1,62 @@
+[
+  {
+    "branch": "auto/code-integration-bank-and-cash-drafts",
+    "also": [],
+    "files": [
+      "tests/integration/test_bank_and_cash_drafts.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "lost-on-the-way:bank-and-cash:src/enterich/tools/bank_and_cash.py:_check_references",
+        "slug": "bank-and-cash-bank-and-cash-check-references",
+        "ratchet": null,
+        "ratchet_done": false
+      },
+      {
+        "key": "missed-pattern:missed-pattern:src/enterich/tools/bank_and_cash.py:_check_references",
+        "slug": "missed-pattern-bank-and-cash-check-references",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  },
+  {
+    "branch": "auto/code-integration-order-to-cash-drafts",
+    "also": [],
+    "files": [
+      "tests/integration/test_order_to_cash_drafts.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "lost-on-the-way:operations-core:src/enterich/tools/__init__.py:_written",
+        "slug": "operations-core-init-written",
+        "ratchet": null,
+        "ratchet_done": false
+      },
+      {
+        "key": "missed-pattern:missed-pattern:src/enterich/tools/drafts.py:duplicates",
+        "slug": "missed-pattern-drafts-duplicates",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  },
+  {
+    "branch": "auto/code-unit-auth",
+    "also": [],
+    "files": [
+      "tests/unit/test_auth.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "lost-on-the-way:service:src/enterich/auth.py:JwksCache._refresh",
+        "slug": "service-auth-jwkscache-refresh",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  }
+]

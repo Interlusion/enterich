@@ -1,0 +1,25 @@
+{
+  "fixes": 5,
+  "states": {
+    "accepted": 5
+  },
+  "missing": [],
+  "unaccepted": {},
+  "accepted": {
+    "auto/code-integration-bank-and-cash-drafts": [
+      "258d9dddb188a20b8921833f0b0a6c0c2311e241",
+      "ccad8c8c66a447e00bcc36c1227aa70e9f5fa992",
+      "e44bb0561e8d08ca14f2cceca1b2d0ee2b71eff5"
+    ],
+    "auto/code-integration-order-to-cash-drafts": [
+      "a5f16040d9991e09775367bd3cd1e714eeaa9c25",
+      "056aa122179cc28b4eec73c8ba41c142051c111c",
+      "b8f09650adc4d468167abc0048835aff7bd7d20c",
+      "837bc495a40e17fcaf74d8659160335bc1f7e92a"
+    ],
+    "auto/code-unit-auth": [
+      "d1ef9c3c80fc9e7a013416150c8f5b17bb0590e8",
+      "dd2ce729432757471f46e3e8ac93f8a71af958e8"
+    ]
+  }
+}
