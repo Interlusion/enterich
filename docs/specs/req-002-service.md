@@ -211,7 +211,7 @@ It SHALL answer a missing or refused token with 401, a token whose `scope` claim
 | `start` | at start | version, resource URL, issuer, client, subject, company, leeway, offered operations, warnings |
 | `operation` | each operation | operation, `call` (Enterich's random ID of the operation, 12 hexadecimal digits, which a written draft's comment names; REQ-001-PRS-F015), `request_id` (the ID of the client's JSON-RPC request, as a string cut to 200 characters), arguments (strings and keys cut to 200 characters, lists and objects to their first 100 items), `sub`, `sid` (null when the token has none), `outcome` (`{"rows": n}`, `{"document": "<name>"}`, or `{"refusal": "<text>"}` with the refusal as in REQ-001-PRS-F008), duration, number of ERPNext calls and their total duration |
 | `rejection` | each rejection | status, reason, `sub` and client where the signature was valid |
-| `jwks` | each JWKS fetch | outcome, number of keys |
+| `jwks` | each JWKS fetch | outcome, number of keys, and for a failed fetch the reason: `status <code>`, `too large`, `no keys`, `no usable signing keys`, or the type of a transport or JSON error |
 | `error` | an unexpected exception, or a configuration Enterich refuses | operation and its `call` if any, exception type, message and traceback without secrets; for a refused configuration, the problems |
 | `library` | a line from a library or the HTTP server | logger, message, and the exception type and traceback if any |
 
@@ -225,6 +225,7 @@ It SHALL answer a missing or refused token with 401, a token whose `scope` claim
 - An unexpected exception in an operation writes one `error` line with the operation, its call ID and the traceback, and one `operation` line with the same call ID; the agent gets a tool error without the exception's text.
 - Every captured line of a test run parses as JSON and has a known event.
 - With `ENTERICH_LOG_LEVEL=ERROR`, `start` and `rejection` lines are still written, and library lines below error are not.
+- A failed JWKS fetch writes one `jwks` line whose reason tells a non-200 status, a body over the limit, a set without keys and one without a usable signing key apart.
 - Verification: test.
 - Evidence: Enterich's test suite.
 
