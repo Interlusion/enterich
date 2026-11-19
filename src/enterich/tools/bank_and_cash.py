@@ -342,10 +342,11 @@ async def _bank_ledger(context: Context, name: str) -> str:
 
 async def _check_references(
     context: Context, side: Side, party: str, references: Sequence[Allocation], paid: Decimal
-) -> None:
+) -> list[Allocation]:
     """REQ-007-PRS-F005: each invoice once, submitted, the party's, not a return, open, and
     allocated at most its outstanding amount; the allocations at most the paid amount; no
-    purchase invoice on hold."""
+    purchase invoice on hold. The references come back with the invoices' stored names, as
+    ERPNext finds names case-insensitively."""
     allocated = sum((r.allocated_amount for r in references), Decimal(0))
     if allocated > paid:
         raise Refusal(
@@ -353,9 +354,10 @@ async def _check_references(
             f"({drafts.plain(paid)}); lower them, or give the amount actually paid."
         )
     if not references:
-        return
+        return []
     names = [r.reference_name for r in references]
-    if twice := sorted({n for n in names if names.count(n) > 1}):
+    keys = [drafts.folded(n) for n in names]
+    if twice := sorted({n for n, k in zip(names, keys, strict=True) if keys.count(k) > 1}):
         raise Refusal(f"references: give each invoice once; {', '.join(twice)} is given twice.")
     rows = await context.erpnext.get_list(
         side.invoice,
@@ -372,17 +374,19 @@ async def _check_references(
         start=0,
         page_length=len(names),
     )
-    found = {str(row.get("name")): row for row in rows}
+    found = {drafts.folded(row.get("name")): row for row in rows}
     what = f"the {side.invoice.lower()}"
+    checked: list[Allocation] = []
     for reference in references:
-        name = reference.reference_name
-        row = found.get(name)
+        row = found.get(drafts.folded(reference.reference_name))
         if row is None:
-            raise unknown_name("references", what, name)
+            raise unknown_name("references", what, reference.reference_name)
+        name = str(row.get("name"))
+        checked.append(reference.model_copy(update={"reference_name": name}))
         state = drafts.DOCSTATUS.get(row.get("docstatus", 0), "a draft")
         if state != "submitted":
             raise Refusal(f"references: {name} is {state}; only submitted invoices are paid.")
-        if row.get(side.party_field) != party:
+        if drafts.folded(row.get(side.party_field)) != drafts.folded(party):
             raise Refusal(
                 f"references: {name} is {row.get(side.party_field)}'s invoice, not {party}'s."
             )
@@ -400,6 +404,7 @@ async def _check_references(
                 f"references: {drafts.plain(reference.allocated_amount)} is allocated to "
                 f"{name}, but only {drafts.plain(outstanding)} of it is outstanding."
             )
+    return checked
 
 
 async def _same_reference(
@@ -491,7 +496,7 @@ async def create_draft_payment_entry(
 ) -> dict[str, Any]:
     side = SIDES[inputs.party_type]
     ledger = await _bank_ledger(context, inputs.bank_account)
-    await _check_references(
+    references = await _check_references(
         context, side, inputs.party, inputs.references or [], inputs.paid_amount
     )
     matches = await _same_reference(context, inputs.party_type, inputs.party, inputs.reference_no)
@@ -512,7 +517,7 @@ async def create_draft_payment_entry(
         "posting_date": posting_date.isoformat(),
     }
     if inputs.references is not None:
-        doc["references"] = _allocations(side, inputs.references)
+        doc["references"] = _allocations(side, references)
     saved = await drafts.insert(context, "Payment Entry", doc)
     warnings = (
         [drafts.duplicate_warning(matches, PAYMENT_MATCH, "payment entry")] if matches else []
@@ -545,8 +550,8 @@ async def update_draft_payment_entry(
         doc[side.bank_field] = await _bank_ledger(context, inputs.bank_account)
     paid = inputs.paid_amount or decimal(stored.get("paid_amount"))
     if inputs.references is not None:
-        await _check_references(context, side, party, inputs.references, paid)
-        doc["references"] = _allocations(side, inputs.references)
+        references = await _check_references(context, side, party, inputs.references, paid)
+        doc["references"] = _allocations(side, references)
         # ERPNext sets the party's account again for the references: with advances booked
         # apart, the advance account without invoices, the party's own with them.
         doc |= _unset(side.party_account_field)
