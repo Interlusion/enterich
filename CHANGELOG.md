@@ -11,6 +11,8 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ### Fixed
 
+- A name given with its accents left out or added, such as `Muller GmbH` for `Müller GmbH`, is taken as the stored one, as ERPNext's database compares names without regard to accents as well as letter case. Before, a payment entry for `Muller GmbH` was refused as for another party than its invoices (REQ-001-PRS-F027).
+- A partial return that gives an item code in another letter case than the invoice's, such as `sku-1` for `SKU-1`, returns that item, and one item given twice in two cases is refused as given twice. Before, it was refused as not on the invoice (REQ-001-PRS-F023, REQ-001-PRS-F024).
 - A payment entry draft whose invoice in `references` or whose `party` is given in another letter case than ERPNext stores it takes the payment, and the reference is sent with the invoice's stored name. Before, the agent was told the invoice doesn't exist, or that it was another party's, although ERPNext finds names case-insensitively, and could book the payment as an advance without the reference (REQ-007-PRS-F005).
 - A failed JWKS fetch logs why: the `jwks` line's `reason` says `status <code>`, `too large`, `no keys` or `no usable signing keys`. Before, all four said `_JwksError`, and an operator facing the 503s couldn't tell a wrong JWKS URL from a key set Enterich can't use (REQ-002-PRS-NF008).
 - An update of a draft of a kind Enterich doesn't change, such as a Bank Entry journal entry or an internal transfer, is refused naming `name` and the kind it changes. Before, the agent was told the name doesn't exist or isn't permitted, although it could read the draft, and took it for a missing right (REQ-001-PRS-F003).

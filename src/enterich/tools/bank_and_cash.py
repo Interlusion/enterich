@@ -346,7 +346,7 @@ async def _check_references(
     """REQ-007-PRS-F005: each invoice once, submitted, the party's, not a return, open, and
     allocated at most its outstanding amount; the allocations at most the paid amount; no
     purchase invoice on hold. The references come back with the invoices' stored names, as
-    ERPNext finds names case-insensitively."""
+    ERPNext finds names without regard to case or accents (REQ-001-PRS-F027)."""
     allocated = sum((r.allocated_amount for r in references), Decimal(0))
     if allocated > paid:
         raise Refusal(

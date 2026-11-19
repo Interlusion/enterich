@@ -1,6 +1,7 @@
 """What every draft operation shares (REQ-001 Drafts): tax rows from a template, the
 duplicate check, the update checks, the warnings, the result."""
 
+import unicodedata
 from collections import Counter
 from collections.abc import Mapping, Sequence, Set
 from datetime import date, datetime, timedelta
@@ -264,8 +265,12 @@ def row_warnings(
 
 
 def folded(value: Any) -> str:
-    """A name as ERPNext compares it: without regard to letter case (REQ-001-PRS-F027)."""
-    return str(value or "").casefold()
+    """A name as ERPNext compares it, by its tables' utf8mb4_unicode_ci: without regard to
+    letter case, accents or trailing spaces, so `muller` is `Müller` and `strasse` is
+    `straße` (REQ-001-PRS-F027). Ø, Ł, Æ, Đ and Þ stay letters of their own, as there.
+    Not alike: the collation takes Œ as OE, and ẞ not as SS."""
+    marks = unicodedata.normalize("NFKD", str(value or "").rstrip(" "))
+    return "".join(c for c in marks if not unicodedata.combining(c)).casefold()
 
 
 def tax_warning(saved: dict[str, Any], template: str | None) -> list[str]:
