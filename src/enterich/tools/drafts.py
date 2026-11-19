@@ -73,7 +73,8 @@ async def duplicates(
     items: Sequence[dict[str, Any]],
 ) -> list[str]:
     """Drafts of the assigned company matching `filters` with the same item codes and
-    quantities, in any order, leaving out free-item rows a pricing rule added."""
+    quantities, in any order, leaving out free-item rows a pricing rule added. ERPNext
+    saves a link in the stored name's case, so item codes match without case."""
     rows = await context.erpnext.get_list(
         doctype,
         fields=("name", "items.item_code", "items.qty", "items.is_free_item"),
@@ -86,8 +87,8 @@ async def duplicates(
     for row in rows:
         found = drafts.setdefault(str(row.get("name")), Counter())
         if row.get("item_code") is not None and not row.get("is_free_item"):
-            found[(str(row["item_code"]), decimal(row.get("qty")))] += 1
-    wanted = Counter((str(i["item_code"]), Decimal(i["qty"])) for i in items)
+            found[(folded(row["item_code"]), decimal(row.get("qty")))] += 1
+    wanted = Counter((folded(i["item_code"]), Decimal(i["qty"])) for i in items)
     return sorted(name for name, found in drafts.items() if found == wanted)
 
 
