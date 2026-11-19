@@ -11,6 +11,7 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ### Fixed
 
+- A failed JWKS fetch logs why: the `jwks` line's `reason` says `status <code>`, `too large`, `no keys` or `no usable signing keys`. Before, all four said `_JwksError`, and an operator facing the 503s couldn't tell a wrong JWKS URL from a key set Enterich can't use (REQ-002-PRS-NF008).
 - An update of a draft of a kind Enterich doesn't change, such as a Bank Entry journal entry or an internal transfer, is refused naming `name` and the kind it changes. Before, the agent was told the name doesn't exist or isn't permitted, although it could read the draft, and took it for a missing right (REQ-001-PRS-F003).
 - A refusal reaches the agent with the message ERPNext raised it with, the last of its messages, not a notice ERPNext sent before it. Before, a purchase draft of a stock item without an expense account was reported with "Expense Head changed…", and the agent never saw why ERPNext refused it, such as a supplier's `bill_no` given twice or a missing field. A message ERPNext sends as a list now reaches the agent with its items; before, the refusal came without a reason (REQ-001-PRS-F008).
 - A create or update whose result would exceed 100,000 characters returns the draft without its tables, naming them in `truncated` and in a warning, and the draft gets its "Enterich:" comment. Before, the draft was written but the agent was told the operation was refused, the draft had no comment, and the log recorded a refusal (REQ-001-PRS-NF003).

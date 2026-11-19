@@ -101,7 +101,9 @@ class JwksCache:
         try:
             keys = await self._fetch()
         except (httpx2.HTTPError, ValueError, _JwksError) as exc:
-            log.event("jwks", logging.WARNING, outcome="failed", reason=type(exc).__name__, keys=0)
+            # _fetch's own messages name the cause and hold no secret; others by type.
+            reason = str(exc) if isinstance(exc, _JwksError) else type(exc).__name__
+            log.event("jwks", logging.WARNING, outcome="failed", reason=reason, keys=0)
             return
         self._keys = keys
         self._fetched_at = self._clock()
