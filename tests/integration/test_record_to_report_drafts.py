@@ -18,7 +18,7 @@ from tests.fakes.erpnext import (
 )
 from tests.fakes.settings import DRAFTS_PER_HOUR
 from tests.integration.clock import TODAY
-from tests.integration.duplicates import Duplicate
+from tests.integration.duplicates import FAILED_RESULT, Duplicate, failing_after_the_write
 from tests.integration.mcp import Result, Session
 
 PATH = "/api/resource/Journal Entry"
@@ -333,6 +333,16 @@ def test_allow_duplicate_creates_and_says_so(mcp: Session, erp: FakeErpnext) -> 
     assert result["warnings"] == [BY_ROWS.warning(DRAFT)]
     [comment] = erp.comments
     assert comment["reference_doctype"] == "Journal Entry"
+
+
+def test_a_written_journal_entry_whose_result_fails_keeps_its_duplicate_warning(
+    mcp: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-F015: the match, known before the write, still reaches the agent
+    failing_after_the_write(monkeypatch)
+    rows = [{"account": RENT, "debit": 500}, {"account": BANK, "credit": 500}]
+    result = create(mcp, accounts=rows, allow_duplicate=True)
+    assert result.data["warnings"] == [BY_ROWS.warning(DRAFT), FAILED_RESULT]
 
 
 # Rounding (REQ-006-PRS-F008)

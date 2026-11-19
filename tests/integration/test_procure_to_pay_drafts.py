@@ -23,7 +23,7 @@ from tests.fakes.erpnext import (
 )
 from tests.fakes.settings import DRAFTS_PER_HOUR
 from tests.integration.clock import TODAY
-from tests.integration.duplicates import Duplicate
+from tests.integration.duplicates import FAILED_RESULT, Duplicate, failing_after_the_write
 from tests.integration.mcp import Result, Session
 
 PATH = "/api/resource/Purchase Invoice"
@@ -354,6 +354,19 @@ def test_allow_duplicate_records_the_bill_again_and_says_so(mcp: Session, erp: F
     result = create(mcp, bill_no="R-4711", allow_duplicate=True).data
     assert result["warnings"] == [BY_BILL.warning("ACC-PINV-2026-00001")]
     assert len(erp.comments) == 1
+
+
+@pytest.mark.parametrize("kind", ["create", "update"])
+def test_a_written_bill_whose_result_fails_keeps_its_duplicate_warning(
+    mcp: Session, monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    # REQ-001-PRS-F015: the match, known before the write, still reaches the agent
+    failing_after_the_write(monkeypatch)
+    if kind == "create":
+        result = create(mcp, bill_no="R-4711", allow_duplicate=True)
+    else:
+        result = update(mcp, bill_no="R-4711")
+    assert result.data["warnings"] == [BY_BILL.warning("ACC-PINV-2026-00001"), FAILED_RESULT]
 
 
 def test_erpnexts_own_bill_check_still_refuses(mcp: Session, erp: FakeErpnext) -> None:

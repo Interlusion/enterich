@@ -21,7 +21,7 @@ from tests.fakes.erpnext import (
 )
 from tests.fakes.settings import DRAFTS_PER_HOUR
 from tests.integration.clock import TODAY
-from tests.integration.duplicates import Duplicate
+from tests.integration.duplicates import FAILED_RESULT, Duplicate, failing_after_the_write
 from tests.integration.mcp import Result, Session
 
 SALES = "/api/resource/Sales Invoice"
@@ -214,6 +214,16 @@ def test_a_create_sends_erpnexts_return_with_the_given_items(
     assert (mapping.method, mapping.params) == ("GET", {"source_name": INVOICE})
 
 
+def test_an_item_code_in_another_case_is_returned(mcp: Session, erp: FakeErpnext) -> None:
+    # REQ-001-PRS-F027: ERPNext compares names without regard to letter case
+    erp.docs["Sales Invoice"].pop(SALES_DRAFT)
+    mapped = erp.mapped_return("Sales Invoice", INVOICE)
+    result = create(mcp, items=[{"item_code": "sku-1", "qty": 3}])
+    assert not result.error, result.text
+    [post] = erp.writes(SALES)
+    assert post.body["items"] == lines(mapped, (0, 2), (2, 1))
+
+
 def test_a_create_with_items_leaves_out_the_other_items(mcp: Session, erp: FakeErpnext) -> None:
     invoice(
         erp, "Sales Invoice", "ACC-SINV-2026-00008", [("v1", "SKU-1", 2.0), ("v2", "SKU-2", 1.0)]
@@ -296,7 +306,12 @@ def test_only_a_submitted_invoice_of_the_company_takes_a_return(
         ([{"item_code": "SKU-9", "qty": 1}], "SKU-9 isn't on"),
         ([{"item_code": "SKU-1", "qty": 5}], "5 of SKU-1 can't be returned; 4 left"),
         ([{"item_code": "SKU-2", "qty": 1}], "1 of SKU-2 can't be returned; 0 left"),
-        ([{"item_code": "SKU-1", "qty": 1}] * 2, "once"),
+        ([{"item_code": "SKU-1", "qty": 1}] * 2, "give each item once; SKU-1 is given twice."),
+        # REQ-001-PRS-F027: one item in two letter cases is given twice
+        (
+            [{"item_code": "SKU-1", "qty": 1}, {"item_code": "sku-1", "qty": 1}],
+            "give each item once; SKU-1, sku-1 is given twice.",
+        ),
     ],
 )
 def test_items_are_returned_at_most_as_far_as_left(
@@ -378,6 +393,15 @@ def test_allow_duplicate_creates_and_warns(mcp: Session, erp: FakeErpnext) -> No
     [warning] = result.data["warnings"]
     assert warning == BY_INVOICE.warning(SALES_DRAFT)
     assert len(erp.comments) == 1
+
+
+def test_a_written_return_whose_result_fails_keeps_its_duplicate_warning(
+    mcp: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-F015: the match, known before the write, still reaches the agent
+    failing_after_the_write(monkeypatch)
+    result = create(mcp, items=[{"item_code": "SKU-1", "qty": 1}], allow_duplicate=True)
+    assert result.data["warnings"] == [BY_INVOICE.warning(SALES_DRAFT), FAILED_RESULT]
 
 
 def test_a_return_counts_with_the_sales_invoices(limited: Session, erp: FakeErpnext) -> None:
@@ -1103,6 +1127,16 @@ def test_a_debit_note_update_with_a_known_number_warns(mcp: Session, erp: FakeEr
     assert not result.error, result.text
     [warning] = result.data["warnings"]
     assert warning == BY_BILL.warning("ACC-PINV-2026-00009")
+
+
+def test_a_written_debit_note_whose_result_fails_keeps_its_duplicate_warning(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-F015: the match, known before the write, still reaches the agent
+    credit_note(erp, status="Draft")
+    failing_after_the_write(monkeypatch)
+    result = update(mcp, "update_draft_purchase_return", bill_no="CN-77")
+    assert result.data["warnings"] == [BY_BILL.warning("ACC-PINV-2026-00009"), FAILED_RESULT]
 
 
 def test_a_debit_notes_own_number_doesnt_warn(mcp: Session, erp: FakeErpnext) -> None:

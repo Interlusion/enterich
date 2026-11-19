@@ -5,6 +5,16 @@ out here, not taken from `drafts.refuse_duplicates` and `drafts.duplicate_warnin
 change to the helpers' wording or default shows too."""
 
 from dataclasses import dataclass
+from typing import Any
+
+import pytest
+
+from enterich.erpnext import Erpnext, ErpnextError
+
+FAILED_RESULT = (
+    "ERPNext saved the draft, but Enterich couldn't build the rest of this result (ERPNext "
+    "refused a later read). Read the draft to see it."
+)
 
 
 @dataclass(frozen=True)
@@ -22,3 +32,17 @@ class Duplicate:
 
     def warning(self, found: str) -> str:
         return f"Possible duplicate of {found}: a {self.kind} with the same {self.match}."
+
+
+def failing_after_the_write(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every insert and update fails right after ERPNext saved the draft, as a later read of the
+    operation would: the result is the fallback of REQ-001-PRS-F015, whose warnings start with
+    those known before the write."""
+    for method in ("insert", "update"):
+        original = getattr(Erpnext, method)
+
+        async def failing(self: Erpnext, *args: Any, _original: Any = original) -> Any:
+            await _original(self, *args)
+            raise ErpnextError("ERPNext refused a later read.")
+
+        monkeypatch.setattr(Erpnext, method, failing)
