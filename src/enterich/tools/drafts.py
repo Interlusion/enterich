@@ -74,7 +74,8 @@ async def duplicates(
 ) -> list[str]:
     """Drafts of the assigned company matching `filters` with the same item codes and
     quantities, in any order, leaving out free-item rows a pricing rule added. ERPNext
-    saves a link in the stored name's case, so item codes match without case."""
+    saves a link in the stored name's case, so item codes match without case
+    (REQ-001-PRS-F027)."""
     rows = await context.erpnext.get_list(
         doctype,
         fields=("name", "items.item_code", "items.qty", "items.is_free_item"),
