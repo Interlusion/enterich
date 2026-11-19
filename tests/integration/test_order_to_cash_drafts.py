@@ -391,6 +391,16 @@ def test_a_draft_with_an_added_free_item_still_matches(mcp: Session, erp: FakeEr
     assert first["name"] in again.text
 
 
+def test_an_item_code_in_another_case_still_matches(mcp: Session, erp: FakeErpnext) -> None:
+    # ERPNext saves a link in the stored name's case: the draft holds SKU-1, the retry
+    # gives sku-1
+    items = [{"item_code": code, "qty": 1} for code in ("sku-1", "Sku-2", "SKU-3")]
+    again = create(mcp, items=items)
+    assert again.error
+    assert again.text == BY_ITEMS.refusal(DRAFT)
+    assert erp.writes(PATH) == []
+
+
 def test_a_duplicate_check_without_the_item_fields_is_refused(
     mcp: Session, erp: FakeErpnext
 ) -> None:
@@ -774,6 +784,26 @@ def test_a_written_draft_whose_result_fails_is_still_returned(
     assert comment["reference_name"] == name
     [line] = logs.events("operation")
     assert line["outcome"] == {"document": name}
+
+
+def test_a_written_draft_whose_result_fails_keeps_its_duplicate_warning(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-F015, REQ-004-PRS-F006: the match, known before the write, still reaches
+    # the agent and the draft's comment
+    first = create(mcp).data
+
+    def unreadable(saved: dict[str, Any]) -> Any:
+        raise ErpnextError("ERPNext's tax detail isn't a number.")
+
+    monkeypatch.setattr(invoicing, "tax_summary", unreadable)
+    second = create(mcp, allow_duplicate=True).data
+    duplicate, failure = second["warnings"]
+    assert duplicate == BY_ITEMS.warning(first["name"])
+    assert "tax detail isn't a number" in failure
+    _, comment = erp.comments
+    assert comment["reference_name"] == second["name"]
+    assert comment["content"].endswith(f"<br>{duplicate}<br>{failure}")
 
 
 def test_the_comment_stays_within_the_operation_time(

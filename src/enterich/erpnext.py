@@ -13,7 +13,7 @@ import time
 from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from http.cookiejar import CookieJar, DefaultCookiePolicy
 from typing import Any, cast
@@ -60,6 +60,8 @@ class Meter:
     seconds: float = 0.0
     # The draft ERPNext answered a write with: once it is set, the operation wrote
     written: dict[str, Any] | None = None
+    # The warnings the operation knew before its write, kept should its result fail
+    warned: list[str] = field(default_factory=list)
 
 
 _meter: ContextVar[Meter | None] = ContextVar("erpnext_meter", default=None)
@@ -74,6 +76,13 @@ def metered() -> Generator[Meter]:
         yield meter
     finally:
         _meter.reset(token)
+
+
+def warn(warnings: Sequence[str]) -> None:
+    """Record the warnings an operation knows before its write in its meter, so they
+    reach the agent and the comment even if building the result fails (REQ-001-PRS-F015)."""
+    if (meter := _meter.get()) is not None:
+        meter.warned = list(warnings)
 
 
 def _wrote(saved: dict[str, Any]) -> dict[str, Any]:

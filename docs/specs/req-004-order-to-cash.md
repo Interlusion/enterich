@@ -125,6 +125,7 @@ The personas (REQ-001-P1 the operator, REQ-001-P3 the bookkeeper and others) are
 - A create matching an existing draft is refused naming it; one that differs in a quantity, an item or the date goes through.
 - A create matches a draft that has an added free-item row as well.
 - A create with an item on two rows of 1 matches a draft with those two rows, not one with a single row of 1.
+- A create whose item codes differ from a draft's only in letter case matches it (REQ-001-PRS-F027).
 - Verification: test.
 - Evidence: Enterich's test suite.
 

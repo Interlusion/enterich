@@ -518,10 +518,10 @@ async def create_draft_payment_entry(
     }
     if inputs.references is not None:
         doc["references"] = _allocations(side, references)
-    saved = await drafts.insert(context, "Payment Entry", doc)
     warnings = (
         [drafts.duplicate_warning(matches, PAYMENT_MATCH, "payment entry")] if matches else []
     )
+    saved = await drafts.insert(context, "Payment Entry", doc, warnings)
     return _payment_result(context, saved, warnings + _payment_warnings(saved))
 
 
@@ -577,11 +577,11 @@ async def update_draft_payment_entry(
         matches = await _same_reference(
             context, party_type, party, inputs.reference_no, draft=inputs.name
         )
-    saved = await drafts.save_update(
-        context, "Payment Entry", inputs.name, {**doc, "modified": inputs.modified}
-    )
     warnings = (
         [drafts.duplicate_warning(matches, PAYMENT_MATCH, "payment entry")] if matches else []
+    )
+    saved = await drafts.save_update(
+        context, "Payment Entry", inputs.name, {**doc, "modified": inputs.modified}, warnings
     )
     return _payment_result(context, saved, warnings + _payment_warnings(saved))
 

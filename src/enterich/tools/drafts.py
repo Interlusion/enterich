@@ -9,6 +9,7 @@ from typing import Any, Self
 
 from pydantic import model_validator
 
+from enterich import erpnext
 from enterich.erpnext import Refused
 from enterich.shapes import (
     Inputs,
@@ -72,7 +73,9 @@ async def duplicates(
     items: Sequence[dict[str, Any]],
 ) -> list[str]:
     """Drafts of the assigned company matching `filters` with the same item codes and
-    quantities, in any order, leaving out free-item rows a pricing rule added."""
+    quantities, in any order, leaving out free-item rows a pricing rule added. ERPNext
+    saves a link in the stored name's case, so item codes match without case
+    (REQ-001-PRS-F027)."""
     rows = await context.erpnext.get_list(
         doctype,
         fields=("name", "items.item_code", "items.qty", "items.is_free_item"),
@@ -85,8 +88,8 @@ async def duplicates(
     for row in rows:
         found = drafts.setdefault(str(row.get("name")), Counter())
         if row.get("item_code") is not None and not row.get("is_free_item"):
-            found[(str(row["item_code"]), decimal(row.get("qty")))] += 1
-    wanted = Counter((str(i["item_code"]), Decimal(i["qty"])) for i in items)
+            found[(folded(row["item_code"]), decimal(row.get("qty")))] += 1
+    wanted = Counter((folded(i["item_code"]), Decimal(i["qty"])) for i in items)
     return sorted(name for name, found in drafts.items() if found == wanted)
 
 
@@ -106,10 +109,14 @@ def duplicate_warning(names: Sequence[str], match: str, kind: str = "draft") -> 
     return f"Possible duplicate of {named(names)}: a {kind} with the same {match}."
 
 
-async def insert(context: Context, doctype: str, doc: dict[str, Any]) -> dict[str, Any]:
+async def insert(
+    context: Context, doctype: str, doc: dict[str, Any], warnings: Sequence[str] = ()
+) -> dict[str, Any]:
     """A new draft of the assigned company, once the limit of drafts per hour allows it
     (REQ-001-PRS-F019): call it after the duplicate check. Never one that amends another,
-    even where ERPNext's mapping carries `amended_from` (REQ-001-PRS-F006)."""
+    even where ERPNext's mapping carries `amended_from` (REQ-001-PRS-F006). `warnings` are
+    those known before the write: they stay with the draft should its result fail."""
+    erpnext.warn(warnings)
     limit = context.settings.max_drafts_per_hour
     new = {k: v for k, v in doc.items() if k != "amended_from"}
     body = {**new, "company": context.settings.company, "docstatus": 0}
@@ -179,8 +186,10 @@ def _timestamp(value: Any) -> datetime | None:
 
 
 async def save_update(
-    context: Context, doctype: str, name: str, doc: dict[str, Any]
+    context: Context, doctype: str, name: str, doc: dict[str, Any], warnings: Sequence[str] = ()
 ) -> dict[str, Any]:
+    """Save an update of a draft; `warnings` as for `insert`."""
+    erpnext.warn(warnings)
     try:
         return await context.erpnext.update(doctype, name, doc)
     except Refused as refused:
