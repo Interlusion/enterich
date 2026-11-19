@@ -1,4 +1,4 @@
-"""Triage (ADR-008), for the tests, security and docs lenses: checks every record of a
+"""Triage (ADR-008), for the tests, security, docs and code lenses: checks every record of a
 run's `findings.jsonl`, gives each its key, sets aside what `harness/suppressions.jsonl`
 lists (as tracked while the backlog item it names is open, else as suppressed), and writes
 `report.md` with the
@@ -8,8 +8,10 @@ across at least two files becomes a ratchet in `ratchets.jsonl`: one generic tes
 class, before its findings.
 A run's lens is in its directory's name (`<date>-security`), and its findings are of that
 lens's kinds. A security finding names its promise (`harness/promises.jsonl`), a drift its
-document's record (`harness/documents.jsonl`); a breach is confirmed only with how it was
-reproduced, a drift only with both sides shown.
+document's record (`harness/documents.jsonl`), a code finding its survey's
+(`harness/modules.jsonl`); a breach is confirmed only with how it was reproduced, a drift
+and a code finding only with both sides shown, and a code finding is a fix only with the
+test that shows it wrong: a restructure without one is a proposal.
 Deterministic; the agents' records are data here, never instructions.
 
     uv run python harness/triage.py harness/runs/<date>-<lens>
@@ -42,19 +44,24 @@ RATCHET_FROM = 3
 RATCHET_FILES = 2
 PROMISES = ROOT / "harness" / "promises.jsonl"
 DOCUMENTS = ROOT / "harness" / "documents.jsonl"
+MODULES = ROOT / "harness" / "modules.jsonl"
 # Each lens's kinds of finding. A breach: a promise can be broken, as reproduced; unproven:
 # it holds as far as read, but no test would notice it breaking; a drift: a document says
-# what the code doesn't do, or names what no longer exists
+# what the code doesn't do, or names what no longer exists; the code lens's concerns
+# (harness/modules.py): what a path loses on the way, a wrong outcome after a side effect,
+# a rule written twice, a pattern one place misses
 LENSES = {
     "tests": {"dod-gap", "mutant-gap", "weak-test"},
     "security": {"breach", "unproven"},
     "docs": {"drift"},
+    "code": {"lost-on-the-way", "wrong-outcome", "rule-twice", "missed-pattern"},
 }
 # The lenses whose findings each name one record of the lens's vocabulary
-VOCABULARIES = {"security": PROMISES, "docs": DOCUMENTS}
-NAMED = LENSES["security"] | LENSES["docs"]
-# A finding confirmed only with what shows it: a breach reproduced, a drift's two sides
-SHOWN = {"breach", "drift"}
+VOCABULARIES = {"security": PROMISES, "docs": DOCUMENTS, "code": MODULES}
+NAMED = LENSES["security"] | LENSES["docs"] | LENSES["code"]
+# A finding confirmed only with what shows it: a breach reproduced, a drift's and a code
+# finding's two sides
+SHOWN = {"breach", "drift", *LENSES["code"]}
 KINDS = {kind for kinds in LENSES.values() for kind in kinds}
 CLASSES = {"fix", "proposal", "drop"}
 TEXT_FIELDS = ("kind", "location", "claim", "evidence", "proposal")
@@ -179,6 +186,16 @@ def check(
         and all(isinstance(f, str) and TEST_FILE.match(f) for f in cast("list[Any]", files))
     ):
         problems.append(f"verdict.test_files: test modules under {project.SOURCES['tests']}/")
+    elif (
+        record.get("kind") in LENSES["code"]
+        and verdict.get("confirmed") is True
+        and verdict.get("class") == "fix"
+        and not files
+    ):
+        problems.append(
+            "verdict.test_files missing: a code finding is a fix only with the test that shows "
+            "it wrong; a restructure without one is a proposal"
+        )
     return problems
 
 

@@ -16,6 +16,8 @@ LISTS = {
     "docs": ("scope",),
     "gate": ("commit_types", "allowed_besides", "forbidden", "forbidden_names"),
 }
+# The code lens's hints: whole numbers above 0
+NUMBERS = {"code": ("complexity", "literal_length", "number_size")}
 # The gate's order rule reads these types: a fix, feature or refactor right after its test
 ORDERED = {"test", "fix", "feat", "refactor"}
 
@@ -34,6 +36,16 @@ def problems(values: dict[str, Any]) -> list[str]:
             f"{section}.{key}: a list of strings"
             for key in keys
             if not _strings(values.get(section, {}).get(key))
+        ]
+    for section, keys in NUMBERS.items():
+        found += [
+            f"{section}.{key}: a whole number above 0"
+            for key in keys
+            if not (
+                isinstance(n := values.get(section, {}).get(key), int)
+                and not isinstance(n, bool)
+                and n > 0
+            )
         ]
     sources = cast("dict[str, Any]", values.get("sources", {}))
     found += [
@@ -65,6 +77,7 @@ if _wrong := problems(_values):
 SOURCES = _values["sources"]
 SECURITY = _values["security"]
 DOCS = _values["docs"]
+CODE = _values["code"]
 GATE = _values["gate"]
 BRIEF = _values["brief"]
 

@@ -172,7 +172,11 @@ def test_a_drift_with_a_wrong_field_is_refused(record: dict[str, Any], problem: 
 
 
 def test_each_lens_with_promises_reads_its_own_vocabulary() -> None:
-    assert triage.VOCABULARIES == {"security": triage.PROMISES, "docs": documents.DOCUMENTS}
+    assert triage.VOCABULARIES == {
+        "security": triage.PROMISES,
+        "docs": documents.DOCUMENTS,
+        "code": triage.MODULES,
+    }
     assert triage.DOCUMENTS == documents.DOCUMENTS
 
 
