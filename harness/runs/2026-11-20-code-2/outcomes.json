@@ -1,0 +1,24 @@
+{
+  "fixes": 3,
+  "states": {
+    "accepted": 2,
+    "rejected": 1
+  },
+  "missing": [],
+  "unaccepted": {
+    "auto/code-unit-config": [
+      "aef152d3cdb73a4a583529b6a1369938caa06e0e",
+      "5a41c811eeb82adfb9aaa1c1e52d9b925ce3c8e3"
+    ]
+  },
+  "accepted": {
+    "auto/code-integration-order-to-cash-drafts": [
+      "d6371fd5ee712e71278f53cbaa1a60bdb2e54414",
+      "c88c1ef946e6c571c90c699aa7c178de540176eb"
+    ],
+    "auto/code-unit-auth": [
+      "8a8786fba1bb50b4d68c41ed51035595181970ba",
+      "9393181286968d743403d3a9a1af9116b6b25b68"
+    ]
+  }
+}

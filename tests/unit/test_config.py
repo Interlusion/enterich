@@ -165,6 +165,8 @@ NO_OPERATION = "must name at least one operation; unset, all are offered"
         ("RESOURCE_URL", "https://1.1/mcp", "must be in the form the metadata publishes"),
         ("ISSUER", "https://id exa.com/realms/example", VALID_HOST),
         ("ISSUER", "https://ID.example.com/realms/example", CANONICAL),
+        ("ISSUER", "https://999.0.0.1/realms/x", "must be a URL the metadata can publish"),
+        ("ISSUER", "https://256.1.1.1/realms/x", "must be a URL the metadata can publish"),
         ("JWKS_URL", "https://id exa.com/certs", VALID_HOST),
         ("JWKS_URL", "https://id.example.com:/certs", "must not have an empty port"),
         ("JWKS_URL", "https://id.example.com:x/certs", "must be a URL"),
@@ -179,6 +181,42 @@ NO_OPERATION = "must name at least one operation; unset, all are offered"
 )
 def test_invalid_values_stop_enterich_with_name_and_rule(name: str, value: str, rule: str) -> None:
     assert problems(**{name: value}) == [f"ENTERICH_{name}: {rule}"]
+
+
+def test_each_url_the_metadata_cannot_publish_is_named() -> None:
+    found = problems(RESOURCE_URL="https://999.1.1.1/mcp", ISSUER="https://999.0.0.1/realms/x")
+    assert found == [
+        "ENTERICH_RESOURCE_URL: must be a URL the metadata can publish",
+        "ENTERICH_ISSUER: must be a URL the metadata can publish",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("env", "expected"),
+    [
+        (
+            {
+                "RESOURCE_URL": "https://erp.example.com:/mcp",
+                "ISSUER": "https://999.0.0.1/realms/x",
+            },
+            [
+                "ENTERICH_RESOURCE_URL: must not have an empty port",
+                "ENTERICH_ISSUER: must be a URL the metadata can publish",
+            ],
+        ),
+        (
+            {"RESOURCE_URL": "https://999.1.1.1/mcp", "ISSUER": "https://id exa.com/realms/x"},
+            [
+                f"ENTERICH_ISSUER: {VALID_HOST}",
+                "ENTERICH_RESOURCE_URL: must be a URL the metadata can publish",
+            ],
+        ),
+    ],
+)
+def test_a_url_the_metadata_cannot_publish_is_named_beside_another_bad_url(
+    env: dict[str, str], expected: list[str]
+) -> None:
+    assert problems(**env) == expected
 
 
 def test_http_urls_are_allowed_for_loopback_hosts() -> None:

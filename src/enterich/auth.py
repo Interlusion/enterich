@@ -178,6 +178,12 @@ class Verifier:
             raise _Refused("unknown key")
         if key.alg is not None and key.alg != alg:
             raise _Refused("algorithm not the key's")
+        try:
+            # A key without `alg` may still be of another type (an EC key for RS256)
+            # or curve; PyJWT's decode would raise TypeError or ValueError for it.
+            jwt.get_algorithm_by_name(alg).prepare_key(key.key)
+        except jwt.PyJWTError, TypeError, ValueError:
+            raise _Refused("algorithm not the key's") from None
 
         try:
             claims: dict[str, Any] = jwt.decode(

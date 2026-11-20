@@ -6,7 +6,7 @@ import hashlib
 import hmac
 import json
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 import anyio
@@ -185,6 +185,28 @@ async def test_a_key_is_used_only_with_the_algorithm_it_names(signer: Signer) ->
     s = settings(token_algorithms="RS256,PS256")
     other_alg = Signer(signer.kid, signer.key, "PS256")
     assert await refusal(verifier(jwks, s), token(other_alg)) == "algorithm not the key's"
+
+
+OCT_KEY = {"kty": "oct", "k": base64.urlsafe_b64encode(b"s" * 32).rstrip(b"=").decode()}
+
+
+@pytest.mark.parametrize(
+    ("published", "alg"),
+    [
+        pytest.param(lambda: ec_signer("key-x").jwk(), "RS256", id="EC key, RS256"),
+        pytest.param(lambda: rsa_signer("key-x").jwk(), "ES256", id="RSA key, ES256"),
+        pytest.param(lambda: {**OCT_KEY, "kid": "key-x"}, "ES256", id="oct key, ES256"),
+        pytest.param(lambda: {**OCT_KEY, "kid": "key-x"}, "RS256", id="oct key, RS256"),
+    ],
+)
+async def test_a_key_without_alg_is_refused_for_an_algorithm_of_another_key_type(
+    published: Callable[[], dict[str, Any]], alg: str
+) -> None:
+    no_alg = {k: v for k, v in published().items() if k != "alg"}
+    jwks = FakeJwks([], extra_keys=[no_alg])
+    s = settings(token_algorithms="RS256,ES256")
+    signer = rsa_signer("key-x") if alg == "RS256" else ec_signer("key-x")
+    assert await refusal(verifier(jwks, s), token(signer)) == "algorithm not the key's"
 
 
 async def test_client_id_counts_when_azp_is_absent(jwks: FakeJwks, signer: Signer) -> None:

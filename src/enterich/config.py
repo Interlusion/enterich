@@ -12,7 +12,7 @@ from urllib.parse import SplitResult, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from mcp.server.auth.settings import AuthSettings
-from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError
+from pydantic import BaseModel, ConfigDict, SecretStr, TypeAdapter, ValidationError
 
 PREFIX = "ENTERICH_"
 
@@ -26,6 +26,7 @@ MAX_DRAFTS_PER_HOUR = 1000
 type LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 LOG_LEVELS: tuple[LogLevel, ...] = get_args(LogLevel.__value__)
 
+CANONICAL_URL = "must be canonical: lower-case scheme and host, no default port"
 # Unreserved characters only, no empty, "." or ".." segments, so the path the
 # client sends is the path the wrapper and the SDK compare.
 CANONICAL_PATH = re.compile(r"(/[A-Za-z0-9_~-][A-Za-z0-9._~-]*)+")
@@ -132,8 +133,11 @@ def load(env: Mapping[str, str], operations: Collection[str]) -> Settings:
         "log_level": reader.log_level(),
         "max_drafts_per_hour": reader.limit("MAX_DRAFTS_PER_HOUR", 1, MAX_DRAFTS_PER_HOUR),
     }
-    if resource and issuer:
-        reader.as_published(resource.geturl(), issuer.geturl())
+    if resource:
+        published = "must be in the form the metadata publishes"
+        reader.as_published("RESOURCE_URL", resource.geturl(), "resource_server_url", published)
+    if issuer:
+        reader.as_published("ISSUER", issuer.geturl(), "issuer_url", CANONICAL_URL)
     if reader.problems:
         raise ConfigError(reader.problems)
 
@@ -277,7 +281,7 @@ class _Reader:
             default_port = {"http": 80, "https": 443}[url.scheme]
             scheme_and_host = raw[: len(url.scheme) + 3 + len(url.netloc)]
             if scheme_and_host != scheme_and_host.lower() or port == default_port:
-                self.fail(name, "must be canonical: lower-case scheme and host, no default port")
+                self.fail(name, CANONICAL_URL)
                 return None
             if not CANONICAL_PATH.fullmatch(url.path):
                 self.fail(
@@ -287,21 +291,19 @@ class _Reader:
                 return None
         return url
 
-    def as_published(self, resource: str, issuer: str) -> None:
-        """The SDK publishes both URLs in the metadata; they must come out unchanged."""
+    def as_published(self, name: str, url: str, field: str, changed: str) -> None:
+        """The SDK publishes the URL in the metadata as its `field`; it must come out unchanged."""
+        annotation = AuthSettings.model_fields[field].annotation
+        if annotation is None:  # every field of AuthSettings is annotated
+            raise TypeError(field)
+        published = TypeAdapter(annotation, config=AuthSettings.model_config)
         try:
-            sdk = AuthSettings(
-                issuer_url=issuer,  # pyright: ignore[reportArgumentType] - pydantic parses it
-                resource_server_url=resource,  # pyright: ignore[reportArgumentType]
-                validate_token_resource=False,
-            )
+            parsed = published.validate_python(url)
         except ValidationError:
-            self.fail("RESOURCE_URL", "must be a URL the metadata can publish")
+            self.fail(name, "must be a URL the metadata can publish")
             return
-        if str(sdk.resource_server_url) != resource:
-            self.fail("RESOURCE_URL", "must be in the form the metadata publishes")
-        if str(sdk.issuer_url) != issuer:
-            self.fail("ISSUER", "must be canonical: lower-case scheme and host, no default port")
+        if str(parsed) != url:
+            self.fail(name, changed)
 
 
 def _valid_host(host: str | None) -> bool:
