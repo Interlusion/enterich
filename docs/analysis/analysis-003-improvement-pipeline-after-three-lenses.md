@@ -88,14 +88,16 @@ Analysis 002's §3.8 still holds; three lenses sharpen it.
 
 Two things a child needs that analysis 002 didn't name: the product description for the prompts, and inventory code that knows the product's structure. Both are small for Enterich and will differ entirely for Haflinger.
 
-The fourth lens, the code lens, was built after this analysis (`harness/README.md`, The code lens), with the move in mind: its four concerns and their bars are generic, and so is its inventory but for the groups of modules (`harness/modules.jsonl`, child data) and its hints' limits (`[code]` in `harness/project.toml`). The move carries one decision still open: whether the gate gets a `refactor:` path for restructures no failing test shows, which its first runs leave to the operator by hand. Its survey and verify engine is the third copy of the one above.
+The fourth lens, the code lens, was built after this analysis (`harness/README.md`, The code lens), with the move in mind: its four concerns and their bars are generic, and so is its inventory but for the groups of modules (`harness/modules.jsonl`, child data) and its hints' limits (`[code]` in `harness/project.toml`). Its survey and verify engine is the third copy of the one above. Its first run ([retrospective](../../harness/runs/2026-11-19-code/retrospective.md)) settled the decision it left open: the gate gets no `refactor:` path. A restructure no failing test shows stays by hand from the report, as documents do, since a run yields few and the tool-list snapshot, their only proof, is the operator's. It also showed two things the parent needs:
+
+- **Dropped findings are checked again after a rule changes:** a run's fixes can add a rule to the contract (here REQ-001-PRS-F027, names in another letter case), and a finding refuted before it may hold under it. Both of the run's refuted findings did.
+- **The CHANGELOG serialises a run's branches:** each fix adds a line under Unreleased, so the gate holds every branch back until the one before is merged, and each rebased branch gets its review again. A child whose changelog is written at the release, or a gate that merges such lines itself, would let them run side by side.
 
 ### 3.7 What no lens looks at
 
 - **The contract's own soundness:** whether a spec is unambiguous and verifiable, whether two specs contradict each other (the docs run met one by chance, REQ-001 against REQ-006), whether an ADR's reasons still hold.
 - **The fake against ERPNext** (analysis 002, §3.5): the integration tests run against `FakeErpnext`; where it differs from ERPNext, they pass and prove nothing.
 - **Agent usability:** whether an agent model uses the tools as meant ([ITEM-009](../backlog/item-009-agent-eval-suite.md)).
-- **The code itself:** the fourth lens of ADR-008, not built.
 
 ## 4. Recommendations
 
