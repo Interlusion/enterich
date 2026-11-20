@@ -810,6 +810,21 @@ def test_a_written_draft_whose_result_fails_is_still_returned(
     assert line["outcome"] == {"document": name}
 
 
+def test_a_written_draft_whose_result_fails_unexpectedly_says_what_any_unexpected_failure_says(
+    mcp: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-F015: the agent gets the one text of an unexpected failure
+    def broken(saved: dict[str, Any]) -> Any:
+        raise RuntimeError("a bug")
+
+    monkeypatch.setattr(invoicing, "tax_summary", broken)
+    monkeypatch.setattr(tools, "UNEXPECTED", "Enterich broke.")
+    assert create(mcp).data["warnings"] == [
+        "ERPNext saved the draft, but Enterich couldn't build the rest of this result "
+        "(Enterich broke). Read the draft to see it."
+    ]
+
+
 def test_a_written_draft_whose_result_fails_keeps_its_duplicate_warning(
     mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
 ) -> None:

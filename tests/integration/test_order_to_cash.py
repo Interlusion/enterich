@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from enterich import shapes
 from tests.fakes.erpnext import (
     AGENT,
     COMPANY,
@@ -192,6 +193,19 @@ def test_exactly_100_addresses_are_not_cut(mcp: Session, erp: FakeErpnext) -> No
     result = mcp.call("get_customer", {"name": "CUST-0002"}).data
     assert len(result["addresses"]) == 100
     assert result["truncated"] == []
+
+
+def test_addresses_follow_the_limit_of_every_table(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """REQ-001-PRS-NF003: a party's addresses are cut as a get's other tables are."""
+    monkeypatch.setattr(shapes, "MAX_ROWS", 2)
+    # CUST-0002 has its billing address already: 2 more make 3.
+    for i in range(2):
+        erp.add("Address", address(f"CUST-0002-{i:03}", "Customer", "CUST-0002"))
+    result = mcp.call("get_customer", {"name": "CUST-0002"}).data
+    assert len(result["addresses"]) == 2
+    assert result["truncated"] == ["addresses"]
 
 
 def test_get_customer_uses_the_name_erpnext_answers_with(mcp: Session, erp: FakeErpnext) -> None:
