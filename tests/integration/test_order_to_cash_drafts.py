@@ -30,7 +30,7 @@ from tests.fakes.erpnext import (
 )
 from tests.fakes.settings import DRAFTS_PER_HOUR
 from tests.integration.clock import HOUR_AGO, TODAY
-from tests.integration.duplicates import Duplicate
+from tests.integration.duplicates import Duplicate, bounded, capped
 from tests.integration.mcp import Result, Session
 
 PATH = "/api/resource/Sales Invoice"
@@ -401,6 +401,28 @@ def test_an_item_code_in_another_case_still_matches(mcp: Session, erp: FakeErpne
     assert erp.writes(PATH) == []
 
 
+def test_a_duplicate_check_that_reads_its_bound_warns(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-F005: the fixture draft fills the check's bound; a match beyond it is missed
+    bounded(monkeypatch, 2)
+    result = create(mcp, items=[{"item_code": "SKU-2", "qty": 7}])
+    assert not result.error, result.text
+    assert result.data["warnings"] == [capped(2)]
+    [comment] = erp.comments
+    assert capped(2) in comment["content"]
+
+
+def test_a_draft_cut_off_at_the_bound_does_not_match(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-F005: the bound cuts the fixture draft after SKU-1 and SKU-2 of its three
+    bounded(monkeypatch, 2)
+    result = create(mcp, items=[{"item_code": "SKU-1", "qty": 1}, {"item_code": "SKU-2", "qty": 1}])
+    assert not result.error, result.text
+    assert result.data["warnings"] == [capped(2)]
+
+
 def test_a_duplicate_check_without_the_item_fields_is_refused(
     mcp: Session, erp: FakeErpnext
 ) -> None:
@@ -759,6 +781,7 @@ def test_a_result_too_large_with_its_rows_still_returns_the_draft(
     assert sorted(data["truncated"]) == ["items", "tax_summary", "taxes"]
     [left_out] = data["warnings"]
     assert "items" in left_out
+    assert "exceed 2,000 characters" in left_out
     [comment] = erp.comments
     assert comment["reference_name"] == data["name"]
     [line] = logs.events("operation")

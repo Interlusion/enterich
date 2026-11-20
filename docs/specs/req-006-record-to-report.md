@@ -149,6 +149,7 @@ The rules on single rows apply to the given rows; ERPNext checks the saved ones 
 
 - A create matching an existing draft is refused naming it; one that differs in a row or the date goes through.
 - A create repeated with amounts of two decimal places is refused naming the first draft; one of three decimal places is refused as input, naming the row's `debit` or `credit`.
+- A create giving an account in another letter case or without its accents matches the draft's rows of the stored account (REQ-001-PRS-F027).
 - Verification: test.
 - Evidence: Enterich's test suite.
 

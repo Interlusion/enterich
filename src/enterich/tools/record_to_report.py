@@ -226,8 +226,11 @@ def _balanced(rows: list[JournalEntryRow]) -> list[JournalEntryRow]:
     return rows
 
 
+MIN_JOURNAL_ROWS, MAX_JOURNAL_ROWS = 2, 20
 JournalEntryRows = Annotated[
-    list[JournalEntryRow], Field(min_length=2, max_length=20), AfterValidator(_balanced)
+    list[JournalEntryRow],
+    Field(min_length=MIN_JOURNAL_ROWS, max_length=MAX_JOURNAL_ROWS),
+    AfterValidator(_balanced),
 ]
 
 
@@ -513,22 +516,16 @@ async def _journal_duplicates(
 ) -> list[str]:
     """REQ-006-PRS-F007: drafts of the assigned company on the posting date with the same
     rows (account, debit, credit), in any order."""
-    found = await context.erpnext.get_list(
+    found = await drafts.duplicate_rows(
+        context,
         "Journal Entry",
-        fields=(
+        (
             "name",
             "accounts.account",
             "accounts.debit_in_account_currency",
             "accounts.credit_in_account_currency",
         ),
-        filters=[
-            ["company", "=", context.settings.company],
-            ["docstatus", "=", 0],
-            ["posting_date", "=", posting_date.isoformat()],
-        ],
-        order_by="name asc",
-        start=0,
-        page_length=drafts.MAX_DUPLICATE_ROWS,
+        [["posting_date", "=", posting_date.isoformat()]],
     )
     entries: dict[str, list[tuple[str, Decimal, Decimal]]] = {}
     for row in found:
@@ -536,8 +533,11 @@ async def _journal_duplicates(
         if row.get("account") is not None:
             debit = decimal(row.get("debit_in_account_currency"))
             credit = decimal(row.get("credit_in_account_currency"))
-            stored.append((str(row["account"]), debit, credit))
-    wanted = [(r.account, r.debit or Decimal(0), r.credit or Decimal(0)) for r in rows]
+            stored.append((drafts.folded(row["account"]), debit, credit))
+    # Accounts compare as ERPNext compares them (REQ-001-PRS-F027)
+    wanted = [
+        (drafts.folded(r.account), r.debit or Decimal(0), r.credit or Decimal(0)) for r in rows
+    ]
     return sorted(name for name, stored in entries.items() if _same_rows(wanted, stored))
 
 
@@ -698,15 +698,15 @@ OPERATIONS: list[Operation[Any]] = [
         name="report_general_ledger",
         title="General ledger",
         description=(
-            "The assigned company's General Ledger from `from_date` to `to_date` (at most 366 "
-            "days), one record per ledger entry, oldest first. Narrow it by `account`, "
-            "`party_type` with `party`, or `voucher_no`. With `account` or `party`, `opening` "
-            "is the balance before `from_date` and each record carries its running `balance`; "
-            "without, `opening` holds only entries marked as opening (such as an Opening "
-            "Entry), which are never among the records, and `balance` is null. `totals` cover "
-            "every record, not only this page. Amounts are in `currency`: the company's, or the "
-            "account's or party's when ERPNext switched to it. A busy ledger may be too large "
-            "for a year without `account`: narrow it by account or period."
+            "The assigned company's General Ledger from `from_date` to `to_date` (at most "
+            f"{MAX_LEDGER_DAYS} days), one record per ledger entry, oldest first. Narrow it by "
+            "`account`, `party_type` with `party`, or `voucher_no`. With `account` or "
+            "`party`, `opening` is the balance before `from_date` and each record carries its "
+            "running `balance`; without, `opening` holds only entries marked as opening (such "
+            "as an Opening Entry), which are never among the records, and `balance` is null. "
+            "`totals` cover every record, not only this page. Amounts are in `currency`: the "
+            "company's, or the account's or party's when ERPNext switched to it. A busy ledger "
+            "may be too large for a year without `account`: narrow it by account or period."
         ),
         kind="read",
         inputs=ReportGeneralLedger,
@@ -731,9 +731,10 @@ OPERATIONS: list[Operation[Any]] = [
         title="Create draft journal entry",
         description=(
             "Create a draft journal entry (voucher type Journal Entry) of the assigned "
-            "company; a person reviews and submits it in ERPNext. Give 2 to 20 `accounts` "
-            "rows, each with exactly one of `debit` and `credit`, of at most 2 decimal places; "
-            "debits and credits must be equal. Accounts are in the company's currency. A "
+            "company; a person reviews and submits it in ERPNext. Give "
+            f"{MIN_JOURNAL_ROWS} to {MAX_JOURNAL_ROWS} `accounts` rows, each with exactly one "
+            "of `debit` and `credit`, of at most 2 decimal places; debits and credits must be "
+            "equal. Accounts are in the company's currency. A "
             "receivable or payable account needs `party_type` and `party`; ERPNext saves a "
             "party on another account but "
             "refuses it on submit. A row referencing an invoice carries its party and its "

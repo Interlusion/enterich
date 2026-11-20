@@ -23,7 +23,13 @@ from tests.fakes.erpnext import (
 )
 from tests.fakes.settings import DRAFTS_PER_HOUR
 from tests.integration.clock import TODAY
-from tests.integration.duplicates import FAILED_RESULT, Duplicate, failing_after_the_write
+from tests.integration.duplicates import (
+    FAILED_RESULT,
+    Duplicate,
+    bounded,
+    capped,
+    failing_after_the_write,
+)
 from tests.integration.mcp import Result, Session
 
 PATH = "/api/resource/Purchase Invoice"
@@ -748,6 +754,35 @@ def test_allow_duplicate_on_the_item_match_warns(mcp: Session, erp: FakeErpnext)
     result = create(mcp, items=DRAFT_ITEMS, allow_duplicate=True).data
     assert result["warnings"] == [BY_ITEMS.warning(DRAFT)]
     assert len(erp.comments) == 1
+
+
+def test_a_duplicate_check_that_reads_its_bound_warns(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-F005: two drafts' rows fill the check's bound; a match beyond it is missed
+    two = [
+        {"item_code": "PAPER", "qty": 1, "rate": 20},
+        {"item_code": "SKU-2", "qty": 1, "rate": 10},
+    ]
+    create(mcp, items=two)
+    bounded(monkeypatch, 2)
+    result = create(mcp, items=[{"item_code": "SKU-2", "qty": 7, "rate": 10}])
+    assert not result.error, result.text
+    assert result.data["warnings"] == [capped(2)]
+    *_, comment = erp.comments
+    assert capped(2) in comment["content"]
+
+
+def test_a_draft_cut_off_at_the_bound_does_not_match(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-F005: the bound takes the fixture draft's row and the next draft's first
+    paper = {"item_code": "PAPER", "qty": 1, "rate": 20}
+    create(mcp, items=[paper, {"item_code": "SKU-2", "qty": 1, "rate": 10}])
+    bounded(monkeypatch, 2)
+    result = create(mcp, items=[paper])
+    assert not result.error, result.text
+    assert result.data["warnings"] == [capped(2)]
 
 
 def test_a_bill_older_than_its_terms_needs_its_due_date(mcp: Session) -> None:

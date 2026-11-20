@@ -40,7 +40,19 @@ INVOICE_DETAIL_FIELDS = (
     "remarks",
 )
 TEMPLATE_FIELDS = ("name", "title", "is_default", "tax_category", "disabled")
-AGEING = tuple(f"range{i}" for i in range(6))  # range0: not yet due; then ERPNext's 30, 60, 90, 120
+# The ageing ranges' upper bounds in days, as ERPNext's aged reports take them (REQ-004-OTC-F004)
+AGEING_DAYS = (30, 60, 90, 120)
+# range0: not yet due; then one per range, and one over the last bound
+AGEING = tuple(f"range{i}" for i in range(len(AGEING_DAYS) + 2))
+# What the aged reports' descriptions say of the ranges
+AGEING_NOTE = (
+    f"`range0` not yet due, then `range1` to `{AGEING[-1]}` for "
+    + ", ".join(
+        f"{lo}-{hi}"
+        for lo, hi in zip((0, *(d + 1 for d in AGEING_DAYS[:-1])), AGEING_DAYS, strict=True)
+    )
+    + f" and over {AGEING_DAYS[-1]} days"
+)
 AGEING_BASED_ON = {"due_date": "Due Date", "posting_date": "Posting Date"}
 MAX_ADDRESSES = 100
 # For each operation whose result has tax rows (REQ-001 Results)
@@ -285,7 +297,7 @@ async def aged_report(
         "party_type": side.party,
         "ageing_based_on": AGEING_BASED_ON[ageing_based_on],
         "age_as_on": "Report Date",
-        "range": "30, 60, 90, 120",
+        "range": ", ".join(map(str, AGEING_DAYS)),
     }
     if party is not None:
         filters["party"] = [party]

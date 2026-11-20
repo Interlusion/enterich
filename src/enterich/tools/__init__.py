@@ -26,7 +26,7 @@ from mcp.server.mcpserver.utilities.func_metadata import ArgModelBase, FuncMetad
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import ConfigDict, ValidationError
 
-from enterich import erpnext, log
+from enterich import erpnext, log, shapes
 from enterich.config import Settings
 from enterich.erpnext import MAX_MESSAGE, Erpnext, ErpnextError, Refused
 from enterich.shapes import (
@@ -46,10 +46,10 @@ MAX_LOGGED_ITEMS = 100
 UNEXPECTED = "Enterich failed unexpectedly; the operator finds the details in Enterich's log."
 # A draft result's lists that aren't its child tables
 KEPT_LISTS = frozenset({"warnings", "truncated"})
-# The fields every create or update result has (REQ-001's Results); all else can be left out
-DRAFT_RESULT_FIELDS = frozenset(
-    {"name", "modified", "status", "docstatus", "company", "url", "warnings", "truncated"}
-)
+# The fields of the saved draft every create or update result has (REQ-001's Results)
+SAVED_FIELDS = ("name", "modified", "status", "docstatus", "company")
+# All the fields every create or update result has; all else can be left out
+DRAFT_RESULT_FIELDS = frozenset({*SAVED_FIELDS, "url", *KEPT_LISTS})
 # The keyword the SDK hands a tool its request under; the client's arguments come in one
 # dict beside it, so a client argument of that name stays an argument
 REQUEST = "enterich_request"
@@ -328,10 +328,14 @@ async def _attempt(
         text = to_text(result)
         if text is None:
             return _refused(
-                "The result would exceed 100,000 characters: narrow a list or report (a search, "
-                "a filter or a smaller limit); a single document this large is too large to return."
+                f"The result would exceed {shapes.MAX_RESULT_CHARS:,} characters: narrow a list "
+                "or report (a search, a filter or a smaller limit); a single document this large "
+                "is too large to return."
             )
         return text, _outcome(op, result)
+    # What a check noted on the way joins the warnings; a result of _written holds it already
+    noted = [w for w in meter.noted if w not in result["warnings"]]
+    result["warnings"] = [*result["warnings"], *noted]
     # The draft is written: it gets its comment, and the agent its number, whatever its size
     origin = _origin(op, call, inputs)
     result["warnings"] = await _comment(
@@ -354,12 +358,12 @@ def _written(
         log.failure(exc, context.settings.secrets, operation=op.name, call=call)
         failure = "Enterich failed unexpectedly; the operator finds the details in its log"
     name = str(saved.get("name"))
-    fields = ("name", "modified", "status", "docstatus", "company")
     return {
-        **{k: saved[k] for k in fields if k in saved},
+        **{k: saved[k] for k in SAVED_FIELDS if k in saved},
         "url": form_url(context.settings.erpnext_public_url, str(op.doctype), name),
         "warnings": [
             *meter.warned,
+            *meter.noted,
             f"ERPNext saved the draft, but Enterich couldn't build the rest of this result "
             f"({failure.rstrip('.')}). Read the draft to see it.",
         ],
@@ -390,7 +394,7 @@ def _without(result: dict[str, Any], left_out: list[str]) -> dict[str, Any]:
     cut = cast("list[str]", result.get("truncated") or [])
     note = (
         f"This result leaves out the draft's {', '.join(left_out)}: with them it would exceed "
-        "100,000 characters. Read the draft to see them."
+        f"{shapes.MAX_RESULT_CHARS:,} characters. Read the draft to see them."
     )
     return {
         **{k: v for k, v in result.items() if k not in left_out},

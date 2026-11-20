@@ -12,7 +12,7 @@ from starlette.testclient import TestClient
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from starlette.websockets import WebSocketDisconnect
 
-from enterich import log
+from enterich import app, log
 from enterich.app import Wrapper
 
 
@@ -182,6 +182,28 @@ async def test_a_content_length_over_1_mib_or_not_a_number_gets_413_unread(
     messages: list[Message] = [{"type": "http.request", "body": b"{}", "more_body": False}]
     read, statuses = await posted(messages, [(b"content-length", declared)])
     assert (read, statuses, len(messages)) == ([], [413], 1)
+
+
+@pytest.mark.anyio
+async def test_the_413_names_the_body_limit_as_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    # REQ-002-PRS-NF011: the limit is written once, so the answer follows it
+    monkeypatch.setattr(app, "MAX_BODY", 2 * 1024 * 1024)
+    sent: list[Message] = []
+
+    async def inner(scope: Scope, receive: Receive, send: Send) -> None:
+        raise AssertionError("the body over the limit reached the inner app")
+
+    async def receive() -> Message:
+        return {"type": "http.request", "body": b"{}", "more_body": False}
+
+    async def send(message: Message) -> None:
+        sent.append(message)
+
+    headers = [(b"content-length", str(3 * 1024 * 1024).encode())]
+    scope: Scope = {"type": "http", "method": "POST", "path": "/mcp", "headers": headers}
+    await Wrapper(inner, "/mcp")(scope, receive, send)
+    body = b"".join(m.get("body", b"") for m in sent if m["type"] == "http.response.body")
+    assert json.loads(body) == {"error": "request body over 2 MiB"}
 
 
 @pytest.mark.anyio

@@ -8,7 +8,7 @@ from typing import Any, cast
 import pytest
 
 from enterich import erpnext as erpnext_module
-from enterich import tools
+from enterich import shapes, tools
 from tests.conftest import Logs
 from tests.fakes.erpnext import COMPANY, FakeErpnext, error, item, item_tax_template
 from tests.fakes.jwks import FakeJwks, Signer, token
@@ -129,6 +129,18 @@ def test_a_list_too_large_for_one_result_asks_to_narrow(mcp: Session, erp: FakeE
     result = mcp.call("list_items", {"limit": 100, "search": "LONG"})
     assert result.error
     assert "narrow" in result.text
+
+
+def test_the_refusal_names_the_result_limit_as_set(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-NF003: the limit is written once, so the refusal follows it
+    monkeypatch.setattr(shapes, "MAX_RESULT_CHARS", 2_000)
+    for i in range(30):
+        erp.add("Item", item(f"LONG-{i:03}", item_name="n" * 400))
+    result = mcp.call("list_items", {"limit": 30, "search": "LONG"})
+    assert result.error
+    assert result.text.startswith("The result would exceed 2,000 characters:")
 
 
 def test_an_erpnext_refusal_reaches_the_agent(mcp: Session, erp: FakeErpnext) -> None:

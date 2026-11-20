@@ -23,7 +23,7 @@ from enterich.shapes import (
     rows_of,
     shape,
 )
-from enterich.tools import Context, Refusal, get_named, invoicing
+from enterich.tools import SAVED_FIELDS, Context, Refusal, get_named, invoicing
 
 MAX_DUPLICATE_ROWS = 1000
 MAX_NAMED = 5
@@ -77,13 +77,8 @@ async def duplicates(
     quantities, in any order, leaving out free-item rows a pricing rule added. ERPNext
     saves a link in the stored name's case, so item codes match without case
     (REQ-001-PRS-F027)."""
-    rows = await context.erpnext.get_list(
-        doctype,
-        fields=("name", "items.item_code", "items.qty", "items.is_free_item"),
-        filters=[["company", "=", context.settings.company], ["docstatus", "=", 0], *filters],
-        order_by="name asc",
-        start=0,
-        page_length=MAX_DUPLICATE_ROWS,
+    rows = await duplicate_rows(
+        context, doctype, ("name", "items.item_code", "items.qty", "items.is_free_item"), filters
     )
     drafts: dict[str, Counter[tuple[str, Decimal]]] = {}
     for row in rows:
@@ -92,6 +87,32 @@ async def duplicates(
             found[(folded(row["item_code"]), decimal(row.get("qty")))] += 1
     wanted = Counter((folded(i["item_code"]), Decimal(i["qty"])) for i in items)
     return sorted(name for name, found in drafts.items() if found == wanted)
+
+
+async def duplicate_rows(
+    context: Context, doctype: str, fields: Sequence[str], filters: Sequence[Sequence[Any]]
+) -> list[dict[str, Any]]:
+    """The rows a duplicate check compares with: of the assigned company's drafts matching
+    `filters`, at most MAX_DUPLICATE_ROWS. A check that reads that many leaves out the last
+    draft's rows, which the bound may have cut, and notes in the result that a match among
+    further drafts may have gone unnoticed (REQ-001-PRS-F005)."""
+    rows = await context.erpnext.get_list(
+        doctype,
+        fields=fields,
+        filters=[["company", "=", context.settings.company], ["docstatus", "=", 0], *filters],
+        order_by="name asc",
+        start=0,
+        page_length=MAX_DUPLICATE_ROWS,
+    )
+    if len(rows) >= MAX_DUPLICATE_ROWS:
+        last = rows[-1]["name"]
+        rows = [row for row in rows if row["name"] != last]
+        erpnext.note(
+            f"Enterich's duplicate check read only the first {MAX_DUPLICATE_ROWS:,} rows of the "
+            "drafts it compares with, so a duplicate among further drafts may have gone "
+            "unnoticed."
+        )
+    return rows
 
 
 def named(names: Sequence[str]) -> str:
@@ -317,9 +338,7 @@ def result(
     """The draft as REQ-001's Results say, with its tax summary (REQ-001-PRS-F022); its rows
     cut as a get cuts them (REQ-001-PRS-NF003), its `outside` fields under `outside_text`."""
     name = str(saved.get("name"))
-    record = shape(
-        saved, ("name", "modified", "status", "docstatus", "company", *fields), outside=outside
-    )
+    record = shape(saved, (*SAVED_FIELDS, *fields), outside=outside)
     taxes, taxes_cut = cut_rows(rows_of(saved, "taxes"))
     items, items_cut = cut_rows(rows_of(saved, "items"))
     summary, summary_cut = invoicing.tax_summary(saved)
