@@ -11,6 +11,7 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ### Fixed
 
+- A create whose duplicate check reaches its limit of 1,000 rows, of sales or purchase invoice drafts with the same party and date or of journal entry drafts of the same date, warns that a duplicate among further drafts may have gone unnoticed, in its result and the draft's comment, and no longer takes the last draft read, which the limit may have cut off, for a duplicate. Before, the check stopped there without a word, and could refuse a create as a duplicate of a draft with more rows (REQ-001-PRS-F005).
 - A journal entry create that gives an account in another letter case than ERPNext stores it, or without its accents, is refused as a duplicate of a draft with the same rows. Before, it went through as a second draft, without a warning (REQ-006-PRS-F007, REQ-001-PRS-F027).
 - A name given with its accents left out or added, such as `Muller GmbH` for `Müller GmbH`, is taken as the stored one, as ERPNext's database compares names without regard to accents as well as letter case. Before, a payment entry for `Muller GmbH` was refused as for another party than its invoices (REQ-001-PRS-F027).
 - A partial return that gives an item code in another letter case than the invoice's, such as `sku-1` for `SKU-1`, returns that item, and one item given twice in two cases is refused as given twice. Before, it was refused as not on the invoice (REQ-001-PRS-F023, REQ-001-PRS-F024).

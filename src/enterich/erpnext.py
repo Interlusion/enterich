@@ -62,6 +62,8 @@ class Meter:
     written: dict[str, Any] | None = None
     # The warnings the operation knew before its write, kept should its result fail
     warned: list[str] = field(default_factory=list)
+    # Warnings a check noted on the way, which no step of the operation carries itself
+    noted: list[str] = field(default_factory=list)
 
 
 _meter: ContextVar[Meter | None] = ContextVar("erpnext_meter", default=None)
@@ -83,6 +85,13 @@ def warn(warnings: Sequence[str]) -> None:
     reach the agent and the comment even if building the result fails (REQ-001-PRS-F015)."""
     if (meter := _meter.get()) is not None:
         meter.warned = list(warnings)
+
+
+def note(warning: str) -> None:
+    """Note a warning for the operation's result, such as a duplicate check's that read all
+    the rows it reads (REQ-001-PRS-F005)."""
+    if (meter := _meter.get()) is not None and warning not in meter.noted:
+        meter.noted.append(warning)
 
 
 def _wrote(saved: dict[str, Any]) -> dict[str, Any]:

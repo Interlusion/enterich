@@ -513,22 +513,16 @@ async def _journal_duplicates(
 ) -> list[str]:
     """REQ-006-PRS-F007: drafts of the assigned company on the posting date with the same
     rows (account, debit, credit), in any order."""
-    found = await context.erpnext.get_list(
+    found = await drafts.duplicate_rows(
+        context,
         "Journal Entry",
-        fields=(
+        (
             "name",
             "accounts.account",
             "accounts.debit_in_account_currency",
             "accounts.credit_in_account_currency",
         ),
-        filters=[
-            ["company", "=", context.settings.company],
-            ["docstatus", "=", 0],
-            ["posting_date", "=", posting_date.isoformat()],
-        ],
-        order_by="name asc",
-        start=0,
-        page_length=drafts.MAX_DUPLICATE_ROWS,
+        [["posting_date", "=", posting_date.isoformat()]],
     )
     entries: dict[str, list[tuple[str, Decimal, Decimal]]] = {}
     for row in found:

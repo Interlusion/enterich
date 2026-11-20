@@ -332,6 +332,9 @@ async def _attempt(
                 "a filter or a smaller limit); a single document this large is too large to return."
             )
         return text, _outcome(op, result)
+    # What a check noted on the way joins the warnings; a result of _written holds it already
+    noted = [w for w in meter.noted if w not in result["warnings"]]
+    result["warnings"] = [*result["warnings"], *noted]
     # The draft is written: it gets its comment, and the agent its number, whatever its size
     origin = _origin(op, call, inputs)
     result["warnings"] = await _comment(
@@ -360,6 +363,7 @@ def _written(
         "url": form_url(context.settings.erpnext_public_url, str(op.doctype), name),
         "warnings": [
             *meter.warned,
+            *meter.noted,
             f"ERPNext saved the draft, but Enterich couldn't build the rest of this result "
             f"({failure.rstrip('.')}). Read the draft to see it.",
         ],
