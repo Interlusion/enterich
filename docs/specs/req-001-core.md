@@ -258,7 +258,7 @@ Only a fixed list of operations, without generic method calls, closes these door
 
 #### REQ-001-PRS-F005: Possible duplicates refused
 
-**Description**: Before a create, Enterich SHALL look in ERPNext for a document of the assigned company, whoever made it, that matches as the operation's area spec defines. When one matches, Enterich SHALL refuse the create, naming the matching documents and the `allow_duplicate` input. With `allow_duplicate` true, Enterich SHALL create the document and name the matches in `warnings`.
+**Description**: Before a create, Enterich SHALL look in ERPNext for a document of the assigned company, whoever made it, that matches as the operation's area spec defines. When one matches, Enterich SHALL refuse the create, naming the matching documents and the `allow_duplicate` input. With `allow_duplicate` true, Enterich SHALL create the document and name the matches in `warnings`. A check that compares rows of the documents reads at most 1,000 of them; when it reads that many, the last document read may be cut off, so it SHALL NOT count as a match, and the result SHALL warn that a match among further documents may have gone unnoticed.
 
 **Related URS**: REQ-001-URS-F007
 
@@ -267,6 +267,8 @@ Only a fixed list of operations, without generic method calls, closes these door
 - For each create operation, a create sent again after its answer was lost (the first one reached ERPNext) is refused with the first draft's number, and nothing is inserted.
 - A create that differs from every existing document in a field of its match goes through without a warning.
 - With `allow_duplicate: true`, a matching create goes through and its result names the match in `warnings`.
+- For each check that compares rows, a create whose check reads 1,000 rows goes through, if nothing matches, with the warning in its result and its comment.
+- For each check that compares rows, a create whose rows match only the part read of the last document read goes through with the warning.
 - Verification: test.
 - Evidence: Enterich's test suite.
 
