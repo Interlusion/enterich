@@ -26,13 +26,23 @@ class Duplicate:
     match: str
 
     def refusal(self, found: str) -> str:
-        return (
-            f"allow_duplicate: a {self.kind} with the same {self.match} exists ({found}). "
-            "Check it first; to create another anyway, repeat with allow_duplicate true."
-        )
+        return refusal((self, found))
 
     def warning(self, found: str) -> str:
         return f"Possible duplicate of {found}: a {self.kind} with the same {self.match}."
+
+
+def refusal(*matches: tuple[Duplicate, str]) -> str:
+    """The refusal of a create that matched each of `matches` (what, and the documents found),
+    naming them all."""
+    exists = ", and ".join(
+        f"a {what.kind} with the same {what.match} exists ({found})" for what, found in matches
+    )
+    them = "it" if len(matches) == 1 else "them"
+    return (
+        f"allow_duplicate: {exists}. Check {them} first; to create another anyway, repeat with "
+        "allow_duplicate true."
+    )
 
 
 def capped(rows: int) -> str:

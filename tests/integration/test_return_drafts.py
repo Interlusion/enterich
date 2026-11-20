@@ -21,7 +21,7 @@ from tests.fakes.erpnext import (
 )
 from tests.fakes.settings import DRAFTS_PER_HOUR
 from tests.integration.clock import TODAY
-from tests.integration.duplicates import FAILED_RESULT, Duplicate, failing_after_the_write
+from tests.integration.duplicates import FAILED_RESULT, Duplicate, failing_after_the_write, refusal
 from tests.integration.mcp import Result, Session
 
 SALES = "/api/resource/Sales Invoice"
@@ -1102,6 +1102,20 @@ def test_a_debit_note_with_a_known_number_is_a_duplicate(mcp: Session, erp: Fake
         ["supplier", "=", "SUPP-0001"],
         ["bill_no", "=", "CN-77"],
     ]
+
+
+def test_a_debit_note_matching_twice_is_refused_naming_both(mcp: Session, erp: FakeErpnext) -> None:
+    # REQ-005-PRS-F009, REQ-001-PRS-F005: the refusal names every match, not the first alone
+    credit_note(erp, status="Draft")
+    result = create(
+        mcp,
+        "create_draft_purchase_return",
+        items=[{"item_code": "SKU-1", "qty": 1}],
+        bill_no="CN-77",
+    )
+    assert result.error
+    assert result.text == refusal((BY_INVOICE, PURCHASE_DRAFT), (BY_BILL, "ACC-PINV-2026-00009"))
+    assert erp.writes() == []
 
 
 def test_a_debit_note_with_a_known_number_is_created_when_allowed(
