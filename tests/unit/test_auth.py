@@ -282,8 +282,16 @@ async def test_a_key_without_use_verifies_tokens(signer: Signer) -> None:
     assert await verifier(jwks).verify_token(token(signer)) is not None
 
 
-async def test_an_unusable_key_doesnt_hide_the_keys_after_it(signer: Signer) -> None:
-    broken = {"kty": "RSA", "kid": "broken", "n": "x", "e": "AQAB"}
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"kty": "RSA", "kid": "broken", "n": "x", "e": "AQAB"},
+        {"kty": "RSA", "kid": "broken", "alg": ["RS256"], "n": "AQAB", "e": "AQAB"},
+    ],
+)
+async def test_an_unusable_key_doesnt_hide_the_keys_after_it(
+    signer: Signer, broken: dict[str, Any]
+) -> None:
     jwks = FakeJwks([], extra_keys=[broken, signer.jwk()])
     assert await verifier(jwks).verify_token(token(signer)) is not None
 
@@ -383,6 +391,7 @@ async def test_each_jwks_fetch_logs_its_outcome_and_keys(
             ),
             "no usable signing keys",
         ),
+        (httpx2.Response(200, content=b"[" * 200_000), "RecursionError"),
     ],
 )
 async def test_a_failed_jwks_fetch_logs_why(
