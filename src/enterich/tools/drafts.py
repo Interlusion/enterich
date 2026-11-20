@@ -23,7 +23,7 @@ from enterich.shapes import (
     rows_of,
     shape,
 )
-from enterich.tools import Context, Refusal, get_named, invoicing
+from enterich.tools import SAVED_FIELDS, Context, Refusal, get_named, invoicing
 
 MAX_DUPLICATE_ROWS = 1000
 MAX_NAMED = 5
@@ -338,9 +338,7 @@ def result(
     """The draft as REQ-001's Results say, with its tax summary (REQ-001-PRS-F022); its rows
     cut as a get cuts them (REQ-001-PRS-NF003), its `outside` fields under `outside_text`."""
     name = str(saved.get("name"))
-    record = shape(
-        saved, ("name", "modified", "status", "docstatus", "company", *fields), outside=outside
-    )
+    record = shape(saved, (*SAVED_FIELDS, *fields), outside=outside)
     taxes, taxes_cut = cut_rows(rows_of(saved, "taxes"))
     items, items_cut = cut_rows(rows_of(saved, "items"))
     summary, summary_cut = invoicing.tax_summary(saved)

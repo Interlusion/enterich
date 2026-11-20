@@ -226,8 +226,11 @@ def _balanced(rows: list[JournalEntryRow]) -> list[JournalEntryRow]:
     return rows
 
 
+MIN_JOURNAL_ROWS, MAX_JOURNAL_ROWS = 2, 20
 JournalEntryRows = Annotated[
-    list[JournalEntryRow], Field(min_length=2, max_length=20), AfterValidator(_balanced)
+    list[JournalEntryRow],
+    Field(min_length=MIN_JOURNAL_ROWS, max_length=MAX_JOURNAL_ROWS),
+    AfterValidator(_balanced),
 ]
 
 
@@ -695,15 +698,15 @@ OPERATIONS: list[Operation[Any]] = [
         name="report_general_ledger",
         title="General ledger",
         description=(
-            "The assigned company's General Ledger from `from_date` to `to_date` (at most 366 "
-            "days), one record per ledger entry, oldest first. Narrow it by `account`, "
-            "`party_type` with `party`, or `voucher_no`. With `account` or `party`, `opening` "
-            "is the balance before `from_date` and each record carries its running `balance`; "
-            "without, `opening` holds only entries marked as opening (such as an Opening "
-            "Entry), which are never among the records, and `balance` is null. `totals` cover "
-            "every record, not only this page. Amounts are in `currency`: the company's, or the "
-            "account's or party's when ERPNext switched to it. A busy ledger may be too large "
-            "for a year without `account`: narrow it by account or period."
+            "The assigned company's General Ledger from `from_date` to `to_date` (at most "
+            f"{MAX_LEDGER_DAYS} days), one record per ledger entry, oldest first. Narrow it by "
+            "`account`, `party_type` with `party`, or `voucher_no`. With `account` or "
+            "`party`, `opening` is the balance before `from_date` and each record carries its "
+            "running `balance`; without, `opening` holds only entries marked as opening (such "
+            "as an Opening Entry), which are never among the records, and `balance` is null. "
+            "`totals` cover every record, not only this page. Amounts are in `currency`: the "
+            "company's, or the account's or party's when ERPNext switched to it. A busy ledger "
+            "may be too large for a year without `account`: narrow it by account or period."
         ),
         kind="read",
         inputs=ReportGeneralLedger,
@@ -728,9 +731,10 @@ OPERATIONS: list[Operation[Any]] = [
         title="Create draft journal entry",
         description=(
             "Create a draft journal entry (voucher type Journal Entry) of the assigned "
-            "company; a person reviews and submits it in ERPNext. Give 2 to 20 `accounts` "
-            "rows, each with exactly one of `debit` and `credit`, of at most 2 decimal places; "
-            "debits and credits must be equal. Accounts are in the company's currency. A "
+            "company; a person reviews and submits it in ERPNext. Give "
+            f"{MIN_JOURNAL_ROWS} to {MAX_JOURNAL_ROWS} `accounts` rows, each with exactly one "
+            "of `debit` and `credit`, of at most 2 decimal places; debits and credits must be "
+            "equal. Accounts are in the company's currency. A "
             "receivable or payable account needs `party_type` and `party`; ERPNext saves a "
             "party on another account but "
             "refuses it on submit. A row referencing an invoice carries its party and its "

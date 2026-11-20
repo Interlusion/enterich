@@ -27,6 +27,7 @@ from enterich.shapes import (
     today,
 )
 from enterich.tools import (
+    SAVED_FIELDS,
     Context,
     Operation,
     Refusal,
@@ -476,7 +477,7 @@ def _payment_result(context: Context, saved: dict[str, Any], warnings: list[str]
     name = str(saved.get("name"))
     record = shape(
         saved,
-        ("name", "modified", "status", "docstatus", "company", *PAYMENT_DRAFT_FIELDS),
+        (*SAVED_FIELDS, *PAYMENT_DRAFT_FIELDS),
         outside=PAYMENT_OUTSIDE,
     )
     outside_text = record.pop("outside_text")

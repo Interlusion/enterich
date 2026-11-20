@@ -411,8 +411,7 @@ OPERATIONS: list[Operation[Any]] = [
         title="Accounts receivable",
         description=(
             "What customers owe the assigned company as of `as_of_date` (default today), one "
-            "record per open voucher, aged by due date or posting date: `range0` not yet due, "
-            "then `range1` to `range5` for 0-30, 31-60, 61-90, 91-120 and over 120 days. "
+            f"record per open voucher, aged by due date or posting date: {invoicing.AGEING_NOTE}. "
             "`total_outstanding` covers every record, not only this page. Customer names "
             "aren't in the records; `get_customer` gives them."
         ),

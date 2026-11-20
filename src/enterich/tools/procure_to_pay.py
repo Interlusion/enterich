@@ -549,8 +549,7 @@ OPERATIONS: list[Operation[Any]] = [
         description=(
             "What the assigned company owes its suppliers as of `as_of_date` (default today), "
             "one record per open voucher with the supplier's invoice number (`bill_no`) and "
-            "date, aged by due date or posting date: `range0` not yet due, then `range1` to "
-            "`range5` for 0-30, 31-60, 61-90, 91-120 and over 120 days. `total_outstanding` "
+            f"date, aged by due date or posting date: {invoicing.AGEING_NOTE}. `total_outstanding` "
             "covers every record, not only this page. Supplier names aren't in the records; "
             "`get_supplier` gives them."
         ),

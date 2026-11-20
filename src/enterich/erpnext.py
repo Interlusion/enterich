@@ -259,7 +259,8 @@ class Erpnext:
             async for chunk in response.aiter_bytes():
                 received += chunk
                 if len(received) > MAX_RESPONSE_BYTES:
-                    raise ErpnextError("ERPNext's answer exceeded 10 MiB.")
+                    mib = MAX_RESPONSE_BYTES // 2**20
+                    raise ErpnextError(f"ERPNext's answer exceeded {mib} MiB.")
             return response.status_code, bytes(received)
 
     def _refusal(self, status: int, answer: Any) -> Refused:

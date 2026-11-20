@@ -129,7 +129,7 @@ class Wrapper:
             return
         body = await _read_body(scope, receive)
         if body is None:
-            await _respond(send, 413, {"error": "request body over 1 MiB"})
+            await _respond(send, 413, {"error": f"request body over {MAX_BODY // 2**20} MiB"})
             return
 
         replayed = False
