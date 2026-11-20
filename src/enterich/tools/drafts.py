@@ -121,9 +121,19 @@ def named(names: Sequence[str]) -> str:
 
 
 def refuse_duplicates(names: Sequence[str], match: str, kind: str = "draft") -> Refusal:
+    return refuse_matches([(names, match, kind)])
+
+
+def refuse_matches(found: Sequence[tuple[Sequence[str], str, str]]) -> Refusal:
+    """The refusal of a create that matched each of `found` (names, match, kind): it names
+    every match, so the agent decides on allow_duplicate knowing them all (REQ-001-PRS-F005)."""
+    exists = ", and ".join(
+        f"a {kind} with the same {match} exists ({named(names)})" for names, match, kind in found
+    )
+    them = "it" if len(found) == 1 else "them"
     return Refusal(
-        f"allow_duplicate: a {kind} with the same {match} exists ({named(names)}). Check it "
-        "first; to create another anyway, repeat with allow_duplicate true."
+        f"allow_duplicate: {exists}. Check {them} first; to create another anyway, repeat with "
+        "allow_duplicate true."
     )
 
 
