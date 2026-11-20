@@ -53,7 +53,8 @@ class DraftUpdate(Inputs):
 
     @model_validator(mode="after")
     def _changes(self) -> Self:
-        changes = [field for field in type(self).model_fields if field not in ("name", "modified")]
+        keys = DraftUpdate.model_fields  # the draft as read; all else is a change
+        changes = [field for field in type(self).model_fields if field not in keys]
         if not self.model_dump(include=set(changes), exclude_none=True):
             raise ValueError(f"give at least one of {', '.join(changes)}")
         return self
@@ -121,9 +122,19 @@ def named(names: Sequence[str]) -> str:
 
 
 def refuse_duplicates(names: Sequence[str], match: str, kind: str = "draft") -> Refusal:
+    return refuse_matches([(names, match, kind)])
+
+
+def refuse_matches(found: Sequence[tuple[Sequence[str], str, str]]) -> Refusal:
+    """The refusal of a create that matched each of `found` (names, match, kind): it names
+    every match, so the agent decides on allow_duplicate knowing them all (REQ-001-PRS-F005)."""
+    exists = ", and ".join(
+        f"a {kind} with the same {match} exists ({named(names)})" for names, match, kind in found
+    )
+    them = "it" if len(found) == 1 else "them"
     return Refusal(
-        f"allow_duplicate: a {kind} with the same {match} exists ({named(names)}). Check it "
-        "first; to create another anyway, repeat with allow_duplicate true."
+        f"allow_duplicate: {exists}. Check {them} first; to create another anyway, repeat with "
+        "allow_duplicate true."
     )
 
 
@@ -218,6 +229,12 @@ async def save_update(
         if refused.exc_type == "TimestampMismatchError":
             raise Refusal(STALE) from None
         raise
+
+
+def posted(day: date) -> dict[str, Any]:
+    """A posting date as the invoice and return operations send it: with `set_posting_time`,
+    without which ERPNext gives the draft the day of each save, which due_dates relies on."""
+    return {"posting_date": day.isoformat(), "set_posting_time": 1}
 
 
 def due_dates(

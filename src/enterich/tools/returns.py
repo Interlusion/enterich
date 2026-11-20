@@ -232,7 +232,7 @@ async def create(
         found.append(more)
     found = [m for m in found if m.names]
     if found and not allow_duplicate:
-        raise drafts.refuse_duplicates(*found[0])
+        raise drafts.refuse_matches(found)
     doc = {**mapped, "items": lines, **timed(invoice, fields)}
     warnings = [drafts.duplicate_warning(*m) for m in found]
     return await drafts.insert(context, side.invoice, doc, warnings), warnings

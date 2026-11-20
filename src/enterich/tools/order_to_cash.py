@@ -256,7 +256,7 @@ def _invoice_body(
     if isinstance(inputs, CreateDraftSalesInvoice):
         doc["customer"] = inputs.customer
     if inputs.posting_date is not None:
-        doc |= {"posting_date": inputs.posting_date.isoformat(), "set_posting_time": 1}
+        doc |= drafts.posted(inputs.posting_date)
     if inputs.due_date is not None:
         doc["due_date"] = inputs.due_date.isoformat()
     if inputs.items is not None:
@@ -315,7 +315,7 @@ async def create_draft_sales_return(
     inputs: CreateDraftSalesReturn, context: Context
 ) -> dict[str, Any]:
     posting_date = inputs.posting_date or today(context.settings.timezone)
-    fields: dict[str, Any] = {"posting_date": posting_date.isoformat(), "set_posting_time": 1}
+    fields = drafts.posted(posting_date)
     if inputs.remarks is not None:
         fields["remarks"] = inputs.remarks
     saved, warnings = await returns.create(
@@ -335,7 +335,7 @@ async def update_draft_sales_return(
     stored = await returns.editable(CREDIT_NOTES, context, inputs.name, inputs.modified)
     fields: dict[str, Any] = {}
     if inputs.posting_date is not None:
-        fields |= {"posting_date": inputs.posting_date.isoformat(), "set_posting_time": 1}
+        fields |= drafts.posted(inputs.posting_date)
     if inputs.remarks is not None:
         fields["remarks"] = inputs.remarks
     doc = await returns.update(CREDIT_NOTES, context, stored, inputs.items, fields)

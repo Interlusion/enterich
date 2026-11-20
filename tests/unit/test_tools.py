@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from enterich import tools
 from enterich.erpnext import Erpnext
 from enterich.shapes import Inputs
-from enterich.tools import Context, Kind, Operation
+from enterich.tools import Context, Kind, Operation, drafts
 from tests.conftest import Logs
 from tests.fakes.erpnext import COMMENT_METHOD, FakeErpnext, error
 from tests.fakes.settings import API_SECRET, settings
@@ -228,3 +228,8 @@ async def test_long_keys_and_lists_are_cut_in_the_line(
     assert logged["texts"] == ["t" * 200, "u"]
     assert len(logged["nested"]) == 100
     assert len(operation["outcome"]["refusal"]) <= 300
+
+
+def test_an_updates_comment_and_its_change_check_take_the_same_keys() -> None:
+    # REQ-001-PRS-F015: the comment names the given changes, the inputs DraftUpdate's own aren't
+    assert tuple(drafts.DraftUpdate.model_fields) == tools.UPDATE_KEYS

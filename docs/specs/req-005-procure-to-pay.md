@@ -170,6 +170,7 @@ An update that gives a `bill_no` SHOULD carry a warning, added to the draft, whe
 
 - A create against an invoice with a draft return is refused naming it; a submitted or cancelled return against it doesn't count.
 - A create with a `bill_no` already on a draft or submitted purchase invoice of the supplier is refused naming it; with `allow_duplicate`, it goes through with a warning naming it. An update giving such a `bill_no` warns naming it; the draft's own `bill_no` doesn't count.
+- A create matching both a draft return and a `bill_no` is refused naming both.
 - Verification: test.
 - Evidence: Enterich's test suite.
 
