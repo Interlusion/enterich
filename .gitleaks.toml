@@ -1,0 +1,13 @@
+# gitleaks reads this file from the scanned repository (CI's job "gitleaks over the
+# pushed commits"). Its own rules, plus one exception: a run's records name commits by
+# their full hash, which the generic rule takes for a key when a commit's subject says
+# "key", "token" or "auth" just before it.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Commit hashes in the improvement pipeline's run records"
+condition = "AND"
+paths = ['''^harness/runs/''']
+regexes = ['''^[0-9a-f]{40}$''']
