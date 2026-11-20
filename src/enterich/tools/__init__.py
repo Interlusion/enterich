@@ -360,7 +360,7 @@ def _written(
         failure = str(exc)
     else:
         log.failure(exc, context.settings.secrets, operation=op.name, call=call)
-        failure = "Enterich failed unexpectedly; the operator finds the details in its log"
+        failure = UNEXPECTED
     name = str(saved.get("name"))
     return {
         **{k: saved[k] for k in SAVED_FIELDS if k in saved},

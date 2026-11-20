@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Any, Literal
 
 from enterich.shapes import (
+    MAX_ROWS,
     InvoiceState,
     cut_rows,
     cut_texts,
@@ -54,7 +55,6 @@ AGEING_NOTE = (
     + f" and over {AGEING_DAYS[-1]} days"
 )
 AGEING_BASED_ON = {"due_date": "Due Date", "posting_date": "Posting Date"}
-MAX_ADDRESSES = 100
 # For each operation whose result has tax rows (REQ-001 Results)
 TAX_RATE_NOTE = (
     "A tax row's `rate` is the rate saved on it; an item with an item tax template is taxed "
@@ -148,22 +148,23 @@ async def get_party(side: Side, context: Context, name: str) -> dict[str, Any]:
         ],
         order_by="name asc",
         start=0,
-        page_length=MAX_ADDRESSES + 1,
+        page_length=MAX_ROWS + 1,
     )
     record = shape(
         doc, (*side.party_fields, "payment_terms"), outside=side.party_outside, flags={"disabled"}
     )
     outside = record.pop("outside_text")
+    addresses, cut = cut_rows(addresses)
     return cut_texts(
         {
             **record,
             "addresses": [
                 shape(a, ADDRESS_FIELDS, outside=ADDRESS_OUTSIDE, flags={"is_primary_address"})
-                for a in addresses[:MAX_ADDRESSES]
+                for a in addresses
             ],
             "modified": doc.get("modified"),
             "url": form_url(context.settings.erpnext_public_url, side.party, name),
-            "truncated": ["addresses"] if len(addresses) > MAX_ADDRESSES else [],
+            "truncated": ["addresses"] if cut else [],
             "outside_text": outside,
         }
     )
