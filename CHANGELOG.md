@@ -11,6 +11,7 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ### Fixed
 
+- An `ENTERICH_ISSUER` the metadata cannot publish, such as `https://999.0.0.1/realms/x`, stops Enterich with a problem naming `ENTERICH_ISSUER`, even when `ENTERICH_RESOURCE_URL` is wrong too. Before, the problem named `ENTERICH_RESOURCE_URL`, which was fine, and neither URL was checked against the metadata while the other broke a URL rule (REQ-002-PRS-NF005).
 - A token that names a JWKS key without `alg` of another type than its algorithm, such as an RS256 token with the `kid` of an EC key, is refused with a 401 and a `rejection` line whose reason is `algorithm not the key's`. Before, it got a 500 with an `error` line, and the client wasn't told to get a new token (REQ-002-PRS-NF001).
 - A draft's comment that ERPNext answers too late, or whose answer is lost or unreadable, is reported as possibly missing: ERPNext may have stored it. Before, the warning said it couldn't be added, unless the operation's deadline ended the call (REQ-001-PRS-F015).
 - A purchase return create against an invoice with a draft return, whose `bill_no` is already on a purchase invoice of the supplier, is refused naming both matches. Before, the refusal named only the draft return, and the agent learnt that the credit note was already booked only from the warnings of a debit note created with `allow_duplicate` (REQ-005-PRS-F009, REQ-001-PRS-F005).
