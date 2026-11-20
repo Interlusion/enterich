@@ -11,6 +11,7 @@ All notable changes to Enterich are recorded here. The format follows [Keep a Ch
 
 ### Fixed
 
+- A draft's comment that ERPNext answers too late, or whose answer is lost or unreadable, is reported as possibly missing: ERPNext may have stored it. Before, the warning said it couldn't be added, unless the operation's deadline ended the call (REQ-001-PRS-F015).
 - A purchase return create against an invoice with a draft return, whose `bill_no` is already on a purchase invoice of the supplier, is refused naming both matches. Before, the refusal named only the draft return, and the agent learnt that the credit note was already booked only from the warnings of a debit note created with `allow_duplicate` (REQ-005-PRS-F009, REQ-001-PRS-F005).
 - A create whose duplicate check reaches its limit of 1,000 rows, of sales or purchase invoice drafts with the same party and date or of journal entry drafts of the same date, warns that a duplicate among further drafts may have gone unnoticed, in its result and the draft's comment, and no longer takes the last draft read, which the limit may have cut off, for a duplicate. Before, the check stopped there without a word, and could refuse a create as a duplicate of a draft with more rows (REQ-001-PRS-F005).
 - A journal entry create that gives an account in another letter case than ERPNext stores it, or without its accents, is refused as a duplicate of a draft with the same rows. Before, it went through as a second draft, without a warning (REQ-006-PRS-F007, REQ-001-PRS-F027).

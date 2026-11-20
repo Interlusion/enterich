@@ -135,15 +135,18 @@ async def _comment(
     deadline: float,
 ) -> list[str]:
     """REQ-001-PRS-F015: one comment with the origin and the warnings, as plain text, by the
-    operation's deadline; a failure is one more warning."""
+    operation's deadline; a failure is one more warning. Only a refusal says it wasn't added:
+    after a late or lost answer ERPNext may have stored it."""
     # The content is HTML: each line escaped, one per line
     lines = [origin, *warnings]
     content = "Enterich: " + "<br>".join(html.escape(line, quote=False) for line in lines)
     with anyio.move_on_after(deadline - time.monotonic()) as scope:
         try:
             await context.erpnext.add_comment(str(op.doctype), name, content)
+        except Refused as refused:
+            return [*warnings, f"Enterich's comment couldn't be added to the draft: {refused}"]
         except ErpnextError as exc:
-            return [*warnings, f"Enterich's comment couldn't be added to the draft: {exc}"]
+            return [*warnings, f"Enterich's comment may be missing from the draft: {exc}"]
     if scope.cancelled_caught:
         return [
             *warnings,
