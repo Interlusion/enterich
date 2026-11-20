@@ -10,6 +10,7 @@ from enterich.shapes import (
     Inputs,
     InvoiceState,
     Limit,
+    MatchedText,
     Name,
     Offset,
     Quantity,
@@ -116,9 +117,8 @@ DEBIT_NOTES = returns.Side(
     return_update="update_draft_purchase_return",
 )
 
-# The supplier's invoice number as printed: free text, not a name (ERPNext's Data field);
-# surrounding whitespace would defeat the duplicate check
-BillNo = Annotated[str, Field(min_length=1, max_length=140, pattern=r"^\S(.*\S)?$")]
+# The supplier's invoice number as printed
+BillNo = MatchedText
 
 
 class ListSuppliers(Inputs):
@@ -289,7 +289,7 @@ def _invoice_body(
     if inputs.bill_date is not None:
         doc["bill_date"] = inputs.bill_date.isoformat()
     if inputs.posting_date is not None:
-        doc |= {"posting_date": inputs.posting_date.isoformat(), "set_posting_time": 1}
+        doc |= drafts.posted(inputs.posting_date)
     if inputs.due_date is not None:
         doc["due_date"] = inputs.due_date.isoformat()
     if inputs.items is not None:
@@ -412,7 +412,7 @@ def _return_fields(inputs: CreateDraftPurchaseReturn | UpdateDraftPurchaseReturn
     if inputs.bill_date is not None:
         doc["bill_date"] = inputs.bill_date.isoformat()
     if inputs.posting_date is not None:
-        doc |= {"posting_date": inputs.posting_date.isoformat(), "set_posting_time": 1}
+        doc |= drafts.posted(inputs.posting_date)
     if inputs.remarks is not None:
         doc["remarks"] = inputs.remarks
     return doc
@@ -424,8 +424,7 @@ async def create_draft_purchase_return(
     posting_date = inputs.posting_date or today(context.settings.timezone)
     fields = {
         **_return_fields(inputs),
-        "posting_date": posting_date.isoformat(),
-        "set_posting_time": 1,
+        **drafts.posted(posting_date),
     }
 
     async def same_bill(invoice: dict[str, Any]) -> returns.Match | None:

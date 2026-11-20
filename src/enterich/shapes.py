@@ -48,6 +48,9 @@ def _name(value: str) -> str:
 # REQ-001-PRS-F010: a name reaches ERPNext only as a query parameter, a JSON
 # value or one percent-encoded path segment.
 Name = Annotated[str, Field(min_length=1, max_length=140), AfterValidator(_name)]
+# A reference as printed that a duplicate check matches on: free text, not a name (ERPNext's
+# Data field); surrounding whitespace would defeat the check
+MatchedText = Annotated[str, Field(min_length=1, max_length=140, pattern=r"^\S(.*\S)?$")]
 Search = Annotated[str, Field(min_length=1, max_length=140)]
 Limit = Annotated[int, Field(ge=1, le=100, strict=True)]
 Offset = Annotated[int, Field(ge=0, le=10_000, strict=True)]

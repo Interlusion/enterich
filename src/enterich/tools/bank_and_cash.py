@@ -14,6 +14,7 @@ from enterich.shapes import (
     Flag,
     Inputs,
     Limit,
+    MatchedText,
     Money,
     Name,
     Offset,
@@ -129,9 +130,8 @@ PAYMENT_DRAFT_FIELDS = (
 DRAFT_REFERENCE_FIELDS = (*REFERENCE_FIELDS, "outstanding_amount")
 PAYMENT_MATCH = "party and bank reference (reference_no)"
 
-# The bank's reference for a payment, as on the statement: free text, not a name (ERPNext's
-# Data field); surrounding whitespace would defeat the duplicate check
-BankReference = Annotated[str, Field(min_length=1, max_length=140, pattern=r"^\S(.*\S)?$")]
+# The bank's reference for a payment, as on the statement
+BankReference = MatchedText
 
 
 @dataclass(frozen=True)

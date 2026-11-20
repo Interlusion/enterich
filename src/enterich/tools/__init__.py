@@ -48,6 +48,9 @@ UNEXPECTED = "Enterich failed unexpectedly; the operator finds the details in En
 KEPT_LISTS = frozenset({"warnings", "truncated"})
 # The fields of the saved draft every create or update result has (REQ-001's Results)
 SAVED_FIELDS = ("name", "modified", "status", "docstatus", "company")
+# The inputs that name an update's draft, those drafts.DraftUpdate declares; all others are
+# its changes
+UPDATE_KEYS = ("name", "modified")
 # All the fields every create or update result has; all else can be left out
 DRAFT_RESULT_FIELDS = frozenset({*SAVED_FIELDS, "url", *KEPT_LISTS})
 # The keyword the SDK hands a tool its request under; the client's arguments come in one
@@ -118,9 +121,7 @@ def _origin(op: Operation[Any], call: str, inputs: Inputs) -> str:
     origin = f"{op.name}, call {call}"
     if op.kind == "update":
         given = inputs.model_dump(exclude_none=True)
-        named = [
-            f for f in type(inputs).model_fields if f in given and f not in ("name", "modified")
-        ]
+        named = [f for f in type(inputs).model_fields if f in given and f not in UPDATE_KEYS]
         origin += f"; given {', '.join(named)}"
     return origin + "."
 

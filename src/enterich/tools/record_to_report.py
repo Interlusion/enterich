@@ -31,6 +31,7 @@ from enterich.shapes import (
     today,
 )
 from enterich.tools import (
+    SAVED_FIELDS,
     Context,
     Operation,
     Refusal,
@@ -109,6 +110,8 @@ BALANCE_VALUES = (
     "closing_credit",
 )
 MAX_FISCAL_YEAR_ROWS = 1000  # one per company a year is assigned to
+# A journal entry has no status (REQ-001's Results: `status` where the DocType has one)
+JOURNAL_SAVED_FIELDS = tuple(f for f in SAVED_FIELDS if f != "status")
 JOURNAL_DRAFT_FIELDS = ("posting_date", "total_debit", "total_credit")
 JOURNAL_MATCH = "posting date and rows"
 # The bank's reference: free text, not a name (ERPNext's Data field)
@@ -564,7 +567,7 @@ def _rounding_warning(saved: dict[str, Any]) -> list[str]:
 
 def _journal_result(context: Context, saved: dict[str, Any], warnings: list[str]) -> dict[str, Any]:
     name = str(saved.get("name"))
-    record = shape(saved, ("name", "modified", "docstatus", "company", *JOURNAL_DRAFT_FIELDS))
+    record = shape(saved, (*JOURNAL_SAVED_FIELDS, *JOURNAL_DRAFT_FIELDS))
     return {
         **record,
         "row_count": len(rows_of(saved, "accounts")),

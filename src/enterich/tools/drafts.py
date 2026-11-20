@@ -53,7 +53,8 @@ class DraftUpdate(Inputs):
 
     @model_validator(mode="after")
     def _changes(self) -> Self:
-        changes = [field for field in type(self).model_fields if field not in ("name", "modified")]
+        keys = DraftUpdate.model_fields  # the draft as read; all else is a change
+        changes = [field for field in type(self).model_fields if field not in keys]
         if not self.model_dump(include=set(changes), exclude_none=True):
             raise ValueError(f"give at least one of {', '.join(changes)}")
         return self
@@ -228,6 +229,12 @@ async def save_update(
         if refused.exc_type == "TimestampMismatchError":
             raise Refusal(STALE) from None
         raise
+
+
+def posted(day: date) -> dict[str, Any]:
+    """A posting date as the invoice and return operations send it: with `set_posting_time`,
+    without which ERPNext gives the draft the day of each save, which due_dates relies on."""
+    return {"posting_date": day.isoformat(), "set_posting_time": 1}
 
 
 def due_dates(
