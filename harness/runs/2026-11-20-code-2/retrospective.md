@@ -38,3 +38,7 @@ The third run's fix stage: 6 agents, 0.34M tokens.
 ## The fourth run
 
 A fourth full run (`2026-11-20-code-3`), after the third's fixes, to see what a run past the rest finds: 12 agents, 0.98M tokens. Seven of nine surveys found nothing; two found 3 findings, all confirmed, none of an earlier run. The operator declined all three as over-engineering, and `suppressions.jsonl` holds them: a failed start that doesn't repeat the unknown-variable warnings, though its refusal already names the variable to look for, and two rules written twice whose copies are equal on purpose and held by the tests. Nothing in the run was worth a change, so the rest holds. From it came a bar of worth: the verifier asks who acts wrongly today and what the change adds, and the fix stage's review rejects a change larger than its fault (`harness/README.md`).
+
+## The fifth run
+
+The first run with the bar of worth (`2026-11-20-code-4`): 12 agents, 1.04M tokens. Eight of nine surveys found nothing; the rule-twice survey found 3, and the verifiers dropped all three as not worth a change, each with the reason in the report: a payment's `received_amount` written as `paid_amount` in three places, which REQ-007-PRS-F004 requires and the tests pin; the fourth run's journal entry kind again, under another location that its suppression didn't match, refuted on its own; and the yes/no fields of a party and an invoice flagged apart for the list and the get, which the tests check in both. Two runs in a row with nothing worth a change: the lens rests until a Python file of `src/` changes.
