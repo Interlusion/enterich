@@ -100,7 +100,8 @@ class JwksCache:
         self._last_attempt = self._clock()
         try:
             keys = await self._fetch()
-        except (httpx2.HTTPError, ValueError, _JwksError) as exc:
+        except (httpx2.HTTPError, ValueError, RecursionError, _JwksError) as exc:
+            # RecursionError: a JSON body nested too deep for the parser.
             # _fetch's own messages name the cause and hold no secret; others by type.
             reason = str(exc) if isinstance(exc, _JwksError) else type(exc).__name__
             log.event("jwks", logging.WARNING, outcome="failed", reason=reason, keys=0)
@@ -133,8 +134,8 @@ class JwksCache:
         for jwk in signing:
             try:
                 parsed = PyJWK(jwk)  # pyright: ignore[reportArgumentType] - JWKDict is a dict
-            except jwt.PyJWTError:
-                continue  # a key PyJWT can't use for signatures
+            except jwt.PyJWTError, TypeError:
+                continue  # a key PyJWT can't use for signatures, or a member of the wrong type
             alg = jwk.get("alg")
             keys[jwk["kid"]] = SigningKey(parsed.key, alg if isinstance(alg, str) else None)
         if not keys:
