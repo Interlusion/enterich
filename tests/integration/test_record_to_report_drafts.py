@@ -18,7 +18,13 @@ from tests.fakes.erpnext import (
 )
 from tests.fakes.settings import DRAFTS_PER_HOUR
 from tests.integration.clock import TODAY
-from tests.integration.duplicates import FAILED_RESULT, Duplicate, failing_after_the_write
+from tests.integration.duplicates import (
+    FAILED_RESULT,
+    Duplicate,
+    bounded,
+    capped,
+    failing_after_the_write,
+)
 from tests.integration.mcp import Result, Session
 
 PATH = "/api/resource/Journal Entry"
@@ -283,6 +289,31 @@ def test_an_account_in_another_case_still_matches(mcp: Session, erp: FakeErpnext
     assert result.error
     assert result.text == BY_ROWS.refusal(DRAFT)
     assert erp.writes() == []
+
+
+def test_a_duplicate_check_that_reads_its_bound_warns(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-F005: the fixture draft fills the check's bound; a match beyond it is missed
+    bounded(monkeypatch, 2)
+    rows = [{"account": RENT, "debit": 501}, {"account": BANK, "credit": 501}]
+    result = create(mcp, accounts=rows)
+    assert not result.error, result.text
+    assert result.data["warnings"] == [capped(2)]
+    [comment] = erp.comments
+    assert capped(2) in comment["content"]
+
+
+def test_a_draft_cut_off_at_the_bound_does_not_match(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-F005: the bound takes the fixture draft's two rows and the next draft's first two
+    first = [{"account": RENT, "debit": 501}, {"account": BANK, "credit": 501}]
+    create(mcp, accounts=[*first, {"account": RENT, "debit": 1}, {"account": BANK, "credit": 1}])
+    bounded(monkeypatch, 4)
+    result = create(mcp, accounts=first)
+    assert not result.error, result.text
+    assert result.data["warnings"] == [capped(4)]
 
 
 @pytest.mark.parametrize(

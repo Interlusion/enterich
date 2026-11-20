@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from enterich.erpnext import Erpnext, ErpnextError
+from enterich.tools import drafts
 
 FAILED_RESULT = (
     "ERPNext saved the draft, but Enterich couldn't build the rest of this result (ERPNext "
@@ -32,6 +33,19 @@ class Duplicate:
 
     def warning(self, found: str) -> str:
         return f"Possible duplicate of {found}: a {self.kind} with the same {self.match}."
+
+
+def capped(rows: int) -> str:
+    """The warning of a duplicate check that read as many rows as it reads at most."""
+    return (
+        f"Enterich's duplicate check read only the first {rows:,} rows of the drafts it "
+        "compares with, so a duplicate among further drafts may have gone unnoticed."
+    )
+
+
+def bounded(monkeypatch: pytest.MonkeyPatch, rows: int) -> None:
+    """Every duplicate check that compares rows reads at most `rows` of them."""
+    monkeypatch.setattr(drafts, "MAX_DUPLICATE_ROWS", rows)
 
 
 def failing_after_the_write(monkeypatch: pytest.MonkeyPatch) -> None:
