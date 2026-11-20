@@ -34,3 +34,7 @@ The third run's fix stage: 6 agents, 0.34M tokens.
 - **The class check pays.** The first fix stage with it rejected one fix of three, and the gap it named was the kind the reviews by hand had found after the first run.
 - **Commit hashes in the records look like keys to gitleaks** when a commit's subject says "key" just before the next hash in `outcomes.jsonl`, as the auth fix's did. `record.py`'s scan didn't see it, as the workflow's output puts each hash on a line of its own. `.gitleaks.toml` now lets a 40-hex hash through under `harness/runs/` only.
 - **A finding refuted twice goes to the backlog** as a spec question rather than to the next run.
+
+## The fourth run
+
+A fourth full run (`2026-11-20-code-3`), after the third's fixes, to see what a run past the rest finds: 12 agents, 0.98M tokens. Seven of nine surveys found nothing; two found 3 findings, all confirmed, none of an earlier run. The operator declined all three as over-engineering, and `suppressions.jsonl` holds them: a failed start that doesn't repeat the unknown-variable warnings, though its refusal already names the variable to look for, and two rules written twice whose copies are equal on purpose and held by the tests. Nothing in the run was worth a change, so the rest holds. From it came a bar of worth: the verifier asks who acts wrongly today and what the change adds, and the fix stage's review rejects a change larger than its fault (`harness/README.md`).
