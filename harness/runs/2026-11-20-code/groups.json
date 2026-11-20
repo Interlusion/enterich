@@ -1,0 +1,34 @@
+[
+  {
+    "branch": "auto/code-integration-return-drafts",
+    "also": [],
+    "files": [
+      "tests/integration/test_return_drafts.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "lost-on-the-way:procure-to-pay:src/enterich/tools/returns.py:create",
+        "slug": "procure-to-pay-returns-create",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  },
+  {
+    "branch": "auto/code-unit-auth",
+    "also": [],
+    "files": [
+      "tests/unit/test_auth.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "lost-on-the-way:service:src/enterich/auth.py:JwksCache._fetch",
+        "slug": "service-auth-jwkscache-fetch",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  }
+]

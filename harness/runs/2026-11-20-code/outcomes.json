@@ -1,0 +1,20 @@
+{
+  "fixes": 2,
+  "states": {
+    "accepted": 1,
+    "rejected": 1
+  },
+  "missing": [],
+  "unaccepted": {
+    "auto/code-integration-return-drafts": [
+      "6afd004a9b62d10bfe16a99020aea2a889aa6321",
+      "195f5ef3685362cf4b88d207d4e47633927d68f7"
+    ]
+  },
+  "accepted": {
+    "auto/code-unit-auth": [
+      "0106c1d",
+      "2a26965"
+    ]
+  }
+}
