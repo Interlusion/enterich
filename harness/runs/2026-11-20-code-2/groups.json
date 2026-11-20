@@ -1,0 +1,50 @@
+[
+  {
+    "branch": "auto/code-integration-order-to-cash-drafts",
+    "also": [],
+    "files": [
+      "tests/integration/test_order_to_cash_drafts.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "wrong-outcome:erpnext-client:src/enterich/tools/__init__.py:_comment",
+        "slug": "erpnext-client-init-comment",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  },
+  {
+    "branch": "auto/code-unit-auth",
+    "also": [],
+    "files": [
+      "tests/unit/test_auth.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "lost-on-the-way:service:src/enterich/auth.py:Verifier._verify",
+        "slug": "service-auth-verifier-verify",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  },
+  {
+    "branch": "auto/code-unit-config",
+    "also": [],
+    "files": [
+      "tests/unit/test_config.py"
+    ],
+    "ratchets": [],
+    "fixes": [
+      {
+        "key": "lost-on-the-way:service:src/enterich/config.py:_Reader.as_published",
+        "slug": "service-config-reader-as-published",
+        "ratchet": null,
+        "ratchet_done": false
+      }
+    ]
+  }
+]
