@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 
+from enterich import erpnext as erpnext_module
 from enterich import shapes, tools
 from enterich.erpnext import ErpnextError
 from enterich.tools import invoicing
@@ -843,6 +844,24 @@ def test_the_comment_stays_within_the_operation_time(
     assert result["name"] in erp.docs["Sales Invoice"]
     [missing] = result["warnings"]
     assert "comment" in missing
+
+
+def test_a_comment_erpnext_answers_too_late_may_be_missing(
+    mcp: Session, erp: FakeErpnext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REQ-001-PRS-F015: the comment's call ends at its own limit, with time left in the
+    # operation's; ERPNext had the comment and may have stored it, so the warning doesn't
+    # say it wasn't added
+    monkeypatch.setattr(erpnext_module, "CALL_TIMEOUT", 0.2)
+    erp.slow[COMMENT_METHOD] = 0.5
+    result = create(mcp).data
+    assert result["name"] in erp.docs["Sales Invoice"]
+    [comment] = [r for r in erp.received if r.path == COMMENT_METHOD]
+    assert (comment.method, comment.body["reference_name"]) == ("POST", result["name"])
+    assert result["warnings"] == [
+        "Enterich's comment may be missing from the draft: "
+        "ERPNext didn't answer within 0.2 seconds."
+    ]
 
 
 def test_a_create_whose_calls_together_exceed_the_operation_time_is_a_tool_error(
