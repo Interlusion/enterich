@@ -781,6 +781,7 @@ def test_a_result_too_large_with_its_rows_still_returns_the_draft(
     assert sorted(data["truncated"]) == ["items", "tax_summary", "taxes"]
     [left_out] = data["warnings"]
     assert "items" in left_out
+    assert "exceed 2,000 characters" in left_out
     [comment] = erp.comments
     assert comment["reference_name"] == data["name"]
     [line] = logs.events("operation")

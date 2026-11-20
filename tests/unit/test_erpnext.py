@@ -180,6 +180,14 @@ async def test_a_response_over_10_mib_in_many_chunks_is_refused() -> None:
         await Erpnext(settings(), chunked(body)).get_doc("Item", "SKU-1")
 
 
+async def test_the_refusal_names_the_answer_limit_as_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    # REQ-002-PRS-NF011: the limit is written once, so the message follows it
+    monkeypatch.setattr(erpnext, "MAX_RESPONSE_BYTES", 1024 * 1024)
+    body = b'{"data": "' + b"x" * (2 * 1024 * 1024) + b'"}'
+    with pytest.raises(ErpnextError, match="exceeded 1 MiB"):
+        await Erpnext(settings(), chunked(body)).get_doc("Item", "SKU-1")
+
+
 @pytest.mark.parametrize(
     ("status", "exc_type", "message"),
     [
