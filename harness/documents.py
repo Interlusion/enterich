@@ -26,8 +26,8 @@ except ModuleNotFoundError:  # run as a script: harness/ is the path's first ent
     import surface  # type: ignore[import-not-found, no-redef]
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
 
-ROOT = Path(__file__).resolve().parent.parent
-DOCUMENTS = ROOT / "harness" / "documents.jsonl"
+ROOT = project.ROOT
+DOCUMENTS = project.CHILD / "documents.jsonl"
 # The documents that say what Enterich does; the backlog, the analyses and the changelog
 # keep what was true on their day
 SCOPE = project.strings(project.DOCS, "scope")

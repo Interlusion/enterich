@@ -26,7 +26,7 @@ except ModuleNotFoundError:  # run as a script: harness/ is the path's first ent
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
     from triage import key  # type: ignore[import-not-found, no-redef]
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = project.ROOT
 SRC = ROOT / project.SOURCES["code"]
 
 Records = list[dict[str, Any]]
@@ -168,7 +168,7 @@ def swept(
                     f"confirmed finding {found_key}: {found['claim']}"
                 ),
                 "evidence": (
-                    f"harness/sweep.py: survivors left to agents that change `{name}` as that "
+                    f"sweep.py: survivors left to agents that change `{name}` as that "
                     f"finding's mutants do ({found['location']}), named in no finding."
                 ),
                 "proposal": f"As for {found_key}: {found['proposal']}",

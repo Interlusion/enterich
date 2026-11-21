@@ -46,7 +46,7 @@ try:
 except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
     import project  # type: ignore[import-not-found, no-redef]
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = project.ROOT
 BASE = project.GATE["base"]
 REMOTE = project.GATE["remote"]
 # Where the tests lie: a `test:` commit changes only these
@@ -314,7 +314,7 @@ def bundle(repo: Path, base: str, picks: Sequence[tuple[str, str]]) -> str | Non
     the branches' commits were reviewed; None if they conflict. Nothing else changes. Each
     commit keeps its own date as the committer's, so the same branches on the same base make
     the same bundle again."""
-    tree = Path(tempfile.mkdtemp(prefix="harness-bundle-"))
+    tree = Path(tempfile.mkdtemp(prefix="gate-bundle-"))
     try:
         _git("worktree", "add", "-q", "--detach", str(tree), base, repo=repo)
         for _, commit in picks:
@@ -344,7 +344,7 @@ def build_scanner() -> None:
 @contextmanager
 def _tree(commit: str) -> Generator[Path]:
     """A worktree of the commit with its packages, removed afterwards."""
-    tree = Path(tempfile.mkdtemp(prefix="harness-gate-"))
+    tree = Path(tempfile.mkdtemp(prefix="gate-"))
     try:
         _git("worktree", "add", "--detach", str(tree), commit)
         subprocess.run(["uv", "sync", "--locked", "-q"], cwd=tree, check=True)  # noqa: S607
@@ -421,20 +421,18 @@ def main(run: Path, branches: list[str], base: str, push: bool, bundled: bool = 
         return 2
     outcomes = run / "outcomes.json"
     if not outcomes.is_file():
-        print(f"{outcomes} is missing: run harness/outcomes.py on the run first", file=sys.stderr)
+        print(f"{outcomes} is missing: run outcomes.py on the run first", file=sys.stderr)
         return 2
     plan = run / "groups.json"
     if not plan.is_file():
-        print(f"{plan} is missing: run harness/plan.py on the run first", file=sys.stderr)
+        print(f"{plan} is missing: run plan.py on the run first", file=sys.stderr)
         return 2
     groups = cast("list[dict[str, Any]]", json.loads(plan.read_text()))
     fetch(ROOT, base)
     build_scanner()
     summary = cast("dict[str, Any]", json.loads(outcomes.read_text()))
     if "accepted" not in summary:
-        print(
-            f"{outcomes} lists no accepted commits: run harness/outcomes.py again", file=sys.stderr
-        )
+        print(f"{outcomes} lists no accepted commits: run outcomes.py again", file=sys.stderr)
         return 2
     accepted = cast("dict[str, list[str]]", summary["accepted"])
     results = run / "gates.jsonl"

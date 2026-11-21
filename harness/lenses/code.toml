@@ -15,7 +15,7 @@ args_comment = '''
 '''
 units_const = "RECORDS"
 units_arg = "records"
-read_only_secret = "  'Write no secret into your answer, real or made up (harness/record.py refuses a result that holds one). ' +"
+read_only_secret = "  'Write no secret into your answer, real or made up (record.py refuses a result that holds one). ' +"
 consts = '''
 // The lens's concerns (harness/modules.py, harness/triage.py), each with what confirms it.
 // They are the only kinds of finding: what the code's checks (the linter, the type checker)
@@ -70,7 +70,7 @@ ${concernLines([f.kind])}
 If uncertain, set confirmed to false.
 
 If confirmed, first ask what it is worth: who acts wrongly today because of it (an agent, a reviewer of a draft, a deployer: a write refused or let through wrongly, a warning or a cause lost, a wrong result, a wrong variable named), and what the change adds (a new mechanism, a parameter, indirection). Where nobody acts wrongly today, or the change adds more than it protects, it is a drop. Then "class" is:
-- fix: someone acts wrongly today, a test can show the code wrong (it fails on the code as it is), and a change to the code closes it, within the current specs and ADRs. A message that would only be more helpful, while the reader already has what they need to act, is no fix. Name in "test_files" where that test goes: the test module where tests of this behaviour live now (${B.test_homes}). The fix stage gives each test file to one branch (harness/plan.py), so name what the fix will change;
+- fix: someone acts wrongly today, a test can show the code wrong (it fails on the code as it is), and a change to the code closes it, within the current specs and ADRs. A message that would only be more helpful, while the reader already has what they need to act, is no fix. Name in "test_files" where that test goes: the test module where tests of this behaviour live now (${B.test_homes}). The fix stage gives each test file to one branch (plan.py), so name what the fix will change;
 - proposal: closing it is a restructure no failing test shows, or it needs a change to ${B.contract}, ${B.policy} or a dependency; "test_files" is []. A rule written twice is a proposal only where no test ties its copies, such as a limit typed into a message beside its constant; copies the tests already hold equal are a drop. A restructure is made by hand with the operator in this lens's first runs;
 - drop: real but not worth a change: nobody acts wrongly today, or the change adds more than it protects (say which).
 If refuted, "class" is drop and "test_files" is [].

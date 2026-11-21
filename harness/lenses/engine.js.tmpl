@@ -16,7 +16,7 @@ const SINCE = args.since || null
 // What the prompts say about this repository: the output of harness/project.py brief, which
 // the session passes, so the prompts name no product, path or check of their own
 const B = args.brief
-if (!B) throw new Error('args.brief: the output of uv run python harness/project.py brief')
+if (!B) throw new Error('args.brief: the output of project.py brief')
 // ADR-008: a run stops when its budget is spent. With a token target set for the turn, no
 // verifier starts once less than the reserve is left; the findings it would have judged
 // are returned unverified, as those beyond the cap are. Without a target, nothing stops.

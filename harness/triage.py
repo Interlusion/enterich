@@ -33,19 +33,19 @@ except ModuleNotFoundError:  # run as a script: harness/ is the path's first ent
     import project  # type: ignore[import-not-found, no-redef]
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
 
-ROOT = Path(__file__).resolve().parent.parent
-SUPPRESSIONS = ROOT / "harness" / "suppressions.jsonl"
+ROOT = project.ROOT
+SUPPRESSIONS = project.CHILD / "suppressions.jsonl"
 BACKLOG = ROOT / project.SOURCES["backlog"]
-PATTERNS = ROOT / "harness" / "patterns.jsonl"
+PATTERNS = project.CHILD / "patterns.jsonl"
 PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 TEST_FILE = re.compile(rf"^{re.escape(project.SOURCES['tests'])}/[\w/]+\.py$")
 # A pattern confirmed in this many findings across this many files is a class: it gets a
 # ratchet. Two neighbouring findings are closed by two tests
 RATCHET_FROM = 3
 RATCHET_FILES = 2
-PROMISES = ROOT / "harness" / "promises.jsonl"
-DOCUMENTS = ROOT / "harness" / "documents.jsonl"
-MODULES = ROOT / "harness" / "modules.jsonl"
+PROMISES = project.CHILD / "promises.jsonl"
+DOCUMENTS = project.CHILD / "documents.jsonl"
+MODULES = project.CHILD / "modules.jsonl"
 # Each lens's kinds of finding: the tests lens's here, the others' in their definitions
 # (harness/lenses/<lens>.toml), which their workflows are written from
 LENSES = {

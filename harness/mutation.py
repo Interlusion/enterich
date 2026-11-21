@@ -24,11 +24,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 try:
-    from harness.sweep import location
+    from harness.sweep import ROOT, location
 except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
-    from sweep import location  # type: ignore[import-not-found, no-redef]
+    from sweep import ROOT, location  # type: ignore[import-not-found, no-redef]
 
-ROOT = Path(__file__).resolve().parent.parent
 MUTMUT = [sys.executable, "-m", "mutmut"]
 STRING = re.compile(r'"(?:[^"\\\n]|\\.)*"|\'(?:[^\'\\\n]|\\.)*\'')
 CAST = re.compile(r'(?<![\w.])cast\("[^"]*",')

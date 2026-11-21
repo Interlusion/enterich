@@ -32,8 +32,8 @@ except ModuleNotFoundError:  # run as a script: harness/ is the path's first ent
     import project  # type: ignore[import-not-found, no-redef]
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
 
-ROOT = Path(__file__).resolve().parent.parent
-PROMISES = ROOT / "harness" / "promises.jsonl"
+ROOT = project.ROOT
+PROMISES = project.CHILD / "promises.jsonl"
 POLICY = project.SECURITY["policy"]
 SRC = Path(project.SOURCES["code"])
 TOOLS = Path(project.SECURITY["tool_snapshot"])

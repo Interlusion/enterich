@@ -17,7 +17,7 @@ try:
 except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
     import project  # type: ignore[import-not-found, no-redef]
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = project.ROOT
 SPECS = ROOT / project.SOURCES["specs"]
 TESTS = ROOT / project.SOURCES["tests"]
 # Tests that cite requirement IDs as data, not as what they check

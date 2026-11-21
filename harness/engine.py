@@ -1,8 +1,9 @@
 """The survey and verify engine of the security, docs and code lenses (analysis 004, section
 3.2): writes each lens's workflow, `.claude/workflows/improve-<lens>.js`, from the engine's
-template and the lens's definition in `harness/lenses/`. A Workflow script reads no file, so
-the engine is assembled here, before a run, not by the script; what differs per run or per
-repository stays in the script's `${...}` and comes with its arguments, as the brief does.
+template and the lens's definition in `lenses/`, beside the scripts. A Workflow script reads
+no file, so the engine is assembled here, before a run, not by the script; what differs per
+run or per repository stays in the script's `${...}` and comes with its arguments, as the
+brief does.
 
 A definition fills every slot of the template, `@@name@@`, and no other. Its values are put
 in as written, but for three forms: a slot inside a quoted string of the template gets its
@@ -24,11 +25,18 @@ import tomllib
 from pathlib import Path
 from typing import Any, cast
 
+try:
+    from harness import project
+except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
+    import project  # type: ignore[import-not-found, no-redef]
+
 Definition = dict[str, Any]
 
-ROOT = Path(__file__).resolve().parent.parent
-LENSES = ROOT / "harness" / "lenses"
+ROOT = project.ROOT
+# The method's: the template and the definitions lie beside the scripts
+LENSES = project.PARENT / "lenses"
 TEMPLATE = LENSES / "engine.js.tmpl"
+# The repository's: where the session's Workflow tool finds them
 WORKFLOWS = ROOT / ".claude" / "workflows"
 SLOT = re.compile(r"@@(\w+)@@")
 # Slots inside a single-quoted string of the template
@@ -138,7 +146,7 @@ def main(argv: list[str]) -> int:
     if argv == ["--check"]:
         differ = stale()
         for name in differ:
-            print(f"{name} differs from its definition: uv run python harness/engine.py")
+            print(f"{name} differs from its definition: write it again with engine.py")
         return 1 if differ else 0
     if argv:
         print(__doc__, file=sys.stderr)

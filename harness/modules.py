@@ -37,8 +37,8 @@ except ModuleNotFoundError:  # run as a script: harness/ is the path's first ent
     import surface  # type: ignore[import-not-found, no-redef]
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
 
-ROOT = Path(__file__).resolve().parent.parent
-MODULES = ROOT / "harness" / "modules.jsonl"
+ROOT = project.ROOT
+MODULES = project.CHILD / "modules.jsonl"
 CODE = project.SOURCES["code"]
 # The lens's kinds of finding (harness/lenses/code.toml): within a group of modules, and across
 _SCOPES = {name: concern["scope"] for name, concern in engine.kinds("code").items()}

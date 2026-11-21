@@ -23,11 +23,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 try:
-    from harness.gate import BASE, fetch
+    from harness.gate import BASE, ROOT, fetch
 except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
-    from gate import BASE, fetch  # type: ignore[import-not-found, no-redef]
+    from gate import BASE, ROOT, fetch  # type: ignore[import-not-found, no-redef]
 
-ROOT = Path(__file__).resolve().parent.parent
 TREES = Path(".claude") / "worktrees"
 
 
