@@ -131,6 +131,27 @@ def test_a_script_copied_outside_the_repository_does_what_it_does_here(
     assert _outcome(_parent(tmp_path), command, run, tmp_path) == here
 
 
+ENTRIES = [s for s in SCRIPTS if 'if __name__ == "__main__":' in s.read_text(encoding="utf-8")]
+
+
+@pytest.mark.parametrize("script", ENTRIES, ids=lambda p: p.name)
+def test_every_script_answers_help_and_does_nothing_else(script: Path, tmp_path: Path) -> None:
+    """An argument a script doesn't know is no run directory to write into."""
+    (tmp_path / "harness").mkdir()
+    shutil.copy(project.FILE, tmp_path / "harness")
+    done = subprocess.run(  # noqa: S603 - the repository's own script, no input
+        [sys.executable, str(script), "--help"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert done.stdout.startswith("usage:")
+    written = sorted(p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*"))
+    assert written == ["harness", "harness/project.toml"]
+
+
 def _strings(source: str) -> list[tuple[int, str]]:
     """A script's string literals, its docstrings left out."""
     tree = ast.parse(source)
