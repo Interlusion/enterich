@@ -26,9 +26,10 @@ from pathlib import Path
 from typing import Any, cast
 
 try:
-    from harness import project
+    from harness import engine, project
     from harness.jsonl import read as _records
 except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
+    import engine  # type: ignore[import-not-found, no-redef]
     import project  # type: ignore[import-not-found, no-redef]
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
 
@@ -45,23 +46,18 @@ RATCHET_FILES = 2
 PROMISES = ROOT / "harness" / "promises.jsonl"
 DOCUMENTS = ROOT / "harness" / "documents.jsonl"
 MODULES = ROOT / "harness" / "modules.jsonl"
-# Each lens's kinds of finding. A breach: a promise can be broken, as reproduced; unproven:
-# it holds as far as read, but no test would notice it breaking; a drift: a document says
-# what the code doesn't do, or names what no longer exists; the code lens's concerns
-# (harness/modules.py): what a path loses on the way, a wrong outcome after a side effect,
-# a rule written twice, a pattern one place misses
+# Each lens's kinds of finding: the tests lens's here, the others' in their definitions
+# (harness/lenses/<lens>.toml), which their workflows are written from
 LENSES = {
     "tests": {"dod-gap", "mutant-gap", "weak-test"},
-    "security": {"breach", "unproven"},
-    "docs": {"drift"},
-    "code": {"lost-on-the-way", "wrong-outcome", "rule-twice", "missed-pattern"},
+    **{name: set(engine.kinds(name)) for name in engine.names()},
 }
 # The lenses whose findings each name one record of the lens's vocabulary
 VOCABULARIES = {"security": PROMISES, "docs": DOCUMENTS, "code": MODULES}
 NAMED = LENSES["security"] | LENSES["docs"] | LENSES["code"]
-# A finding confirmed only with what shows it: a breach reproduced, a drift's and a code
-# finding's two sides
-SHOWN = {"breach", "drift", *LENSES["code"]}
+# A finding confirmed only with what shows it, such as a breach reproduced or a drift's two
+# sides: the kinds whose definition says "shown"
+SHOWN = {k for name in engine.names() for k, kind in engine.kinds(name).items() if kind["shown"]}
 KINDS = {kind for kinds in LENSES.values() for kind in kinds}
 CLASSES = {"fix", "proposal", "drop"}
 TEXT_FIELDS = ("kind", "location", "claim", "evidence", "proposal")

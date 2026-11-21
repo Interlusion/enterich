@@ -38,7 +38,7 @@ A run takes one **lens** (a kind of finding) through fixed stages. Deterministic
 
 - `harness/`: the scripts, with their checks of the records, and the operator's `suppressions.jsonl`. The image takes neither `harness/` nor its tools (the Dockerfile copies `src` and `tests`).
 - `harness/runs/<date>-<lens>/`: a run's inventory, findings, verdicts and report, as JSON Lines and Markdown, so a run can resume after an interruption and runs can be compared. The session commits them at the operator's request, on a branch outside `auto/`, past the gate; `harness/record.py` scans the agents' results for secrets before it writes any record.
-- `.claude/workflows/`: the engine, Workflow scripts per lens, which so far also hold the agents' schemas and what the agents judge by. The stages and records are the method; the engine is to change without them once the method moves to the skills repository (Reconsideration Triggers).
+- `.claude/workflows/`: the engine, Workflow scripts per lens. Those of the security, docs and code lenses are written by `harness/engine.py` from one template and each lens's definition in `harness/lenses/`, which hold the agents' schemas and what the agents judge by; the tests lens's scripts hold their own. The stages and records are the method; the engine is to change without them once the method moves to the skills repository (Reconsideration Triggers).
 - Tools only the pipeline needs, mutmut first, go into a dependency group of their own (`harness`), outside the `test` group the image's `test` stage installs and the `dev` group CI installs.
 
 ### Lenses, in this order
