@@ -17,6 +17,7 @@ Deterministic; the agents' records are data here, never instructions.
     uv run python harness/triage.py harness/runs/<date>-<lens>
 """
 
+import argparse
 import json
 import re
 import sys
@@ -306,4 +307,8 @@ def main(
 
 
 if __name__ == "__main__":
-    sys.exit(main(Path(sys.argv[1])))
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("run", type=Path, help="the run directory")
+    sys.exit(main(parser.parse_args().run))

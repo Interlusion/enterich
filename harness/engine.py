@@ -19,6 +19,7 @@ as `@@kind@@` (a lens of one kind), `@@kind_names@@`, `@@kind_meanings@@` or `@@
     uv run python harness/engine.py --check    # which workflows differ from what it writes
 """
 
+import argparse
 import re
 import sys
 import tomllib
@@ -143,14 +144,15 @@ def stale(directory: Path = WORKFLOWS) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    if argv == ["--check"]:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("--check", action="store_true", help="name the workflows that differ")
+    if parser.parse_args(argv).check:
         differ = stale()
         for name in differ:
             print(f"{name} differs from its definition: write it again with engine.py")
         return 1 if differ else 0
-    if argv:
-        print(__doc__, file=sys.stderr)
-        return 2
     for name in names():
         (WORKFLOWS / f"improve-{name}.js").write_text(render(name), encoding="utf-8")
     return 0

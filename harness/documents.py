@@ -13,6 +13,7 @@ surveys those. Deterministic and read-only; writes to the run directory given.
     uv run python harness/documents.py harness/runs/<date>-docs [--since <commit>]
 """
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -108,6 +109,10 @@ def main(run: Path, root: Path = ROOT, since: str | None = None) -> int:
 
 
 if __name__ == "__main__":
-    arguments = sys.argv[1:]
-    after = arguments[arguments.index("--since") + 1] if "--since" in arguments else None
-    sys.exit(main(Path(arguments[0]), since=after))
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("run", type=Path, help="the run directory")
+    parser.add_argument("--since", help="survey what changed after this commit")
+    a = parser.parse_args()
+    sys.exit(main(a.run, since=a.since))

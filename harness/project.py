@@ -9,6 +9,7 @@ own files for the pipeline: this file, the vocabularies, the suppressions and th
 the scripts. No script finds the repository from where it lies, so the scripts work from the
 skill's directory as they work from this repository's."""
 
+import argparse
 import re
 import sys
 import tomllib
@@ -123,6 +124,9 @@ def brief() -> dict[str, str]:
 if __name__ == "__main__":
     import json
 
-    if sys.argv[1:] != ["brief"]:
-        sys.exit("usage: project.py brief")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("command", choices=["brief"], help="print the brief the workflows take")
+    parser.parse_args()
     print(json.dumps(brief(), ensure_ascii=False))

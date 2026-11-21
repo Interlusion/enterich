@@ -11,6 +11,7 @@ anywhere else (a name, a format, a header, a result's text) is left to the agent
     uv run --group harness python harness/mutation.py harness/runs/<date>-tests [--fresh]
 """
 
+import argparse
 import ast
 import json
 import os
@@ -188,4 +189,10 @@ def main(run: Path, fresh: bool) -> None:
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]), "--fresh" in sys.argv[2:])
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("run", type=Path, help="the run directory")
+    parser.add_argument("--fresh", action="store_true", help="run every mutant again")
+    a = parser.parse_args()
+    main(a.run, a.fresh)
