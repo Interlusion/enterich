@@ -4,6 +4,8 @@ The scripts, schemas and rubrics of the improvement pipeline: agents between det
 
 This repository's values, where its specs, code, tests and documents are, and what the gate checks and lets through, are in `project.toml`, read by `project.py`; the scripts name none of them themselves (`tests/repo/test_harness_project.py`). The rest is the method ([analysis 003, §3.6](../docs/analysis/analysis-003-improvement-pipeline-after-three-lenses.md#36-parent-and-child-refreshed)). What the workflows' prompts say about the repository, the product, its threat model, where its tests and fakes are and what only the operator changes, is the file's `[brief]`: every workflow takes `brief`, the output of `uv run python harness/project.py brief`, among its arguments, as a workflow can't read a file.
 
+The security, docs and code lenses share one survey and verify engine. `engine.py` writes each lens's workflow, `.claude/workflows/improve-<lens>.js`, from the template `lenses/engine.js.tmpl` and the lens's definition `lenses/<lens>.toml`: its prompts, its finding's fields, its verdict's descriptions, the constants it adds, and its kinds of finding, which `triage.py` and `modules.py` read from there too. Change a lens in its definition, or the engine in the template, then run `uv run python harness/engine.py`; `tests/repo/test_harness_engine.py` fails on a workflow that differs from what they write ([analysis 004, §3.2](../docs/analysis/analysis-004-improvement-pipeline-before-the-move.md#32-other-ways-to-the-same-goal)). The tests lens's two workflows have a shape of their own and are edited as they are.
+
 ## The tests lens
 
 A run lives in `runs/<date>-tests/`.
@@ -44,7 +46,7 @@ A run lives in `runs/<date>-docs/`. Triage and the plan are the tests lens's; th
 
 A run lives in `runs/<date>-code/`. Triage, the plan, the fix stage and the gate are the tests lens's, with the fix stage's prompts worded for its findings. The other lenses ask whether the tests notice a change, whether a promise can be broken and whether a document says what the code does; this one asks whether the code is sound in itself, within the ADRs' choices. What the linter and the type checker flag, and what the other lenses cover, is not its; nor is "could be nicer". The first run surveys every record; a run after it surveys the records touched since the last run's records, and the lens rests while no Python file of the code has changed. Another full run still finds something, as each survey is a sample; the lens rests once its fixes are edge cases rather than wrong outcomes for the agent, judged by what they are, not by their count ([the third run's retrospective](runs/2026-11-20-code-2/retrospective.md)).
 
-Its kinds of finding, its **concerns**, each confirmed only with what its bar names (`.claude/workflows/improve-code.js`):
+Its kinds of finding, its **concerns**, each confirmed only with what its bar names (`lenses/code.toml`):
 
 - **lost-on-the-way:** an error path, a fallback or a conversion drops what the caller needs to act (a warning, the cause, a field the result promises); confirmed with an input, its path, and what the agent, the log or the reviewer then lacks.
 - **wrong-outcome:** after a side effect (a write, a comment), a later failure is reported as if nothing happened, or a success for what didn't take effect; confirmed with the side effect, the failure and what the caller is told.
