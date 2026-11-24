@@ -15,7 +15,7 @@ args_comment = '''
 '''
 units_const = "DOCUMENTS"
 units_arg = "documents"
-read_only_secret = "  'Write no secret into your answer, real or made up (harness/record.py refuses a result that holds one). ' +"
+read_only_secret = "  'Write no secret into your answer, real or made up (record.py refuses a result that holds one). ' +"
 consts = '''
 // What CI already compares, so no agent spends tokens on it
 const CHECKED = B.docs_checked
@@ -79,7 +79,7 @@ If refuted, "class" is drop.
 
 ${patternLines}
 
-If confirmed with the code wrong, "test_files" names where the test that closes the finding belongs: the test module where tests of this behaviour live now (${B.test_homes}). The fix stage gives each test file to one branch (harness/plan.py), so name what the fix will change. With the document wrong, or refuted, []. ${READ_ONLY}
+If confirmed with the code wrong, "test_files" names where the test that closes the finding belongs: the test module where tests of this behaviour live now (${B.test_homes}). The fix stage gives each test file to one branch (plan.py), so name what the fix will change. With the document wrong, or refuted, []. ${READ_ONLY}
 '''
 items = "const items = DOCUMENTS.map(name => ({ label: `document:${name}`, name }))"
 item_field = "name"

@@ -8,6 +8,7 @@ the gate lets through. Deterministic; the agents' records are data here, never i
     uv run python harness/outcomes.py harness/runs/<date>-tests
 """
 
+import argparse
 import json
 import re
 import sys
@@ -124,4 +125,8 @@ def main(run: Path) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(Path(sys.argv[1])))
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("run", type=Path, help="the run directory")
+    sys.exit(main(parser.parse_args().run))

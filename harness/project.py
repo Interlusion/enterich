@@ -1,14 +1,25 @@
 """This repository's values for the improvement pipeline, from `harness/project.toml`: the
 one place the scripts read them from (analysis 003, section 3.6). A value of the wrong form
-stops every script at its import, rather than letting a check pass that reads nothing."""
+stops every script at its import, rather than letting a check pass that reads nothing.
 
+It is also the one place that says where things are (analysis 004, section 3.1, step 2):
+the repository is the working directory the scripts run from, its child (the repository's
+own files for the pipeline: this file, the vocabularies, the suppressions and the runs) is
+`harness/` there, and the method's own files, such as the engine's definitions, lie beside
+the scripts. No script finds the repository from where it lies, so the scripts work from the
+skill's directory as they work from this repository's."""
+
+import argparse
 import re
+import sys
 import tomllib
 from pathlib import Path
 from typing import Any, cast
 
-ROOT = Path(__file__).resolve().parent.parent
-FILE = ROOT / "harness" / "project.toml"
+ROOT = Path.cwd().resolve()
+CHILD = ROOT / "harness"
+PARENT = Path(__file__).resolve().parent
+FILE = CHILD / "project.toml"
 # Directories, written without a trailing slash
 PATHS = ("specs", "tests", "code", "backlog")
 LISTS = {
@@ -71,6 +82,8 @@ def problems(values: dict[str, Any]) -> list[str]:
     return found
 
 
+if not FILE.is_file():
+    sys.exit(f"{FILE} is missing: run the pipeline's scripts from the repository's root")
 _values = cast("dict[str, dict[str, Any]]", tomllib.loads(FILE.read_text(encoding="utf-8")))
 if _wrong := problems(_values):
     raise ValueError(f"{FILE.name}: {'; '.join(_wrong)}")
@@ -104,13 +117,16 @@ def brief() -> dict[str, str]:
         "specs": f"{SOURCES['specs']}/",
         "policy": SECURITY["policy"],
         "may_change": f"{', '.join(first)} and {last}",
+        "child": f"{CHILD.relative_to(ROOT).as_posix()}/",
     }
 
 
 if __name__ == "__main__":
     import json
-    import sys
 
-    if sys.argv[1:] != ["brief"]:
-        sys.exit("usage: project.py brief")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("command", choices=["brief"], help="print the brief the workflows take")
+    parser.parse_args()
     print(json.dumps(brief(), ensure_ascii=False))

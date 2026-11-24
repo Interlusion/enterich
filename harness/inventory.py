@@ -5,10 +5,10 @@ trace. Deterministic and read-only; writes JSON Lines to the run directory given
     uv run python harness/inventory.py harness/runs/<date>-tests
 """
 
+import argparse
 import ast
 import json
 import re
-import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -17,7 +17,7 @@ try:
 except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
     import project  # type: ignore[import-not-found, no-redef]
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = project.ROOT
 SPECS = ROOT / project.SOURCES["specs"]
 TESTS = ROOT / project.SOURCES["tests"]
 # Tests that cite requirement IDs as data, not as what they check
@@ -151,4 +151,8 @@ def main(run: Path) -> None:
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]))
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("run", type=Path, help="the run directory")
+    main(parser.parse_args().run)

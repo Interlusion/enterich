@@ -15,6 +15,7 @@ changes. Deterministic and read-only; writes to the run directory given.
     uv run python harness/surface.py harness/runs/<date>-security [--since <commit>]
 """
 
+import argparse
 import ast
 import json
 import re
@@ -32,8 +33,8 @@ except ModuleNotFoundError:  # run as a script: harness/ is the path's first ent
     import project  # type: ignore[import-not-found, no-redef]
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
 
-ROOT = Path(__file__).resolve().parent.parent
-PROMISES = ROOT / "harness" / "promises.jsonl"
+ROOT = project.ROOT
+PROMISES = project.CHILD / "promises.jsonl"
 POLICY = project.SECURITY["policy"]
 SRC = Path(project.SOURCES["code"])
 TOOLS = Path(project.SECURITY["tool_snapshot"])
@@ -336,6 +337,10 @@ def main(run: Path, root: Path = ROOT, since: str | None = None) -> int:
 
 
 if __name__ == "__main__":
-    arguments = sys.argv[1:]
-    after = arguments[arguments.index("--since") + 1] if "--since" in arguments else None
-    sys.exit(main(Path(arguments[0]), since=after))
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("run", type=Path, help="the run directory")
+    parser.add_argument("--since", help="survey what changed after this commit")
+    a = parser.parse_args()
+    sys.exit(main(a.run, since=a.since))

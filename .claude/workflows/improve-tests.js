@@ -21,7 +21,7 @@ const SWEEP = args.sweep || null
 // What the prompts say about this repository: the output of harness/project.py brief, which
 // the session passes, so the prompts name no product, path or check of their own
 const B = args.brief
-if (!B) throw new Error('args.brief: the output of uv run python harness/project.py brief')
+if (!B) throw new Error('args.brief: the output of project.py brief')
 // ADR-008: a run stops when its budget is spent. With a token target set for the turn, no
 // verifier starts once less than the reserve is left; the findings it would have judged
 // are returned unverified, as those beyond the cap are. Without a target, nothing stops.
@@ -115,7 +115,7 @@ Judge each survivor, reading the code and the tests around it:
 Report only gaps, as "mutant-gap" findings. Group survivors that one missing test would kill into one finding; list their ids in full in "mutants". Name the requirement when a spec states the behaviour. The most consequential first, at most 20. ${READ_ONLY}`
 
 const madeBy = f => f.like
-  ? `A script made it (harness/sweep.py), not an agent: no finding named these survivors, and they change a call of the same function as the mutants of the confirmed finding ${f.like}. That makes them a candidate, not a gap; its claim and proposal are that finding's. Judge them on their own, as any finding, and say in "reason" what this place's gap is, if it is one.`
+  ? `A script made it (sweep.py), not an agent: no finding named these survivors, and they change a call of the same function as the mutants of the confirmed finding ${f.like}. That makes them a candidate, not a gap; its claim and proposal are that finding's. Judge them on their own, as any finding, and say in "reason" what this place's gap is, if it is one.`
   : 'Another agent made it; try to refute it.'
 
 const verifyPrompt = f => `You verify one finding of the tests lens of ${B.product}'s improvement pipeline (${B.method}). ${madeBy(f)}
@@ -133,7 +133,7 @@ If refuted, "class" is drop.
 
 ${patternLines}
 
-If confirmed, "test_files" names where the test that closes the finding belongs: the test module where tests of this behaviour live now (${B.test_homes}), with any test helper the fix must change too. Usually that is one file. The fix stage gives each test file to one branch (harness/plan.py), so name what the fix will change, not every file you read. If refuted, []. ${READ_ONLY}`
+If confirmed, "test_files" names where the test that closes the finding belongs: the test module where tests of this behaviour live now (${B.test_homes}), with any test helper the fix must change too. Usually that is one file. The fix stage gives each test file to one branch (plan.py), so name what the fix will change, not every file you read. If refuted, []. ${READ_ONLY}`
 
 // harness/triage.py's key(): what a suppression names. Its tests are the rule's reference.
 const mutantName = m => m.split('__mutmut_')[0]

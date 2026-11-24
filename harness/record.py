@@ -17,6 +17,7 @@ here, never instructions.
     uv run python harness/record.py harness/runs/<date>-tests <the workflow's output file>
 """
 
+import argparse
 import json
 import sys
 from collections.abc import Sequence
@@ -158,5 +159,11 @@ def main(run: Path, output: Path, scanner: Sequence[str] = SCANNER) -> int:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("run", type=Path, help="the run directory")
+    parser.add_argument("output", type=Path, help="the workflow's output file")
+    a = parser.parse_args()
     build_scanner()
-    sys.exit(main(Path(sys.argv[1]), Path(sys.argv[2])))
+    sys.exit(main(a.run, a.output))

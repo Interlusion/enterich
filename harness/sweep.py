@@ -10,6 +10,7 @@ Deterministic; the agents' records are data here, never instructions.
     uv run python harness/sweep.py harness/runs/<date>-tests
 """
 
+import argparse
 import ast
 import json
 import re
@@ -26,7 +27,7 @@ except ModuleNotFoundError:  # run as a script: harness/ is the path's first ent
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
     from triage import key  # type: ignore[import-not-found, no-redef]
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = project.ROOT
 SRC = ROOT / project.SOURCES["code"]
 
 Records = list[dict[str, Any]]
@@ -168,7 +169,7 @@ def swept(
                     f"confirmed finding {found_key}: {found['claim']}"
                 ),
                 "evidence": (
-                    f"harness/sweep.py: survivors left to agents that change `{name}` as that "
+                    f"sweep.py: survivors left to agents that change `{name}` as that "
                     f"finding's mutants do ({found['location']}), named in no finding."
                 ),
                 "proposal": f"As for {found_key}: {found['proposal']}",
@@ -195,4 +196,8 @@ def main(run: Path, src: Path = SRC) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(Path(sys.argv[1])))
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("run", type=Path, help="the run directory")
+    sys.exit(main(parser.parse_args().run))

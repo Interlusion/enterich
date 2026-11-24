@@ -17,7 +17,7 @@ units_const = "PROMISES"
 units_arg = "promises"
 read_only_secret = '''
   'Write no secret into your answer, real or made up: say that one was planted and where, ' +
-  'never its value (harness/record.py refuses a result that holds one). ' +
+  'never its value (record.py refuses a result that holds one). ' +
 '''
 consts = ''
 finding_properties = '''
@@ -76,7 +76,7 @@ If refuted, "class" is drop.
 
 ${patternLines}
 
-If confirmed, "test_files" names where the test that closes the finding belongs: the test module where tests of this behaviour live now (${B.test_homes}), with any test helper the fix must change too. Usually that is one file. The fix stage gives each test file to one branch (harness/plan.py), so name what the fix will change, not every file you read. If refuted, []. ${READ_ONLY}
+If confirmed, "test_files" names where the test that closes the finding belongs: the test module where tests of this behaviour live now (${B.test_homes}), with any test helper the fix must change too. Usually that is one file. The fix stage gives each test file to one branch (plan.py), so name what the fix will change, not every file you read. If refuted, []. ${READ_ONLY}
 '''
 items = "const items = PROMISES.map(promise => ({ label: `promise:${promise}`, promise }))"
 item_field = "promise"

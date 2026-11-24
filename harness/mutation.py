@@ -11,6 +11,7 @@ anywhere else (a name, a format, a header, a result's text) is left to the agent
     uv run --group harness python harness/mutation.py harness/runs/<date>-tests [--fresh]
 """
 
+import argparse
 import ast
 import json
 import os
@@ -24,11 +25,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 try:
-    from harness.sweep import location
+    from harness.sweep import ROOT, location
 except ModuleNotFoundError:  # run as a script: harness/ is the path's first entry
-    from sweep import location  # type: ignore[import-not-found, no-redef]
+    from sweep import ROOT, location  # type: ignore[import-not-found, no-redef]
 
-ROOT = Path(__file__).resolve().parent.parent
 MUTMUT = [sys.executable, "-m", "mutmut"]
 STRING = re.compile(r'"(?:[^"\\\n]|\\.)*"|\'(?:[^\'\\\n]|\\.)*\'')
 CAST = re.compile(r'(?<![\w.])cast\("[^"]*",')
@@ -189,4 +189,10 @@ def main(run: Path, fresh: bool) -> None:
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]), "--fresh" in sys.argv[2:])
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("run", type=Path, help="the run directory")
+    parser.add_argument("--fresh", action="store_true", help="run every mutant again")
+    a = parser.parse_args()
+    main(a.run, a.fresh)

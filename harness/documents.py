@@ -13,6 +13,7 @@ surveys those. Deterministic and read-only; writes to the run directory given.
     uv run python harness/documents.py harness/runs/<date>-docs [--since <commit>]
 """
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -26,8 +27,8 @@ except ModuleNotFoundError:  # run as a script: harness/ is the path's first ent
     import surface  # type: ignore[import-not-found, no-redef]
     from jsonl import read as _records  # type: ignore[import-not-found, no-redef]
 
-ROOT = Path(__file__).resolve().parent.parent
-DOCUMENTS = ROOT / "harness" / "documents.jsonl"
+ROOT = project.ROOT
+DOCUMENTS = project.CHILD / "documents.jsonl"
 # The documents that say what Enterich does; the backlog, the analyses and the changelog
 # keep what was true on their day
 SCOPE = project.strings(project.DOCS, "scope")
@@ -108,6 +109,10 @@ def main(run: Path, root: Path = ROOT, since: str | None = None) -> int:
 
 
 if __name__ == "__main__":
-    arguments = sys.argv[1:]
-    after = arguments[arguments.index("--since") + 1] if "--since" in arguments else None
-    sys.exit(main(Path(arguments[0]), since=after))
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("run", type=Path, help="the run directory")
+    parser.add_argument("--since", help="survey what changed after this commit")
+    a = parser.parse_args()
+    sys.exit(main(a.run, since=a.since))
