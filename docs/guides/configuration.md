@@ -65,7 +65,7 @@ Enterich neither creates nor checks the agent user's rights; ERPNext enforces th
 - **No hidden fields:** don't raise the permission level of a field Enterich returns above the agent's role, and don't mask it. Enterich refuses a list without the field, but a get returns it as empty, and a masked value as a placeholder such as `XXXXXXXX`.
 - **Inherited rights:** ERPNext gives every desk user the roles All and Desk User as well. Their rights come on top of the agent's role: among others select on Item, Company, Currency and UOM, read and write on the addresses and contacts the user made, files, to-dos and tags. None of them posts or changes an accounting document.
 
-Adding a permission rule for a DocType in ERPNext replaces its standard rules with the site's own; copy the existing rules first.
+Adding a permission rule for a DocType in ERPNext replaces its standard rules with the site's own; copy the existing rules first. The copy doesn't follow ERPNext upgrades: a standard rule that a later version adds or changes doesn't reach the site. After each upgrade, compare the DocType's standard rules with the site's own.
 
 - **Reports:** a report operation also needs the agent's role on the report. A standard report can't be saved outside developer mode, so grant the role through Role Permission for Page and Report. Its list of roles replaces the report's own: enter the roles that use the report today as well, or they lose it.
 
